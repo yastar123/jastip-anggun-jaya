@@ -13,7 +13,20 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { LogOut, Package, LayoutDashboard, ScanLine, History, Users, FileText, Settings, UserPlus } from "lucide-react";
+import {
+  LogOut,
+  Package,
+  LayoutDashboard,
+  ScanLine,
+  History,
+  Users,
+  FileText,
+  Settings,
+  UserPlus,
+  Barcode,
+  FileSpreadsheet,
+  FileInput,
+} from "lucide-react";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -35,8 +48,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     admin: [
       { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
       { name: "Semua Paket", href: "/admin/packages", icon: Package },
-      { name: "Input Paket", href: "/admin/packages/new", icon: FileText },
-      { name: "Import Excel", href: "/admin/packages/import", icon: FileText },
+      { name: "Input Paket", href: "/admin/packages/new", icon: FileInput },
+      { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet },
+      { name: "Label Barcode", href: "/admin/barcode", icon: Barcode },
+      { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine },
     ],
     owner: [
       { name: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard },

@@ -19,6 +19,8 @@ import AdminPackages from "@/pages/admin/packages";
 import AdminPackagesNew from "@/pages/admin/packages-new";
 import AdminPackagesImport from "@/pages/admin/packages-import";
 import AdminPackagesDetail from "@/pages/admin/packages-detail";
+import AdminBarcode from "@/pages/admin/barcode";
+import AdminScan from "@/pages/admin/scan";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
@@ -112,6 +114,8 @@ function Router() {
       <Route path="/admin/packages/new">{(params) => <ProtectedRoute role="admin" component={AdminPackagesNew} params={params} />}</Route>
       <Route path="/admin/packages/import">{(params) => <ProtectedRoute role="admin" component={AdminPackagesImport} params={params} />}</Route>
       <Route path="/admin/packages/:id">{(params) => <ProtectedRoute role="admin" component={AdminPackagesDetail} params={params} />}</Route>
+      <Route path="/admin/barcode">{(params) => <ProtectedRoute role="admin" component={AdminBarcode} params={params} />}</Route>
+      <Route path="/admin/scan">{(params) => <ProtectedRoute role="admin" component={AdminScan} params={params} />}</Route>
 
       {/* Owner Routes */}
       <Route path="/owner/dashboard">{(params) => <ProtectedRoute role="owner" component={OwnerDashboard} params={params} />}</Route>

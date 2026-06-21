@@ -73,5 +73,10 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "html5-qrcode": "^2.3.8",
+    "jsbarcode": "^3.12.3",
+    "xlsx": "^0.18.5"
   }
 }

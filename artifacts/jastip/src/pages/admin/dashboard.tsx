@@ -1,14 +1,40 @@
-import { useGetDashboardSummary, useGetDashboardChart } from "@workspace/api-client-react";
+import { useGetDashboardSummary, useGetDashboardChart, useListPackages } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, PackageCheck, PackagePlus } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
+
+function formatRp(n: number | null | undefined) {
+  if (!n) return "-";
+  return `Rp ${Number(n).toLocaleString("id-ID")}`;
+}
+
+function formatDate(d: string | null | undefined) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const statusStyles: Record<string, string> = {
+  pending:   "bg-yellow-100 text-yellow-800",
+  transit:   "bg-blue-100 text-blue-800",
+  arrived:   "bg-green-100 text-green-800",
+  picked_up: "bg-gray-100 text-gray-700",
+  returned:  "bg-red-100 text-red-800",
+};
 
 export default function AdminDashboard() {
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
   const [period, setPeriod] = useState<"week" | "month" | "year">("week");
   const { data: chartData, isLoading: isChartLoading } = useGetDashboardChart({ period });
+  const { data: packages, isLoading: isPackagesLoading } = useListPackages();
+  const [, setLocation] = useLocation();
+
+  const recentPackages = [...(packages || [])]
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 10);
 
   if (isSummaryLoading) {
     return <div className="animate-pulse p-8">Memuat dashboard...</div>;
@@ -80,13 +106,82 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData || []}>
                   <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip wrapperClassName="text-sm" />
                   <Legend />
                   <Bar dataKey="incoming" name="Masuk" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="outgoing" name="Keluar" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Packages Table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Data Paket Terbaru</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">10 paket terakhir yang diinput admin</p>
+          </div>
+          <button
+            onClick={() => setLocation("/admin/packages")}
+            className="text-sm text-primary hover:underline font-medium"
+          >
+            Lihat semua →
+          </button>
+        </CardHeader>
+        <CardContent>
+          {isPackagesLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-10 bg-muted/40 rounded animate-pulse" />
+              ))}
+            </div>
+          ) : recentPackages.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
+              <p className="text-sm">Belum ada data paket</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/60">
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Tanggal</th>
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">No Resi</th>
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">No Paket</th>
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">No Konsumen</th>
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total Berat</th>
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total Ongkir</th>
+                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentPackages.map((pkg: any, i) => (
+                    <tr
+                      key={pkg.id}
+                      className="border-b border-border/30 hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => setLocation(`/admin/packages/${pkg.id}`)}
+                    >
+                      <td className="py-3 px-2 text-muted-foreground whitespace-nowrap">{formatDate(pkg.createdAt)}</td>
+                      <td className="py-3 px-2 font-mono font-medium whitespace-nowrap">{pkg.resiNumber || "-"}</td>
+                      <td className="py-3 px-2 font-mono whitespace-nowrap">{pkg.packageNumber || "-"}</td>
+                      <td className="py-3 px-2 whitespace-nowrap">{pkg.customerPhone || pkg.customerName || "-"}</td>
+                      <td className="py-3 px-2 whitespace-nowrap">
+                        {pkg.usedWeight ? `${pkg.usedWeight} Kg` : (pkg.realWeight ? `${pkg.realWeight} Kg` : "-")}
+                      </td>
+                      <td className="py-3 px-2 font-semibold whitespace-nowrap">{formatRp(pkg.totalShipping)}</td>
+                      <td className="py-3 px-2">
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[pkg.status] || "bg-gray-100 text-gray-700"}`}>
+                          {pkg.status || "pending"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

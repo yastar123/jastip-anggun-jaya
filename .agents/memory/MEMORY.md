@@ -1,0 +1,1 @@
+- [Jastip JAJ project](jastip-project.md) — main working app is at artifacts/jastip (NOT jastip-app); password hash = SHA256(pw + "jaj_salt_2024")

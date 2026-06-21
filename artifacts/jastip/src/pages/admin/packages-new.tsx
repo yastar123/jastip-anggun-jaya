@@ -101,9 +101,9 @@ export default function AdminPackagesNew() {
       queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
       toast({
         title: "Berhasil",
-        description: "Paket baru berhasil ditambahkan",
+        description: "Paket baru berhasil ditambahkan. Barcode siap dicetak.",
       });
-      setLocation("/admin/packages");
+      setLocation("/admin/barcode");
     } catch (error: any) {
       toast({
         variant: "destructive",
