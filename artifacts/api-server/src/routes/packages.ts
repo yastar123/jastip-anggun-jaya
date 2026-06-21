@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, packagesTable, usersTable } from "@workspace/db";
-import { eq, and, gte, lte, or, ilike, inArray } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -17,6 +17,35 @@ function buildStatus(status: string | undefined) {
   return status as "pending" | "in_transit" | "ready" | "picked_up";
 }
 
+function toNum(val: any): number | null {
+  if (val === null || val === undefined) return null;
+  const n = Number(val);
+  return isNaN(n) ? null : n;
+}
+
+function formatPackage(pkg: any, customerMap: Map<number, any>, adminMap: Map<number, any>) {
+  return {
+    ...pkg,
+    weight: toNum(pkg.weight),
+    realWeight: toNum(pkg.realWeight),
+    length: toNum(pkg.length),
+    width: toNum(pkg.width),
+    height: toNum(pkg.height),
+    volumeWeight: toNum(pkg.volumeWeight),
+    usedWeight: toNum(pkg.usedWeight),
+    shippingRate: toNum(pkg.shippingRate),
+    totalWeight: toNum(pkg.totalWeight),
+    price: toNum(pkg.price),
+    totalShipping: toNum(pkg.totalShipping),
+    customerName: customerMap.get(pkg.customerId)?.name ?? "",
+    customerPhone: customerMap.get(pkg.customerId)?.phone ?? "",
+    adminName: pkg.adminId ? adminMap.get(pkg.adminId)?.name ?? null : null,
+    pickedUpAt: pkg.pickedUpAt?.toISOString() ?? null,
+    createdAt: pkg.createdAt.toISOString(),
+    updatedAt: pkg.updatedAt.toISOString(),
+  };
+}
+
 // GET /api/packages
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -30,12 +59,7 @@ router.get("/", requireAuth, async (req, res) => {
 
     let rows = await db.select().from(packagesTable).orderBy(packagesTable.createdAt);
 
-    // Filter by role
-    if (user.role === "customer") {
-      rows = rows.filter(p => p.customerId === user.id);
-    }
-
-    // Filters
+    if (user.role === "customer") rows = rows.filter(p => p.customerId === user.id);
     if (status) rows = rows.filter(p => p.status === status);
     if (customerId) rows = rows.filter(p => p.customerId === Number(customerId));
     if (adminId) rows = rows.filter(p => p.adminId === Number(adminId));
@@ -46,22 +70,12 @@ router.get("/", requireAuth, async (req, res) => {
       rows = rows.filter(p =>
         p.resiNumber.toLowerCase().includes(s) ||
         p.itemName.toLowerCase().includes(s) ||
-        p.barcode.toLowerCase().includes(s)
+        p.barcode.toLowerCase().includes(s) ||
+        (p.packageNumber ?? "").toLowerCase().includes(s)
       );
     }
 
-    const result = rows.map(p => ({
-      ...p,
-      weight: p.weight ? Number(p.weight) : null,
-      customerName: customerMap.get(p.customerId)?.name ?? "",
-      customerPhone: customerMap.get(p.customerId)?.phone ?? "",
-      adminName: p.adminId ? adminMap.get(p.adminId)?.name ?? null : null,
-      pickedUpAt: p.pickedUpAt?.toISOString() ?? null,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    }));
-
-    res.json(result);
+    res.json(rows.map(p => formatPackage(p, customerMap, adminMap)));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -72,35 +86,59 @@ router.get("/", requireAuth, async (req, res) => {
 router.post("/", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
     const user = (req as any).user;
-    const { resiNumber, itemName, weight, notes, customerId } = req.body;
+    const {
+      resiNumber, packageNumber, itemName,
+      realWeight, length, width, height,
+      packagingType, shippingRate, totalWeight, price,
+      weight, notes, customerId
+    } = req.body;
+
     if (!resiNumber || !itemName || !customerId) {
       res.status(400).json({ error: "resiNumber, itemName, customerId required" });
       return;
     }
+
+    // Auto-calculate volumeWeight and usedWeight
+    let volumeWeight: number | null = null;
+    if (length && width && height) {
+      volumeWeight = (Number(length) * Number(width) * Number(height)) / 6000;
+    }
+    const effectiveRealWeight = realWeight ? Number(realWeight) : null;
+    const usedWeight = effectiveRealWeight !== null && volumeWeight !== null
+      ? Math.max(effectiveRealWeight, volumeWeight)
+      : effectiveRealWeight ?? volumeWeight;
+    const totalShipping = usedWeight && shippingRate ? usedWeight * Number(shippingRate) : null;
+
     const barcode = generateBarcode();
     const inserted = await db.insert(packagesTable).values({
       barcode,
       resiNumber,
+      packageNumber: packageNumber || null,
       itemName,
+      realWeight: realWeight ? String(realWeight) : null,
+      length: length ? String(length) : null,
+      width: width ? String(width) : null,
+      height: height ? String(height) : null,
+      volumeWeight: volumeWeight !== null ? String(volumeWeight) : null,
+      packagingType: packagingType || null,
+      usedWeight: usedWeight !== null ? String(usedWeight) : null,
+      shippingRate: shippingRate ? String(shippingRate) : null,
+      totalWeight: totalWeight ? String(totalWeight) : null,
+      price: price ? String(price) : null,
+      totalShipping: totalShipping !== null ? String(totalShipping) : null,
       weight: weight ? String(weight) : null,
       notes: notes || null,
       status: "ready",
       customerId: Number(customerId),
       adminId: user.role === "admin" ? user.id : null,
     }).returning();
-    const pkg = inserted[0];
 
+    const pkg = inserted[0];
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
-    res.status(201).json({
-      ...pkg,
-      weight: pkg.weight ? Number(pkg.weight) : null,
-      customerName: customer[0]?.name ?? "",
-      customerPhone: customer[0]?.phone ?? "",
-      adminName: null,
-      pickedUpAt: null,
-      createdAt: pkg.createdAt.toISOString(),
-      updatedAt: pkg.updatedAt.toISOString(),
-    });
+    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
+    const adminMap = new Map<number, any>();
+
+    res.status(201).json(formatPackage(pkg, customerMap, adminMap));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -183,19 +221,13 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
     }
 
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
+    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
+    const adminMap = new Map<number, any>();
+
     res.json({
       valid: true,
       message: "Paket valid dan siap diambil",
-      package: {
-        ...pkg,
-        weight: pkg.weight ? Number(pkg.weight) : null,
-        customerName: customer[0]?.name ?? "",
-        customerPhone: customer[0]?.phone ?? "",
-        adminName: null,
-        pickedUpAt: null,
-        createdAt: pkg.createdAt.toISOString(),
-        updatedAt: pkg.updatedAt.toISOString(),
-      },
+      package: formatPackage(pkg, customerMap, adminMap),
     });
   } catch (err) {
     req.log.error(err);
@@ -212,21 +244,15 @@ router.get("/:id", requireAuth, async (req, res) => {
     if (!pkg) { res.status(404).json({ error: "Not found" }); return; }
 
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
-    let adminName = null;
+    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
+    const adminMap = new Map<number, any>();
+
     if (pkg.adminId) {
       const admin = await db.select().from(usersTable).where(eq(usersTable.id, pkg.adminId)).limit(1);
-      adminName = admin[0]?.name ?? null;
+      if (admin[0]) adminMap.set(admin[0].id, admin[0]);
     }
-    res.json({
-      ...pkg,
-      weight: pkg.weight ? Number(pkg.weight) : null,
-      customerName: customer[0]?.name ?? "",
-      customerPhone: customer[0]?.phone ?? "",
-      adminName,
-      pickedUpAt: pkg.pickedUpAt?.toISOString() ?? null,
-      createdAt: pkg.createdAt.toISOString(),
-      updatedAt: pkg.updatedAt.toISOString(),
-    });
+
+    res.json(formatPackage(pkg, customerMap, adminMap));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -246,16 +272,9 @@ router.patch("/:id", requireAuth, requireRole("admin", "owner"), async (req, res
     const pkg = updated[0];
     if (!pkg) { res.status(404).json({ error: "Not found" }); return; }
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
-    res.json({
-      ...pkg,
-      weight: pkg.weight ? Number(pkg.weight) : null,
-      customerName: customer[0]?.name ?? "",
-      customerPhone: customer[0]?.phone ?? "",
-      adminName: null,
-      pickedUpAt: pkg.pickedUpAt?.toISOString() ?? null,
-      createdAt: pkg.createdAt.toISOString(),
-      updatedAt: pkg.updatedAt.toISOString(),
-    });
+    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
+    const adminMap = new Map<number, any>();
+    res.json(formatPackage(pkg, customerMap, adminMap));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -270,16 +289,9 @@ router.post("/:id/confirm-pickup", requireAuth, requireRole("admin", "owner"), a
     const pkg = updated[0];
     if (!pkg) { res.status(404).json({ error: "Not found" }); return; }
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
-    res.json({
-      ...pkg,
-      weight: pkg.weight ? Number(pkg.weight) : null,
-      customerName: customer[0]?.name ?? "",
-      customerPhone: customer[0]?.phone ?? "",
-      adminName: null,
-      pickedUpAt: pkg.pickedUpAt?.toISOString() ?? null,
-      createdAt: pkg.createdAt.toISOString(),
-      updatedAt: pkg.updatedAt.toISOString(),
-    });
+    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
+    const adminMap = new Map<number, any>();
+    res.json(formatPackage(pkg, customerMap, adminMap));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });

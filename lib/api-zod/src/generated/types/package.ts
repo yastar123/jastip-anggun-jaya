@@ -11,7 +11,31 @@ export interface Package {
   id: number;
   barcode: string;
   resiNumber: string;
+  /** @nullable */
+  packageNumber?: string | null;
   itemName: string;
+  /** @nullable */
+  realWeight?: number | null;
+  /** @nullable */
+  length?: number | null;
+  /** @nullable */
+  width?: number | null;
+  /** @nullable */
+  height?: number | null;
+  /** @nullable */
+  volumeWeight?: number | null;
+  /** @nullable */
+  packagingType?: string | null;
+  /** @nullable */
+  usedWeight?: number | null;
+  /** @nullable */
+  shippingRate?: number | null;
+  /** @nullable */
+  totalWeight?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  totalShipping?: number | null;
   /** @nullable */
   weight?: number | null;
   /** @nullable */

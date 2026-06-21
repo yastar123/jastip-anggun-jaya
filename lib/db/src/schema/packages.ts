@@ -7,7 +7,29 @@ export const packagesTable = pgTable("packages", {
   id: serial("id").primaryKey(),
   barcode: text("barcode").notNull().unique(),
   resiNumber: text("resi_number").notNull(),
+  packageNumber: text("package_number"),
   itemName: text("item_name").notNull(),
+  // Berat Real Kg
+  realWeight: numeric("real_weight", { precision: 10, scale: 2 }),
+  // Dimensi (cm)
+  length: numeric("length", { precision: 10, scale: 2 }),
+  width: numeric("width", { precision: 10, scale: 2 }),
+  height: numeric("height", { precision: 10, scale: 2 }),
+  // Berat Volume = P x L x T / 6000
+  volumeWeight: numeric("volume_weight", { precision: 10, scale: 2 }),
+  // Jenis Paking
+  packagingType: text("packaging_type"),
+  // Berat Yang Digunakan = MAX(realWeight, volumeWeight)
+  usedWeight: numeric("used_weight", { precision: 10, scale: 2 }),
+  // Ongkir Per Kg
+  shippingRate: numeric("shipping_rate", { precision: 15, scale: 2 }),
+  // Total Berat (semua paket konsumen)
+  totalWeight: numeric("total_weight", { precision: 10, scale: 2 }),
+  // Harga barang
+  price: numeric("price", { precision: 15, scale: 2 }),
+  // Total Ongkir = usedWeight * shippingRate
+  totalShipping: numeric("total_shipping", { precision: 15, scale: 2 }),
+  // Legacy weight (kept for backward compat)
   weight: numeric("weight", { precision: 10, scale: 2 }),
   notes: text("notes"),
   status: text("status", { enum: ["pending", "in_transit", "ready", "picked_up"] }).notNull().default("ready"),

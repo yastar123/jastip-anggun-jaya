@@ -570,8 +570,32 @@ components:
           type: string
         resiNumber:
           type: string
+        packageNumber:
+          type: ["string", "null"]
         itemName:
           type: string
+        realWeight:
+          type: ["number", "null"]
+        length:
+          type: ["number", "null"]
+        width:
+          type: ["number", "null"]
+        height:
+          type: ["number", "null"]
+        volumeWeight:
+          type: ["number", "null"]
+        packagingType:
+          type: ["string", "null"]
+        usedWeight:
+          type: ["number", "null"]
+        shippingRate:
+          type: ["number", "null"]
+        totalWeight:
+          type: ["number", "null"]
+        price:
+          type: ["number", "null"]
+        totalShipping:
+          type: ["number", "null"]
         weight:
           type: ["number", "null"]
         notes:
@@ -602,8 +626,32 @@ components:
       properties:
         resiNumber:
           type: string
+        packageNumber:
+          type: ["string", "null"]
         itemName:
           type: string
+        realWeight:
+          type: ["number", "null"]
+        length:
+          type: ["number", "null"]
+        width:
+          type: ["number", "null"]
+        height:
+          type: ["number", "null"]
+        volumeWeight:
+          type: ["number", "null"]
+        packagingType:
+          type: ["string", "null"]
+        usedWeight:
+          type: ["number", "null"]
+        shippingRate:
+          type: ["number", "null"]
+        totalWeight:
+          type: ["number", "null"]
+        price:
+          type: ["number", "null"]
+        totalShipping:
+          type: ["number", "null"]
         weight:
           type: ["number", "null"]
         notes:

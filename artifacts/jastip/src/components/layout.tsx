@@ -1,6 +1,7 @@
 import { useAuth } from "@/lib/auth";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import logoImg from "/logo.png";
 import {
   Sidebar,
   SidebarContent,
@@ -55,9 +56,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar className="border-r bg-sidebar">
           <SidebarHeader className="p-4 border-b border-border/50">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl">
-                J
-              </div>
+              <img src={logoImg} alt="Jastip Anggun Jaya" className="h-10 w-auto rounded" />
               <div className="flex flex-col">
                 <span className="font-bold tracking-tight text-primary leading-tight">JASTIP</span>
                 <span className="text-xs text-muted-foreground font-semibold leading-none">ANGGUN JAYA</span>
