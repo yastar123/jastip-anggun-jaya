@@ -1,0 +1,104 @@
+Kamu adalah seorang senior UI/UX designer dan full-stack developer berpengalaman. Tugasmu adalah melakukan audit menyeluruh dan peningkatan total pada website ini. Ikuti semua langkah di bawah secara berurutan dan menyeluruh:
+
+---
+
+## 1. AUDIT & PENINGKATAN UI/UX (LEVEL AWWWARDS)
+
+Tingkatkan tampilan visual website ini agar layak meraih penghargaan Awwwards dalam kategori "Site of the Day". Standar yang harus dipenuhi:
+
+- Terapkan desain modern dengan hierarki visual yang kuat, tipografi premium, dan sistem warna yang konsisten
+- Gunakan micro-animation dan transisi halus (CSS/JS) untuk setiap interaksi pengguna
+- Pastikan whitespace, grid layout, dan spacing mengikuti prinsip desain kelas dunia
+- Tambahkan efek visual premium: parallax, scroll-triggered animation, hover effect yang elegan
+- Optimalkan estetika setiap halaman: hero section, navigation, card, button, form, footer
+- Gunakan prinsip "visual storytelling" agar pengguna terpandu secara alami melalui konten
+- Pastikan semua ilustrasi, ikon, dan gambar konsisten secara visual
+
+---
+
+## 2. RESPONSIVITAS PENUH DI SEMUA PERANGKAT
+
+Pastikan semua komponen website ini 100% responsif dan berfungsi sempurna di:
+
+- Mobile (320px – 480px)
+- Tablet (481px – 1024px)
+- Desktop (1025px – 1440px)
+- Large screen (1441px ke atas)
+
+Terapkan:
+- Fluid typography menggunakan clamp() atau vw units
+- Flexible grid dengan CSS Grid dan Flexbox
+- Breakpoint yang tepat untuk setiap komponen
+- Touch-friendly tap target minimal 44x44px di mobile
+- Navigation yang berubah menjadi mobile-friendly (hamburger menu, bottom nav, dll)
+- Gambar dan media menggunakan srcset atau lazy loading
+
+---
+
+## 3. TESTING SEMUA FITUR & MENU
+
+Lakukan pengujian menyeluruh pada seluruh fitur dan menu website ini:
+
+- Klik dan uji setiap tautan navigasi — pastikan tidak ada broken link
+- Uji semua tombol (CTA, submit, toggle, dll) — pastikan trigger aksi yang benar
+- Uji semua form input: validasi, submit, error state, dan success state
+- Uji semua fitur interaktif: modal, dropdown, accordion, slider, tab, dll
+- Uji alur pengguna (user flow) dari awal hingga akhir di setiap halaman
+- Catat semua fitur yang tidak berfungsi dan tandai untuk diperbaiki
+
+---
+
+## 4. SELESAIKAN FITUR & MENU YANG BELUM LENGKAP
+
+Identifikasi dan selesaikan semua fitur atau halaman yang masih setengah jadi:
+
+- Halaman atau section yang masih berisi placeholder / lorem ipsum → ganti dengan konten yang relevan
+- Fitur yang sudah ada tampilan UI-nya tetapi belum ada fungsinya → implementasikan logikanya
+- Komponen yang belum terhubung ke data atau state → sambungkan dengan benar
+- Tombol atau menu yang belum memiliki aksi → tambahkan handler yang sesuai
+
+---
+
+## 5. TEMUKAN & PERBAIKI SEMUA BUG
+
+Lakukan pencarian bug secara sistematis dan perbaiki semua yang ditemukan:
+
+**Bug visual:**
+- Layout yang patah di resolusi tertentu
+- Overflow konten yang tidak disengaja
+- Z-index yang salah (elemen tertutup/tertimpa)
+- Font yang tidak load atau fallback yang buruk
+- Warna teks yang tidak kontras (aksesibilitas)
+
+**Bug fungsional:**
+- Event handler yang tidak berjalan atau duplikat
+- State management yang tidak sinkron
+- API call yang gagal atau tidak ditangani errornya
+- Conditional rendering yang salah
+- Memory leak atau re-render berlebihan
+
+**Bug performa:**
+- Asset yang tidak dioptimasi (gambar besar, script blocking)
+- Animasi yang menyebabkan layout thrashing
+- Komponen yang render ulang tanpa perlu
+
+---
+
+## FORMAT LAPORAN AKHIR
+
+Setelah semua langkah selesai, buat laporan ringkas dengan format:
+
+### ✅ Perubahan UI/UX yang diterapkan
+[daftar perubahan desain]
+
+### ✅ Komponen yang dibuat responsif
+[daftar komponen]
+
+### ✅ Fitur yang diperbaiki / diselesaikan
+[daftar fitur]
+
+### 🐛 Bug yang ditemukan dan diperbaiki
+[daftar bug beserta solusinya]
+
+### ⚠️ Catatan & rekomendasi tambahan
+[hal-hal yang perlu diperhatikan selanjutnya]
