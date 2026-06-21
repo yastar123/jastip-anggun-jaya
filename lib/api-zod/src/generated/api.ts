@@ -97,6 +97,7 @@ export const ListPackagesResponseItem = zod.object({
   "customerPhone": zod.string().optional(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
   "pickedUpAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -124,7 +125,8 @@ export const CreatePackageBody = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "customerId": zod.number()
+  "customerId": zod.number(),
+  "packageDate": zod.string().nullish()
 })
 
 
@@ -133,10 +135,22 @@ export const CreatePackageBody = zod.object({
  */
 export const ImportPackagesBody = zod.object({
   "packages": zod.array(zod.object({
+  "packageDate": zod.string().nullish(),
   "resiNumber": zod.string(),
-  "itemName": zod.string(),
-  "weight": zod.number().nullish(),
+  "packageNumber": zod.string().nullish(),
   "customerPhone": zod.string(),
+  "itemName": zod.string().nullish(),
+  "realWeight": zod.number().nullish(),
+  "length": zod.number().nullish(),
+  "width": zod.number().nullish(),
+  "height": zod.number().nullish(),
+  "volumeWeight": zod.number().nullish(),
+  "packagingType": zod.string().nullish(),
+  "usedWeight": zod.number().nullish(),
+  "shippingRate": zod.number().nullish(),
+  "totalWeight": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "totalShipping": zod.number().nullish(),
   "notes": zod.string().nullish()
 }))
 })
@@ -181,6 +195,7 @@ export const GetPackageResponse = zod.object({
   "customerPhone": zod.string().optional(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
   "pickedUpAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -224,6 +239,7 @@ export const UpdatePackageResponse = zod.object({
   "customerPhone": zod.string().optional(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
   "pickedUpAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -265,6 +281,7 @@ export const ScanPackageResponse = zod.object({
   "customerPhone": zod.string().optional(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
   "pickedUpAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
@@ -304,6 +321,7 @@ export const ConfirmPickupResponse = zod.object({
   "customerPhone": zod.string().optional(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
   "pickedUpAt": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()

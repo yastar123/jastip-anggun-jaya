@@ -3,19 +3,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/lib/auth";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import logoImg from "/logo.png";
+import { MapPin, Phone, Mail, CheckCircle } from "lucide-react";
 
 const loginSchema = z.object({
   phone: z.string().min(5, "Nomor HP harus diisi minimal 5 karakter"),
@@ -23,15 +17,22 @@ const loginSchema = z.object({
 });
 
 const demoAccounts = [
-  { label: "Admin", role: "admin", phone: "081200000001", password: "admin123", color: "bg-blue-500", desc: "Kelola paket & data" },
-  { label: "Customer", role: "customer", phone: "081200000010", password: "customer123", color: "bg-green-500", desc: "Lacak kiriman Anda" },
-  { label: "Owner", role: "owner", phone: "081200000000", password: "owner123", color: "bg-amber-500", desc: "Monitor bisnis" },
+  { label: "Admin", phone: "081200000001", password: "admin123", color: "bg-blue-500" },
+  { label: "Customer", phone: "081200000010", password: "customer123", color: "bg-green-500" },
+  { label: "Owner", phone: "081200000000", password: "owner123", color: "bg-amber-500" },
+];
+
+const services = [
+  "Jastip Cargo – hemat untuk paket besar",
+  "Jastip Hemat – lebih cepat, harga tetap terjangkau",
+  "Jastip Pelni – pengiriman kapal cepat",
+  "Jastip Pesawat – paling cepat",
+  "Jasa Belanja – gratis jasa",
 ];
 
 export default function Login() {
   const { login } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof loginSchema>>({
@@ -45,65 +46,85 @@ export default function Login() {
       await login(values);
       toast({ title: "Login berhasil", description: "Selamat datang kembali" });
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Login gagal",
-        description: error.message || "Nomor HP atau password salah",
-      });
+      toast({ variant: "destructive", title: "Login gagal", description: error.message || "Nomor HP atau password salah" });
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  function fillDemo(phone: string, password: string) {
-    form.setValue("phone", phone);
-    form.setValue("password", password);
-  }
-
   return (
     <div className="min-h-screen w-full flex">
-      {/* LEFT PANEL — branding */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative bg-red-700 flex-col items-center justify-center overflow-hidden">
-        {/* Decorative circles */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-red-600/60" />
-        <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-red-800/70" />
-        <div className="absolute top-1/3 right-10 w-48 h-48 rounded-full bg-red-500/40" />
+      {/* LEFT — Branding */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative bg-red-700 flex-col overflow-hidden">
+        {/* Decorative shapes */}
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-red-600/50" />
+        <div className="absolute -bottom-32 -right-32 w-[400px] h-[400px] rounded-full bg-red-800/60" />
+        <div className="absolute top-1/2 right-16 w-56 h-56 rounded-full bg-red-500/30" />
 
-        <div className="relative z-10 flex flex-col items-center text-center px-12 max-w-lg">
-          <img src={logoImg} alt="Jastip Anggun Jaya" className="h-40 w-auto mb-8 drop-shadow-2xl rounded-2xl" />
-          <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4">
-            Jastip Anggun Jaya
-          </h1>
-          <p className="text-red-100 text-lg xl:text-xl leading-relaxed mb-8">
-            Layanan jasa titip & ekspedisi terpercaya. Cepat, aman, dan terjangkau.
-          </p>
-          <div className="grid grid-cols-3 gap-4 w-full">
-            {[
-              { label: "Paket Terkirim", value: "10K+" },
-              { label: "Customer Puas", value: "5K+" },
-              { label: "Kota Terjangkau", value: "50+" },
-            ].map((s) => (
-              <div key={s.label} className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/20">
-                <div className="text-2xl font-bold text-white">{s.value}</div>
-                <div className="text-xs text-red-200 mt-1">{s.label}</div>
-              </div>
-            ))}
+        <div className="relative z-10 flex flex-col h-full px-12 py-12">
+          {/* Logo & Brand */}
+          <div className="flex items-center gap-4 mb-10">
+            <img src={logoImg} alt="Jastip Anggun Jaya" className="h-16 w-auto rounded-xl shadow-2xl" />
+            <div>
+              <h1 className="text-2xl font-extrabold text-white leading-tight">Jastip Anggun Jaya</h1>
+              <p className="text-red-200 text-sm mt-0.5">Aman • Terpercaya • Berpengalaman</p>
+            </div>
+          </div>
+
+          {/* Tagline */}
+          <div className="mb-8">
+            <p className="text-red-100 text-lg font-medium leading-relaxed">
+              Layanan pengiriman paket & kendaraan ke Papua
+            </p>
+            <p className="text-red-200 text-base mt-1 font-medium">
+              Jakarta • Surabaya • Makassar → <span className="text-white font-bold">Manokwari</span>
+            </p>
+          </div>
+
+          {/* Services */}
+          <div className="mb-10 flex-1">
+            <p className="text-red-200 text-xs font-semibold uppercase tracking-widest mb-4">Layanan Kami</p>
+            <div className="space-y-3">
+              {services.map((s, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <CheckCircle className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+                  <span className="text-white text-sm leading-snug">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div className="border-t border-red-600/60 pt-6 space-y-2">
+            <div className="flex items-center gap-2.5 text-red-100 text-sm">
+              <MapPin className="w-4 h-4 text-red-300 shrink-0" />
+              <span>Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-red-100 text-sm">
+              <Phone className="w-4 h-4 text-red-300 shrink-0" />
+              <span>+62 812-4500-8384</span>
+            </div>
+            <div className="flex items-center gap-2.5 text-red-100 text-sm">
+              <Mail className="w-4 h-4 text-red-300 shrink-0" />
+              <span>jastipanggunjaya@gmail.com</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* RIGHT PANEL — login form */}
+      {/* RIGHT — Login Form */}
       <div className="w-full lg:w-1/2 xl:w-2/5 flex flex-col items-center justify-center bg-white px-6 py-12 overflow-y-auto">
         {/* Mobile logo */}
         <div className="flex flex-col items-center mb-6 lg:hidden">
           <img src={logoImg} alt="Jastip Anggun Jaya" className="h-20 w-auto mb-2 rounded-xl" />
-          <p className="text-muted-foreground text-sm">Jastip Anggun Jaya</p>
+          <p className="text-base font-bold text-gray-900">Jastip Anggun Jaya</p>
+          <p className="text-xs text-muted-foreground">Layanan pengiriman paket ke Papua</p>
         </div>
 
         <div className="w-full max-w-sm">
-          <div className="mb-8">
+          <div className="mb-7">
             <h2 className="text-3xl font-bold text-gray-900">Selamat Datang</h2>
-            <p className="text-muted-foreground mt-1">Masuk ke akun Anda untuk melanjutkan</p>
+            <p className="text-muted-foreground mt-1 text-sm">Masuk ke akun Anda untuk melanjutkan</p>
           </div>
 
           {/* Demo accounts */}
@@ -114,10 +135,10 @@ export default function Login() {
             <div className="grid grid-cols-3 gap-2">
               {demoAccounts.map((acc) => (
                 <button
-                  key={acc.role}
+                  key={acc.label}
                   type="button"
-                  onClick={() => fillDemo(acc.phone, acc.password)}
-                  className="flex flex-col items-start p-2.5 rounded-lg border bg-white hover:bg-gray-50 hover:border-red-300 transition-all text-left shadow-sm group"
+                  onClick={() => { form.setValue("phone", acc.phone); form.setValue("password", acc.password); }}
+                  className="flex flex-col items-start p-2.5 rounded-lg border bg-white hover:bg-gray-50 hover:border-red-300 transition-all text-left shadow-sm"
                 >
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className={`w-2 h-2 rounded-full ${acc.color}`} />
@@ -139,11 +160,7 @@ export default function Login() {
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Nomor HP</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="0812xxxx"
-                        className="h-11 border-gray-300 focus:border-red-500 focus:ring-red-500"
-                        {...field}
-                      />
+                      <Input placeholder="0812xxxx" className="h-11" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -156,22 +173,13 @@ export default function Login() {
                   <FormItem>
                     <FormLabel className="text-gray-700 font-medium">Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        className="h-11 border-gray-300 focus:border-red-500 focus:ring-red-500"
-                        {...field}
-                      />
+                      <Input type="password" placeholder="••••••••" className="h-11" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button
-                type="submit"
-                className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-semibold text-base shadow-md hover:shadow-lg transition-all"
-                disabled={isSubmitting}
-              >
+              <Button type="submit" className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-semibold text-base shadow-md" disabled={isSubmitting}>
                 {isSubmitting ? "Memproses..." : "Masuk"}
               </Button>
             </form>

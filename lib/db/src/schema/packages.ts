@@ -35,6 +35,7 @@ export const packagesTable = pgTable("packages", {
   status: text("status", { enum: ["pending", "in_transit", "ready", "picked_up"] }).notNull().default("ready"),
   customerId: integer("customer_id").notNull().references(() => usersTable.id),
   adminId: integer("admin_id").references(() => usersTable.id),
+  packageDate: timestamp("package_date", { withTimezone: true }),
   pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

@@ -99,6 +99,8 @@ export interface Package {
   /** @nullable */
   adminName?: string | null;
   /** @nullable */
+  packageDate?: string | null;
+  /** @nullable */
   pickedUpAt?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -136,6 +138,8 @@ export interface PackageInput {
   /** @nullable */
   notes?: string | null;
   customerId: number;
+  /** @nullable */
+  packageDate?: string | null;
 }
 
 export type PackageUpdateStatus = typeof PackageUpdateStatus[keyof typeof PackageUpdateStatus];
@@ -155,11 +159,36 @@ export interface PackageUpdate {
 }
 
 export interface PackageRow {
-  resiNumber: string;
-  itemName: string;
   /** @nullable */
-  weight?: number | null;
+  packageDate?: string | null;
+  resiNumber: string;
+  /** @nullable */
+  packageNumber?: string | null;
   customerPhone: string;
+  /** @nullable */
+  itemName?: string | null;
+  /** @nullable */
+  realWeight?: number | null;
+  /** @nullable */
+  length?: number | null;
+  /** @nullable */
+  width?: number | null;
+  /** @nullable */
+  height?: number | null;
+  /** @nullable */
+  volumeWeight?: number | null;
+  /** @nullable */
+  packagingType?: string | null;
+  /** @nullable */
+  usedWeight?: number | null;
+  /** @nullable */
+  shippingRate?: number | null;
+  /** @nullable */
+  totalWeight?: number | null;
+  /** @nullable */
+  price?: number | null;
+  /** @nullable */
+  totalShipping?: number | null;
   /** @nullable */
   notes?: string | null;
 }

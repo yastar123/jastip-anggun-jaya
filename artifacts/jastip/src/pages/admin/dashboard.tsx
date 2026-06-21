@@ -1,11 +1,11 @@
 import { useGetDashboardSummary, useGetDashboardChart, useListPackages } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, PackageCheck, PackagePlus } from "lucide-react";
+import { Package, PackageCheck, PackagePlus, ClipboardList } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 
 function formatRp(n: number | null | undefined) {
   if (!n) return "-";
@@ -19,26 +19,25 @@ function formatDate(d: string | null | undefined) {
 
 const statusStyles: Record<string, string> = {
   pending:   "bg-yellow-100 text-yellow-800",
-  transit:   "bg-blue-100 text-blue-800",
-  arrived:   "bg-green-100 text-green-800",
+  in_transit:"bg-blue-100 text-blue-800",
+  ready:     "bg-green-100 text-green-800",
   picked_up: "bg-gray-100 text-gray-700",
-  returned:  "bg-red-100 text-red-800",
 };
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
   const [period, setPeriod] = useState<"week" | "month" | "year">("week");
   const { data: chartData, isLoading: isChartLoading } = useGetDashboardChart({ period });
-  const { data: packages, isLoading: isPackagesLoading } = useListPackages();
+  const { data: allPackages, isLoading: isPackagesLoading } = useListPackages();
   const [, setLocation] = useLocation();
 
-  const recentPackages = [...(packages || [])]
+  const myPackages = (allPackages || []).filter((p: any) => p.adminId === user?.id);
+  const recentPackages = [...(allPackages || [])]
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 10);
 
-  if (isSummaryLoading) {
-    return <div className="animate-pulse p-8">Memuat dashboard...</div>;
-  }
+  if (isSummaryLoading) return <div className="animate-pulse p-8">Memuat dashboard...</div>;
 
   return (
     <div className="space-y-6">
@@ -47,7 +46,7 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground mt-1">Ringkasan operasional Jastip Anggun Jaya.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Paket</CardTitle>
@@ -56,6 +55,17 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-3xl font-bold">{summary?.totalPackages || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Semua paket dalam sistem</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Paket Saya</CardTitle>
+            <ClipboardList className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{myPackages.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">Paket yang saya input</p>
           </CardContent>
         </Card>
 
@@ -98,19 +108,17 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           {isChartLoading ? (
-            <div className="h-[300px] w-full flex items-center justify-center text-muted-foreground">
-              Memuat grafik...
-            </div>
+            <div className="h-[260px] w-full flex items-center justify-center text-muted-foreground">Memuat grafik...</div>
           ) : (
-            <div className="h-[300px] w-full mt-4">
+            <div className="h-[260px] w-full mt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData || []}>
                   <XAxis dataKey="date" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip wrapperClassName="text-sm" />
                   <Legend />
-                  <Bar dataKey="incoming" name="Masuk" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="outgoing" name="Keluar" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="incoming" name="Masuk" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
+                  <Bar dataKey="outgoing" name="Keluar" fill="hsl(var(--secondary))" radius={[4,4,0,0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -123,60 +131,40 @@ export default function AdminDashboard() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Data Paket Terbaru</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">10 paket terakhir yang diinput admin</p>
+            <p className="text-sm text-muted-foreground mt-1">10 paket terakhir yang diinput</p>
           </div>
-          <button
-            onClick={() => setLocation("/admin/packages")}
-            className="text-sm text-primary hover:underline font-medium"
-          >
+          <button onClick={() => setLocation("/admin/packages")} className="text-sm text-primary hover:underline font-medium">
             Lihat semua →
           </button>
         </CardHeader>
         <CardContent>
           {isPackagesLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-10 bg-muted/40 rounded animate-pulse" />
-              ))}
-            </div>
+            <div className="space-y-3">{Array.from({length:4}).map((_,i)=><div key={i} className="h-10 bg-muted/40 rounded animate-pulse"/>)}</div>
           ) : recentPackages.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              <Package className="w-10 h-10 mx-auto mb-2 opacity-20" />
-              <p className="text-sm">Belum ada data paket</p>
+              <Package className="w-10 h-10 mx-auto mb-2 opacity-20"/><p className="text-sm">Belum ada data paket</p>
             </div>
           ) : (
             <div className="overflow-x-auto -mx-6 px-6">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border/60">
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Tanggal</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">No Resi</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">No Paket</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">No Konsumen</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total Berat</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total Ongkir</th>
-                    <th className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Status</th>
+                    {["Tanggal","No Resi","No Paket","Nama Konsumen","Total Berat","Total Ongkir","Status"].map(h=>(
+                      <th key={h} className="text-left py-3 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {recentPackages.map((pkg: any, i) => (
-                    <tr
-                      key={pkg.id}
-                      className="border-b border-border/30 hover:bg-muted/30 cursor-pointer transition-colors"
-                      onClick={() => setLocation(`/admin/packages/${pkg.id}`)}
-                    >
-                      <td className="py-3 px-2 text-muted-foreground whitespace-nowrap">{formatDate(pkg.createdAt)}</td>
-                      <td className="py-3 px-2 font-mono font-medium whitespace-nowrap">{pkg.resiNumber || "-"}</td>
-                      <td className="py-3 px-2 font-mono whitespace-nowrap">{pkg.packageNumber || "-"}</td>
-                      <td className="py-3 px-2 whitespace-nowrap">{pkg.customerPhone || pkg.customerName || "-"}</td>
-                      <td className="py-3 px-2 whitespace-nowrap">
-                        {pkg.usedWeight ? `${pkg.usedWeight} Kg` : (pkg.realWeight ? `${pkg.realWeight} Kg` : "-")}
-                      </td>
+                  {recentPackages.map((pkg:any) => (
+                    <tr key={pkg.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer transition-colors" onClick={()=>setLocation(`/admin/packages/${pkg.id}`)}>
+                      <td className="py-3 px-2 text-muted-foreground whitespace-nowrap">{formatDate(pkg.packageDate || pkg.createdAt)}</td>
+                      <td className="py-3 px-2 font-mono font-medium whitespace-nowrap">{pkg.resiNumber||"-"}</td>
+                      <td className="py-3 px-2 font-mono whitespace-nowrap">{pkg.packageNumber||"-"}</td>
+                      <td className="py-3 px-2 whitespace-nowrap">{pkg.customerName||"-"}</td>
+                      <td className="py-3 px-2 whitespace-nowrap">{pkg.usedWeight?`${pkg.usedWeight} Kg`:(pkg.realWeight?`${pkg.realWeight} Kg`:"-")}</td>
                       <td className="py-3 px-2 font-semibold whitespace-nowrap">{formatRp(pkg.totalShipping)}</td>
                       <td className="py-3 px-2">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[pkg.status] || "bg-gray-100 text-gray-700"}`}>
-                          {pkg.status || "pending"}
-                        </span>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusStyles[pkg.status]||"bg-gray-100 text-gray-700"}`}>{pkg.status||"pending"}</span>
                       </td>
                     </tr>
                   ))}

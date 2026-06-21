@@ -613,6 +613,8 @@ components:
           type: ["integer", "null"]
         adminName:
           type: ["string", "null"]
+        packageDate:
+          type: ["string", "null"]
         pickedUpAt:
           type: ["string", "null"]
         createdAt:
@@ -658,6 +660,8 @@ components:
           type: ["string", "null"]
         customerId:
           type: integer
+        packageDate:
+          type: ["string", "null"]
 
     PackageUpdate:
       type: object
@@ -679,16 +683,40 @@ components:
 
     PackageRow:
       type: object
-      required: [resiNumber, itemName, customerPhone]
+      required: [resiNumber, customerPhone]
       properties:
+        packageDate:
+          type: ["string", "null"]
         resiNumber:
           type: string
-        itemName:
-          type: string
-        weight:
-          type: ["number", "null"]
+        packageNumber:
+          type: ["string", "null"]
         customerPhone:
           type: string
+        itemName:
+          type: ["string", "null"]
+        realWeight:
+          type: ["number", "null"]
+        length:
+          type: ["number", "null"]
+        width:
+          type: ["number", "null"]
+        height:
+          type: ["number", "null"]
+        volumeWeight:
+          type: ["number", "null"]
+        packagingType:
+          type: ["string", "null"]
+        usedWeight:
+          type: ["number", "null"]
+        shippingRate:
+          type: ["number", "null"]
+        totalWeight:
+          type: ["number", "null"]
+        price:
+          type: ["number", "null"]
+        totalShipping:
+          type: ["number", "null"]
         notes:
           type: ["string", "null"]
 

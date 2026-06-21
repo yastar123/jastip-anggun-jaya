@@ -38,4 +38,6 @@ export interface PackageInput {
   /** @nullable */
   notes?: string | null;
   customerId: number;
+  /** @nullable */
+  packageDate?: string | null;
 }

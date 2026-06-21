@@ -12,11 +12,6 @@ function generateBarcode(): string {
   return `JAJ-${ts}-${rnd}`;
 }
 
-function buildStatus(status: string | undefined) {
-  if (!status || status === "all") return undefined;
-  return status as "pending" | "in_transit" | "ready" | "picked_up";
-}
-
 function toNum(val: any): number | null {
   if (val === null || val === undefined) return null;
   const n = Number(val);
@@ -40,6 +35,7 @@ function formatPackage(pkg: any, customerMap: Map<number, any>, adminMap: Map<nu
     customerName: customerMap.get(pkg.customerId)?.name ?? "",
     customerPhone: customerMap.get(pkg.customerId)?.phone ?? "",
     adminName: pkg.adminId ? adminMap.get(pkg.adminId)?.name ?? null : null,
+    packageDate: pkg.packageDate?.toISOString() ?? null,
     pickedUpAt: pkg.pickedUpAt?.toISOString() ?? null,
     createdAt: pkg.createdAt.toISOString(),
     updatedAt: pkg.updatedAt.toISOString(),
@@ -90,11 +86,11 @@ router.post("/", requireAuth, requireRole("admin", "owner"), async (req, res) =>
       resiNumber, packageNumber, itemName,
       realWeight, length, width, height,
       packagingType, shippingRate, totalWeight, price,
-      weight, notes, customerId
+      weight, notes, customerId, packageDate
     } = req.body;
 
-    if (!resiNumber || !itemName || !customerId) {
-      res.status(400).json({ error: "resiNumber, itemName, customerId required" });
+    if (!resiNumber || !customerId) {
+      res.status(400).json({ error: "resiNumber, customerId required" });
       return;
     }
 
@@ -114,7 +110,7 @@ router.post("/", requireAuth, requireRole("admin", "owner"), async (req, res) =>
       barcode,
       resiNumber,
       packageNumber: packageNumber || null,
-      itemName,
+      itemName: itemName || resiNumber,
       realWeight: realWeight ? String(realWeight) : null,
       length: length ? String(length) : null,
       width: width ? String(width) : null,
@@ -130,13 +126,18 @@ router.post("/", requireAuth, requireRole("admin", "owner"), async (req, res) =>
       notes: notes || null,
       status: "ready",
       customerId: Number(customerId),
-      adminId: user.role === "admin" ? user.id : null,
+      adminId: user.id,
+      packageDate: packageDate ? new Date(packageDate) : new Date(),
     }).returning();
 
     const pkg = inserted[0];
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
     const customerMap = new Map([[customer[0]?.id, customer[0]]]);
     const adminMap = new Map<number, any>();
+    if (pkg.adminId) {
+      const admin = await db.select().from(usersTable).where(eq(usersTable.id, pkg.adminId)).limit(1);
+      if (admin[0]) adminMap.set(admin[0].id, admin[0]);
+    }
 
     res.status(201).json(formatPackage(pkg, customerMap, adminMap));
   } catch (err) {
@@ -159,28 +160,58 @@ router.post("/import", requireAuth, requireRole("admin", "owner"), async (req, r
 
     for (const row of rows) {
       try {
-        const { resiNumber, itemName, weight, customerPhone, notes } = row;
-        if (!resiNumber || !itemName || !customerPhone) {
+        const {
+          resiNumber, packageNumber, customerPhone, itemName,
+          realWeight, length, width, height,
+          packagingType, shippingRate, totalWeight, price,
+          notes, packageDate
+        } = row;
+
+        if (!resiNumber || !customerPhone) {
           failed++;
-          errors.push(`Row missing required fields: ${JSON.stringify(row)}`);
+          errors.push(`Row missing resiNumber or customerPhone: ${JSON.stringify(row)}`);
           continue;
         }
-        const customer = await db.select().from(usersTable).where(and(eq(usersTable.phone, customerPhone), eq(usersTable.role, "customer"))).limit(1);
+        const customer = await db.select().from(usersTable).where(and(eq(usersTable.phone, String(customerPhone)), eq(usersTable.role, "customer"))).limit(1);
         if (!customer[0]) {
           failed++;
           errors.push(`Customer not found for phone: ${customerPhone}`);
           continue;
         }
+
+        // Auto-calculate volumeWeight
+        let volumeWeight: number | null = null;
+        if (length && width && height) {
+          volumeWeight = (Number(length) * Number(width) * Number(height)) / 6000;
+        }
+        const effectiveRealWeight = realWeight ? Number(realWeight) : null;
+        const usedWeight = effectiveRealWeight !== null && volumeWeight !== null
+          ? Math.max(effectiveRealWeight, volumeWeight)
+          : effectiveRealWeight ?? volumeWeight;
+        const totalShipping = usedWeight && shippingRate ? usedWeight * Number(shippingRate) : null;
+
         const barcode = generateBarcode();
         await db.insert(packagesTable).values({
           barcode,
-          resiNumber,
-          itemName,
-          weight: weight ? String(weight) : null,
-          notes: notes || null,
+          resiNumber: String(resiNumber),
+          packageNumber: packageNumber ? String(packageNumber) : null,
+          itemName: itemName ? String(itemName) : String(resiNumber),
+          realWeight: realWeight ? String(realWeight) : null,
+          length: length ? String(length) : null,
+          width: width ? String(width) : null,
+          height: height ? String(height) : null,
+          volumeWeight: volumeWeight !== null ? String(volumeWeight) : null,
+          packagingType: packagingType ? String(packagingType) : null,
+          usedWeight: usedWeight !== null ? String(usedWeight) : null,
+          shippingRate: shippingRate ? String(shippingRate) : null,
+          totalWeight: totalWeight ? String(totalWeight) : null,
+          price: price ? String(price) : null,
+          totalShipping: totalShipping !== null ? String(totalShipping) : null,
+          notes: notes ? String(notes) : null,
           status: "ready",
           customerId: customer[0].id,
-          adminId: user.role === "admin" ? user.id : null,
+          adminId: user.id,
+          packageDate: packageDate ? new Date(String(packageDate)) : new Date(),
         });
         success++;
       } catch (e) {
@@ -203,32 +234,18 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
     const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.barcode, barcode)).limit(1);
     const pkg = pkgs[0];
 
-    if (!pkg) {
-      res.json({ valid: false, message: "Paket tidak ditemukan" });
-      return;
-    }
+    if (!pkg) { res.json({ valid: false, message: "Paket tidak ditemukan" }); return; }
     if (user.role === "customer" && pkg.customerId !== user.id) {
-      res.json({ valid: false, message: "Paket ini bukan milik Anda" });
-      return;
+      res.json({ valid: false, message: "Paket ini bukan milik Anda" }); return;
     }
-    if (pkg.status === "picked_up") {
-      res.json({ valid: false, message: "Paket sudah diambil sebelumnya" });
-      return;
-    }
-    if (pkg.status !== "ready") {
-      res.json({ valid: false, message: "Paket belum siap untuk diambil" });
-      return;
-    }
+    if (pkg.status === "picked_up") { res.json({ valid: false, message: "Paket sudah diambil sebelumnya" }); return; }
+    if (pkg.status !== "ready") { res.json({ valid: false, message: "Paket belum siap untuk diambil" }); return; }
 
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
     const customerMap = new Map([[customer[0]?.id, customer[0]]]);
     const adminMap = new Map<number, any>();
 
-    res.json({
-      valid: true,
-      message: "Paket valid dan siap diambil",
-      package: formatPackage(pkg, customerMap, adminMap),
-    });
+    res.json({ valid: true, message: "Paket valid dan siap diambil", package: formatPackage(pkg, customerMap, adminMap) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -306,13 +323,7 @@ router.get("/:id/barcode", requireAuth, async (req, res) => {
     const pkg = pkgs[0];
     if (!pkg) { res.status(404).json({ error: "Not found" }); return; }
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
-    res.json({
-      barcode: pkg.barcode,
-      packageId: pkg.id,
-      resiNumber: pkg.resiNumber,
-      itemName: pkg.itemName,
-      customerName: customer[0]?.name ?? "",
-    });
+    res.json({ barcode: pkg.barcode, packageId: pkg.id, resiNumber: pkg.resiNumber, itemName: pkg.itemName, customerName: customer[0]?.name ?? "" });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });

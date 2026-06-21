@@ -11,19 +11,24 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
+// Exact columns user requested — must match import backend keys
 const TEMPLATE_COLUMNS = [
-  { header: "No Resi", key: "resiNumber", example: "JNE-001" },
-  { header: "No Paket", key: "packageNumber", example: "PKT-001" },
-  { header: "No HP Customer", key: "customerPhone", example: "081234567890" },
-  { header: "Nama Barang", key: "itemName", example: "Sepatu" },
-  { header: "Berat Real (Kg)", key: "weight", example: "1.5" },
-  { header: "Panjang (cm)", key: "length", example: "30" },
-  { header: "Lebar (cm)", key: "width", example: "20" },
-  { header: "Tinggi (cm)", key: "height", example: "15" },
-  { header: "Jenis Paking", key: "packagingType", example: "karton" },
-  { header: "Ongkir/Kg (Rp)", key: "shippingRate", example: "50000" },
-  { header: "Harga (Rp)", key: "price", example: "150000" },
-  { header: "Catatan", key: "notes", example: "Fragile" },
+  { header: "Tanggal",             key: "packageDate",    example: "2025-06-21" },
+  { header: "No Resi",             key: "resiNumber",     example: "JNE-001" },
+  { header: "No Paket",            key: "packageNumber",  example: "PKT-001" },
+  { header: "No HP Customer",      key: "customerPhone",  example: "081234567890" },
+  { header: "Nama Barang",         key: "itemName",       example: "Sepatu" },
+  { header: "Berat Real Kg",       key: "realWeight",     example: "1.5" },
+  { header: "P (Panjang cm)",      key: "length",         example: "30" },
+  { header: "L (Lebar cm)",        key: "width",          example: "20" },
+  { header: "T (Tinggi cm)",       key: "height",         example: "15" },
+  { header: "Berat Volume",        key: "volumeWeight",   example: "(auto)" },
+  { header: "Jenis Paking",        key: "packagingType",  example: "karton" },
+  { header: "Berat Yang Digunakan",key: "usedWeight",     example: "(auto)" },
+  { header: "Ongkir Per Paket",    key: "shippingRate",   example: "50000" },
+  { header: "Total Berat",         key: "totalWeight",    example: "5" },
+  { header: "Harga",               key: "price",          example: "150000" },
+  { header: "Total Ongkir",        key: "totalShipping",  example: "(auto)" },
 ];
 
 function downloadTemplate() {
@@ -31,10 +36,10 @@ function downloadTemplate() {
     TEMPLATE_COLUMNS.map((c) => c.header),
     TEMPLATE_COLUMNS.map((c) => c.example),
   ]);
-  ws["!cols"] = TEMPLATE_COLUMNS.map(() => ({ wch: 18 }));
+  ws["!cols"] = TEMPLATE_COLUMNS.map(() => ({ wch: 20 }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Template Import Paket");
-  XLSX.writeFile(wb, "template-import-paket.xlsx");
+  XLSX.writeFile(wb, "template-import-paket-jaj.xlsx");
 }
 
 export default function AdminPackagesImport() {
@@ -72,7 +77,9 @@ export default function AdminPackagesImport() {
         const obj: Record<string, any> = {};
         headers.forEach((h, i) => {
           const col = TEMPLATE_COLUMNS.find((c) => c.header === h);
-          if (col) obj[col.key] = row[i] !== undefined ? String(row[i]) : "";
+          if (col && col.key !== "volumeWeight" && col.key !== "usedWeight" && col.key !== "totalShipping") {
+            obj[col.key] = row[i] !== undefined ? String(row[i]) : "";
+          }
         });
         return obj;
       });
@@ -90,40 +97,22 @@ export default function AdminPackagesImport() {
       toast({ variant: "destructive", title: "Format Tidak Didukung", description: "Gunakan file .xlsx, .xls, atau .csv" });
       return;
     }
-    setFile(f);
-    setImportResult(null);
-    setParsedData([]);
-    setPreviewRows([]);
+    setFile(f); setImportResult(null); setParsedData([]); setPreviewRows([]);
     parseExcel(f);
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
-    if (f) {
-      const input = fileInputRef.current;
-      if (input) {
-        const dt = new DataTransfer();
-        dt.items.add(f);
-        input.files = dt.files;
-      }
-      setFile(f);
-      setImportResult(null);
-      parseExcel(f);
-    }
+    if (f) { setFile(f); setImportResult(null); parseExcel(f); }
   }
 
   async function handleImport() {
     if (!parsedData.length) return;
     try {
-      setIsSubmitting(true);
-      setProgress(20);
-      setImportResult(null);
-
+      setIsSubmitting(true); setProgress(20); setImportResult(null);
       const res = await importPackages.mutateAsync({ data: { packages: parsedData } });
-      setProgress(100);
-      setImportResult(res);
-
+      setProgress(100); setImportResult(res);
       if (res.success > 0) {
         queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
         toast({ title: "Import Selesai", description: `Berhasil mengimport ${res.success} paket.` });
@@ -131,25 +120,21 @@ export default function AdminPackagesImport() {
     } catch (error: any) {
       toast({ variant: "destructive", title: "Import Gagal", description: error.message || "Terjadi kesalahan saat import" });
     } finally {
-      setIsSubmitting(false);
-      setProgress(0);
+      setIsSubmitting(false); setProgress(0);
     }
   }
 
   function clearFile() {
-    setFile(null);
-    setParsedData([]);
-    setPreviewRows([]);
-    setImportResult(null);
+    setFile(null); setParsedData([]); setPreviewRows([]); setImportResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  const displayCols = ["Tanggal","No Resi","No Paket","No HP Customer","Nama Barang","Berat Real Kg","P","L","T","Jenis Paking","Ongkir/Paket","Total Berat","Harga"];
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => setLocation("/admin/packages")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+        <Button variant="outline" size="icon" onClick={() => setLocation("/admin/packages")}><ArrowLeft className="h-4 w-4" /></Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Import Excel</h1>
           <p className="text-muted-foreground mt-1">Import banyak paket sekaligus dari file Excel.</p>
@@ -157,59 +142,48 @@ export default function AdminPackagesImport() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Template download */}
+        {/* Template */}
         <Card className="md:col-span-1 border-dashed border-2 border-primary/30 bg-primary/5">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-primary" />
-              Template Excel
+              <FileSpreadsheet className="w-5 h-5 text-primary" />Template Excel
             </CardTitle>
-            <CardDescription>Download template dan isi data sesuai kolom yang tersedia</CardDescription>
+            <CardDescription>Download template dengan 16 kolom sesuai format JAJ</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-semibold text-foreground mb-2">Kolom yang tersedia:</p>
+              <p className="font-semibold text-foreground mb-2">Kolom template:</p>
               {TEMPLATE_COLUMNS.map((c) => (
                 <div key={c.key} className="flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  {c.header}
+                  <span>{c.header}</span>
+                  {(c.key === "volumeWeight" || c.key === "usedWeight" || c.key === "totalShipping") && (
+                    <span className="text-muted-foreground/60 italic ml-1">(auto)</span>
+                  )}
                 </div>
               ))}
             </div>
             <Button onClick={downloadTemplate} className="w-full" variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Unduh Template .xlsx
+              <Download className="w-4 h-4 mr-2" />Unduh Template .xlsx
             </Button>
           </CardContent>
         </Card>
 
-        {/* Upload area */}
+        {/* Upload */}
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Upload className="w-5 h-5" />
-              Upload File Excel
-            </CardTitle>
+            <CardTitle className="text-base flex items-center gap-2"><Upload className="w-5 h-5" />Upload File Excel</CardTitle>
             <CardDescription>Pilih atau drag & drop file .xlsx / .xls / .csv</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {!file ? (
-              <div
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
+              <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}
                 className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
+                onClick={() => fileInputRef.current?.click()}>
                 <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
                 <p className="font-medium text-muted-foreground">Klik atau drag & drop file di sini</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">Mendukung .xlsx, .xls, .csv</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
               </div>
             ) : (
               <div className="space-y-4">
@@ -217,41 +191,41 @@ export default function AdminPackagesImport() {
                   <File className="w-8 h-8 text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {parsedData.length} baris data ditemukan
-                    </p>
+                    <p className="text-xs text-muted-foreground">{parsedData.length} baris data ditemukan</p>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={clearFile}>
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <Button variant="ghost" size="icon" onClick={clearFile}><X className="w-4 h-4" /></Button>
                 </div>
 
                 {previewRows.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium mb-2">Preview data (5 baris pertama):</p>
+                    <p className="text-sm font-medium mb-2">Preview (5 baris pertama):</p>
                     <div className="overflow-x-auto rounded-lg border text-xs">
                       <table className="w-full">
                         <thead className="bg-muted">
-                          <tr>
-                            {Object.keys(previewRows[0]).map((k) => (
-                              <th key={k} className="px-3 py-2 text-left font-medium whitespace-nowrap">{k}</th>
-                            ))}
-                          </tr>
+                          <tr>{displayCols.map(k=><th key={k} className="px-2 py-2 text-left font-medium whitespace-nowrap">{k}</th>)}</tr>
                         </thead>
                         <tbody>
                           {previewRows.map((row, i) => (
-                            <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/30"}>
-                              {Object.values(row).map((v: any, j) => (
-                                <td key={j} className="px-3 py-2 whitespace-nowrap">{v || "-"}</td>
-                              ))}
+                            <tr key={i} className={i%2===0?"bg-background":"bg-muted/30"}>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.packageDate||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap font-mono">{row.resiNumber||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.packageNumber||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.customerPhone||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.itemName||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.realWeight||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.length||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.width||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.height||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.packagingType||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.shippingRate||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.totalWeight||"-"}</td>
+                              <td className="px-2 py-2 whitespace-nowrap">{row.price||"-"}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                    {parsedData.length > 5 && (
-                      <p className="text-xs text-muted-foreground mt-1">...dan {parsedData.length - 5} baris lainnya</p>
-                    )}
+                    {parsedData.length > 5 && <p className="text-xs text-muted-foreground mt-1">...dan {parsedData.length - 5} baris lainnya</p>}
                   </div>
                 )}
 
@@ -262,14 +236,8 @@ export default function AdminPackagesImport() {
                   </div>
                 )}
 
-                <Button
-                  onClick={handleImport}
-                  disabled={isSubmitting || !parsedData.length}
-                  className="w-full"
-                >
-                  {isSubmitting ? "Memproses..." : (
-                    <><Upload className="w-4 h-4 mr-2" /> Import {parsedData.length} Paket</>
-                  )}
+                <Button onClick={handleImport} disabled={isSubmitting || !parsedData.length} className="w-full">
+                  {isSubmitting ? "Memproses..." : <><Upload className="w-4 h-4 mr-2" />Import {parsedData.length} Paket</>}
                 </Button>
               </div>
             )}
@@ -278,31 +246,20 @@ export default function AdminPackagesImport() {
       </div>
 
       {importResult && (
-        <Alert
-          variant={importResult.failed > 0 ? "destructive" : "default"}
-          className={importResult.failed === 0 ? "border-green-400 bg-green-50 dark:bg-green-950/20" : ""}
-        >
+        <Alert variant={importResult.failed > 0 ? "destructive" : "default"} className={importResult.failed === 0 ? "border-green-400 bg-green-50" : ""}>
           <AlertTitle className="flex items-center gap-2">
-            {importResult.failed === 0 ? (
-              <CheckCircle className="w-4 h-4 text-green-600" />
-            ) : (
-              <XCircle className="w-4 h-4" />
-            )}
+            {importResult.failed === 0 ? <CheckCircle className="w-4 h-4 text-green-600"/> : <XCircle className="w-4 h-4"/>}
             Hasil Import
           </AlertTitle>
           <AlertDescription className="mt-2 space-y-2">
             <div className="flex flex-wrap gap-3 mt-2">
               <Badge variant="secondary">Total: {importResult.total}</Badge>
               <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Berhasil: {importResult.success}</Badge>
-              {importResult.failed > 0 && (
-                <Badge variant="destructive">Gagal: {importResult.failed}</Badge>
-              )}
+              {importResult.failed > 0 && <Badge variant="destructive">Gagal: {importResult.failed}</Badge>}
             </div>
             {importResult.errors?.length > 0 && (
               <div className="mt-3 p-3 bg-background/50 rounded text-xs font-mono overflow-auto max-h-40 space-y-1">
-                {importResult.errors.map((e: string, i: number) => (
-                  <div key={i} className="text-red-600">{e}</div>
-                ))}
+                {importResult.errors.map((e: string, i: number) => <div key={i} className="text-red-600">{e}</div>)}
               </div>
             )}
           </AlertDescription>

@@ -6,22 +6,16 @@ import { useCreatePackage, useListCustomers, getListPackagesQueryKey } from "@wo
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calculator } from "lucide-react";
+import { ArrowLeft, Calculator, CalendarDays } from "lucide-react";
 
 const packageSchema = z.object({
+  packageDate: z.string().optional().nullable(),
   customerId: z.coerce.number({ required_error: "Pilih customer" }),
   resiNumber: z.string().min(1, "No Resi wajib diisi"),
   packageNumber: z.string().optional().nullable(),
@@ -42,6 +36,11 @@ const packageSchema = z.object({
 
 type PackageFormValues = z.infer<typeof packageSchema>;
 
+// Format today's date as YYYY-MM-DD for input[type=date]
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export default function AdminPackagesNew() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -54,6 +53,7 @@ export default function AdminPackagesNew() {
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
     defaultValues: {
+      packageDate: todayStr(),
       resiNumber: "",
       packageNumber: "",
       itemName: "",
@@ -68,7 +68,6 @@ export default function AdminPackagesNew() {
   const watchUsedWeight = form.watch("usedWeight");
   const watchShippingRate = form.watch("shippingRate");
 
-  // Auto-calculate volume weight and used weight
   useEffect(() => {
     const l = Number(watchLength) || 0;
     const w = Number(watchWidth) || 0;
@@ -80,12 +79,10 @@ export default function AdminPackagesNew() {
       const used = realW > 0 ? Math.max(realW, volW) : volW;
       form.setValue("usedWeight", parseFloat(used.toFixed(2)));
     } else if (watchRealWeight) {
-      const realW = Number(watchRealWeight);
-      form.setValue("usedWeight", realW);
+      form.setValue("usedWeight", Number(watchRealWeight));
     }
   }, [watchLength, watchWidth, watchHeight, watchRealWeight]);
 
-  // Auto-calculate total shipping
   useEffect(() => {
     const used = Number(watchUsedWeight) || 0;
     const rate = Number(watchShippingRate) || 0;
@@ -99,17 +96,10 @@ export default function AdminPackagesNew() {
       setIsSubmitting(true);
       await createPackage.mutateAsync({ data: values as any });
       queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({
-        title: "Berhasil",
-        description: "Paket baru berhasil ditambahkan. Barcode siap dicetak.",
-      });
+      toast({ title: "Berhasil", description: "Paket baru berhasil ditambahkan. Barcode siap dicetak." });
       setLocation("/admin/barcode");
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Gagal",
-        description: error.message || "Terjadi kesalahan",
-      });
+      toast({ variant: "destructive", title: "Gagal", description: error.message || "Terjadi kesalahan" });
     } finally {
       setIsSubmitting(false);
     }
@@ -133,9 +123,26 @@ export default function AdminPackagesNew() {
           {/* Section: Identitas Paket */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Identitas Paket</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarDays className="h-4 w-4" />Identitas Paket
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Tanggal */}
+              <FormField
+                control={form.control}
+                name="packageDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tanggal <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} value={field.value || ""} className="w-full md:w-56" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -206,12 +213,11 @@ export default function AdminPackagesNew() {
             </CardContent>
           </Card>
 
-          {/* Section: Data Berat & Dimensi */}
+          {/* Section: Berat & Dimensi */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Calculator className="h-4 w-4" />
-                Berat & Dimensi
+                <Calculator className="h-4 w-4" />Berat & Dimensi
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -221,16 +227,9 @@ export default function AdminPackagesNew() {
                   name="realWeight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Berat Real (Kg)</FormLabel>
+                      <FormLabel>Berat Real Kg</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -244,9 +243,7 @@ export default function AdminPackagesNew() {
                       <FormLabel>Jenis Paking</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih jenis paking" />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Pilih jenis paking" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="karton">Karton</SelectItem>
@@ -263,67 +260,23 @@ export default function AdminPackagesNew() {
                 />
               </div>
 
+              {/* P, L, T */}
               <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name="length"
-                  render={({ field }) => (
+                {[
+                  { name: "length" as const, label: "P — Panjang (cm)" },
+                  { name: "width" as const, label: "L — Lebar (cm)" },
+                  { name: "height" as const, label: "T — Tinggi (cm)" },
+                ].map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name} render={({ field }) => (
                     <FormItem>
-                      <FormLabel>P — Panjang (cm)</FormLabel>
+                      <FormLabel>{label}</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="0"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
+                        <Input type="number" step="0.1" placeholder="0" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="width"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>L — Lebar (cm)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="0"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="height"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>T — Tinggi (cm)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          placeholder="0"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  )} />
+                ))}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -334,15 +287,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Berat Volume (Kg)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Auto-hitung dari P×L×T÷6000"
-                          {...field}
-                          value={field.value ?? ""}
-                          readOnly
-                          className="bg-muted/50 text-muted-foreground"
-                        />
+                        <Input type="number" step="0.01" placeholder="Auto P×L×T÷6000" {...field} value={field.value ?? ""} readOnly className="bg-muted/50 text-muted-foreground" />
                       </FormControl>
                       <p className="text-xs text-muted-foreground">Otomatis: P × L × T ÷ 6000</p>
                       <FormMessage />
@@ -356,15 +301,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Berat Yang Digunakan (Kg)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Otomatis: MAX(Berat Real, Berat Volume)"
-                          {...field}
-                          value={field.value ?? ""}
-                          readOnly
-                          className="bg-muted/50 text-muted-foreground"
-                        />
+                        <Input type="number" step="0.01" placeholder="MAX(Real, Volume)" {...field} value={field.value ?? ""} readOnly className="bg-muted/50 text-muted-foreground" />
                       </FormControl>
                       <p className="text-xs text-muted-foreground">Otomatis: MAX(Berat Real, Berat Volume)</p>
                       <FormMessage />
@@ -389,14 +326,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Ongkir Per Paket (Rp/Kg)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="100"
-                          placeholder="0"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
+                        <Input type="number" step="100" placeholder="0" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -409,14 +339,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Total Berat (Kg)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Total berat semua paket"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
+                        <Input type="number" step="0.01" placeholder="Total semua paket konsumen" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -432,14 +355,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Harga Barang (Rp)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="1000"
-                          placeholder="0"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
+                        <Input type="number" step="1000" placeholder="0" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -452,15 +368,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Total Ongkir (Rp)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="100"
-                          placeholder="Otomatis: Berat Digunakan × Ongkir/Kg"
-                          {...field}
-                          value={field.value ?? ""}
-                          readOnly
-                          className="bg-muted/50 font-semibold"
-                        />
+                        <Input type="number" step="100" placeholder="Otomatis: Berat × Ongkir/Kg" {...field} value={field.value ?? ""} readOnly className="bg-muted/50 font-semibold" />
                       </FormControl>
                       <p className="text-xs text-muted-foreground">Otomatis: Berat Digunakan × Ongkir per Kg</p>
                       <FormMessage />
@@ -471,11 +379,9 @@ export default function AdminPackagesNew() {
             </CardContent>
           </Card>
 
-          {/* Section: Catatan */}
+          {/* Notes */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Catatan</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base">Catatan</CardTitle></CardHeader>
             <CardContent>
               <FormField
                 control={form.control}
@@ -484,12 +390,7 @@ export default function AdminPackagesNew() {
                   <FormItem>
                     <FormLabel>Catatan Tambahan (Opsional)</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Tambahkan catatan atau keterangan khusus..."
-                        {...field}
-                        value={field.value || ""}
-                        rows={3}
-                      />
+                      <Textarea placeholder="Tambahkan catatan atau keterangan khusus..." {...field} value={field.value || ""} rows={3} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -499,10 +400,8 @@ export default function AdminPackagesNew() {
           </Card>
 
           <div className="flex justify-end gap-3 pb-6">
-            <Button type="button" variant="outline" onClick={() => setLocation("/admin/packages")}>
-              Batal
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-32">
+            <Button type="button" variant="outline" onClick={() => setLocation("/admin/packages")}>Batal</Button>
+            <Button type="submit" disabled={isSubmitting} className="min-w-36">
               {isSubmitting ? "Menyimpan..." : "Simpan Paket"}
             </Button>
           </div>

@@ -3,42 +3,27 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import logoImg from "/logo.png";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
+  Sidebar, SidebarContent, SidebarFooter, SidebarHeader,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
-  LogOut,
-  Package,
-  LayoutDashboard,
-  ScanLine,
-  History,
-  Users,
-  FileText,
-  Settings,
-  UserPlus,
-  Barcode,
-  FileSpreadsheet,
-  FileInput,
+  LogOut, Package, LayoutDashboard, ScanLine, History, Users, FileText,
+  Settings, UserPlus, Barcode, FileSpreadsheet, FileInput, TrendingUp, Crown,
+  Wrench,
 } from "lucide-react";
+
+type NavItem = { name: string; href: string; icon: any };
+type NavSection = { label: string; items: NavItem[] };
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
 
-  if (!user) {
-    return <>{children}</>;
-  }
+  if (!user) return <>{children}</>;
 
   const role = user.role;
 
-  const navigation = {
+  const flatNav: Record<string, NavItem[]> = {
     customer: [
       { name: "Dashboard", href: "/customer/dashboard", icon: LayoutDashboard },
       { name: "Paket Saya", href: "/customer/packages", icon: Package },
@@ -53,17 +38,53 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       { name: "Label Barcode", href: "/admin/barcode", icon: Barcode },
       { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine },
     ],
-    owner: [
-      { name: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard },
-      { name: "Monitor Paket", href: "/owner/packages", icon: Package },
-      { name: "Data Customer", href: "/owner/customers", icon: Users },
-      { name: "Data Admin", href: "/owner/admins", icon: UserPlus },
-      { name: "Laporan", href: "/owner/reports", icon: FileText },
-      { name: "Manajemen User", href: "/owner/users", icon: Settings },
-    ],
   };
 
-  const navItems = navigation[role as keyof typeof navigation] || [];
+  // Owner gets two sections
+  const ownerSections: NavSection[] = [
+    {
+      label: "Owner",
+      items: [
+        { name: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard },
+        { name: "Monitor Paket", href: "/owner/packages", icon: Package },
+        { name: "Data Customer", href: "/owner/customers", icon: Users },
+        { name: "Data Admin", href: "/owner/admins", icon: UserPlus },
+        { name: "Keuangan", href: "/owner/finance", icon: TrendingUp },
+        { name: "Laporan", href: "/owner/reports", icon: FileText },
+        { name: "Manajemen User", href: "/owner/users", icon: Settings },
+      ],
+    },
+    {
+      label: "Admin Tools",
+      items: [
+        { name: "Input Paket", href: "/owner/packages/new", icon: FileInput },
+        { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet },
+        { name: "Label Barcode", href: "/owner/barcode", icon: Barcode },
+        { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine },
+      ],
+    },
+  ];
+
+  const isOwner = role === "owner";
+  const navItems = flatNav[role as keyof typeof flatNav] || [];
+
+  function isActive(href: string) {
+    return location === href || location.startsWith(`${href}/`);
+  }
+
+  function renderNavItem(item: NavItem) {
+    const active = isActive(item.href);
+    return (
+      <SidebarMenuItem key={item.href}>
+        <SidebarMenuButton asChild isActive={active} tooltip={item.name}>
+          <Link href={item.href} className="flex items-center gap-3 w-full">
+            <item.icon className="w-5 h-5" />
+            <span>{item.name}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -79,31 +100,37 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarHeader>
           <SidebarContent className="p-2">
-            <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive = location === item.href || location.startsWith(`${item.href}/`);
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
-                      <Link href={item.href} className="flex items-center gap-3 w-full">
-                        <item.icon className="w-5 h-5" />
-                        <span>{item.name}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
+            {isOwner ? (
+              ownerSections.map((section) => (
+                <div key={section.label} className="mb-3">
+                  <div className="flex items-center gap-2 px-3 py-1.5 mb-1">
+                    {section.label === "Owner" ? <Crown className="w-3 h-3 text-amber-500" /> : <Wrench className="w-3 h-3 text-blue-500" />}
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      {section.label}
+                    </span>
+                  </div>
+                  <SidebarMenu>
+                    {section.items.map(renderNavItem)}
+                  </SidebarMenu>
+                  {section.label !== ownerSections[ownerSections.length - 1].label && (
+                    <div className="mx-3 mt-3 border-t border-border/40" />
+                  )}
+                </div>
+              ))
+            ) : (
+              <SidebarMenu>
+                {navItems.map(renderNavItem)}
+              </SidebarMenu>
+            )}
           </SidebarContent>
           <SidebarFooter className="p-4 border-t border-border/50">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               <div className="flex flex-col">
                 <span className="font-medium text-sm">{user.name}</span>
                 <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
               </div>
               <Button variant="outline" className="w-full justify-start text-destructive" onClick={() => logout()}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Keluar
+                <LogOut className="w-4 h-4 mr-2" />Keluar
               </Button>
             </div>
           </SidebarFooter>

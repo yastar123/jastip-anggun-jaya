@@ -49,6 +49,8 @@ export interface Package {
   /** @nullable */
   adminName?: string | null;
   /** @nullable */
+  packageDate?: string | null;
+  /** @nullable */
   pickedUpAt?: string | null;
   createdAt: string;
   updatedAt?: string;
