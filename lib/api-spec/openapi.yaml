@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Jastip Anggun Jaya API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: packages
+    description: Package management
+  - name: customers
+    description: Customer management
+  - name: admins
+    description: Admin management
+  - name: reports
+    description: Reports and analytics
+  - name: dashboard
+    description: Dashboard data
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,468 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login for customer, admin, or owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current logged-in user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  # ─── PACKAGES ───────────────────────────────────────────────────────────────
+
+  /packages:
+    get:
+      operationId: listPackages
+      tags: [packages]
+      summary: List packages (filtered by role)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, in_transit, ready, picked_up]
+        - name: customerId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: adminId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: dateFrom
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: dateTo
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Package"
+
+    post:
+      operationId: createPackage
+      tags: [packages]
+      summary: Create a new package (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackageInput"
+      responses:
+        "201":
+          description: Package created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+  /packages/import:
+    post:
+      operationId: importPackages
+      tags: [packages]
+      summary: Import packages from Excel data (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackageImport"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+
+  /packages/{id}:
+    get:
+      operationId: getPackage
+      tags: [packages]
+      summary: Get package by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Package detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+    patch:
+      operationId: updatePackage
+      tags: [packages]
+      summary: Update package status (admin/owner)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PackageUpdate"
+      responses:
+        "200":
+          description: Updated package
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+  /packages/scan/{barcode}:
+    get:
+      operationId: scanPackage
+      tags: [packages]
+      summary: Scan barcode and verify package ownership
+      parameters:
+        - name: barcode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Package scan result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanResult"
+
+  /packages/{id}/confirm-pickup:
+    post:
+      operationId: confirmPickup
+      tags: [packages]
+      summary: Admin confirms package pickup after customer scan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Pickup confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+  /packages/{id}/barcode:
+    get:
+      operationId: getBarcode
+      tags: [packages]
+      summary: Get barcode data for a package
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Barcode data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BarcodeData"
+
+  # ─── CUSTOMERS ──────────────────────────────────────────────────────────────
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List all customers (admin/owner)
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CustomerWithStats"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      summary: Get customer by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Customer detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerWithStats"
+
+  # ─── ADMINS ─────────────────────────────────────────────────────────────────
+
+  /admins:
+    get:
+      operationId: listAdmins
+      tags: [admins]
+      summary: List all admins with package stats (owner only)
+      responses:
+        "200":
+          description: List of admins
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminWithStats"
+
+    post:
+      operationId: createAdmin
+      tags: [admins]
+      summary: Create a new admin (owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminInput"
+      responses:
+        "201":
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /admins/{id}:
+    patch:
+      operationId: updateAdmin
+      tags: [admins]
+      summary: Update admin (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdate"
+      responses:
+        "200":
+          description: Admin updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /admins/{id}/toggle-active:
+    post:
+      operationId: toggleAdminActive
+      tags: [admins]
+      summary: Activate or deactivate admin (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Admin status toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /admins/{id}/reset-password:
+    post:
+      operationId: resetAdminPassword
+      tags: [admins]
+      summary: Reset admin password (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # ─── DASHBOARD ──────────────────────────────────────────────────────────────
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/chart:
+    get:
+      operationId: getDashboardChart
+      tags: [dashboard]
+      summary: Get chart data (daily package trend)
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year]
+      responses:
+        "200":
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChartPoint"
+
+  # ─── REPORTS ────────────────────────────────────────────────────────────────
+
+  /reports:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get report data (owner only)
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [daily, monthly, yearly]
+        - name: date
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: month
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: year
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: Report data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportData"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +504,303 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    LoginInput:
+      type: object
+      required: [phone, password]
+      properties:
+        phone:
+          type: string
+        password:
+          type: string
+
+    RegisterInput:
+      type: object
+      required: [name, phone, password]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+
+    User:
+      type: object
+      required: [id, name, phone, role, isActive]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [customer, admin, owner]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    Package:
+      type: object
+      required: [id, barcode, resiNumber, itemName, status, customerId, customerName, createdAt]
+      properties:
+        id:
+          type: integer
+        barcode:
+          type: string
+        resiNumber:
+          type: string
+        itemName:
+          type: string
+        weight:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, in_transit, ready, picked_up]
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        adminId:
+          type: ["integer", "null"]
+        adminName:
+          type: ["string", "null"]
+        pickedUpAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    PackageInput:
+      type: object
+      required: [resiNumber, itemName, customerId]
+      properties:
+        resiNumber:
+          type: string
+        itemName:
+          type: string
+        weight:
+          type: ["number", "null"]
+        notes:
+          type: ["string", "null"]
+        customerId:
+          type: integer
+
+    PackageUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, in_transit, ready, picked_up]
+        notes:
+          type: ["string", "null"]
+
+    PackageImport:
+      type: object
+      required: [packages]
+      properties:
+        packages:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageRow"
+
+    PackageRow:
+      type: object
+      required: [resiNumber, itemName, customerPhone]
+      properties:
+        resiNumber:
+          type: string
+        itemName:
+          type: string
+        weight:
+          type: ["number", "null"]
+        customerPhone:
+          type: string
+        notes:
+          type: ["string", "null"]
+
+    ImportResult:
+      type: object
+      required: [success, failed, total]
+      properties:
+        success:
+          type: integer
+        failed:
+          type: integer
+        total:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    ScanResult:
+      type: object
+      required: [valid, message]
+      properties:
+        valid:
+          type: boolean
+        message:
+          type: string
+        package:
+          $ref: "#/components/schemas/Package"
+
+    BarcodeData:
+      type: object
+      required: [barcode, packageId, resiNumber, itemName, customerName]
+      properties:
+        barcode:
+          type: string
+        packageId:
+          type: integer
+        resiNumber:
+          type: string
+        itemName:
+          type: string
+        customerName:
+          type: string
+
+    CustomerWithStats:
+      type: object
+      required: [id, name, phone, isActive, totalPackages, pendingPackages, pickedUpPackages]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        totalPackages:
+          type: integer
+        pendingPackages:
+          type: integer
+        pickedUpPackages:
+          type: integer
+
+    AdminWithStats:
+      type: object
+      required: [id, name, phone, isActive, packagesInputted]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        packagesInputted:
+          type: integer
+
+    AdminInput:
+      type: object
+      required: [name, phone, password]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+
+    AdminUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+
+    ResetPasswordInput:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+
+    DashboardSummary:
+      type: object
+      required: [totalPackages, pendingPackages, pickedUpPackages, totalCustomers, totalAdmins, readyPackages]
+      properties:
+        totalPackages:
+          type: integer
+        pendingPackages:
+          type: integer
+        readyPackages:
+          type: integer
+        pickedUpPackages:
+          type: integer
+        totalCustomers:
+          type: integer
+        totalAdmins:
+          type: integer
+
+    ChartPoint:
+      type: object
+      required: [date, incoming, outgoing]
+      properties:
+        date:
+          type: string
+        incoming:
+          type: integer
+        outgoing:
+          type: integer
+
+    ReportData:
+      type: object
+      required: [period, totalPackages, pickedUp, pending, entries]
+      properties:
+        period:
+          type: string
+        totalPackages:
+          type: integer
+        pickedUp:
+          type: integer
+        pending:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportEntry"
+
+    ReportEntry:
+      type: object
+      required: [label, incoming, outgoing]
+      properties:
+        label:
+          type: string
+        incoming:
+          type: integer
+        outgoing:
+          type: integer

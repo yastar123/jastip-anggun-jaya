@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Jastip Anggun Jaya"
+version = "1.0.0"
+id = "artifacts/jastip"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21033
+
+[services.development]
+run = "pnpm --filter @workspace/jastip run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/jastip", "run", "build" ]
+publicDir = "artifacts/jastip/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21033"
+BASE_PATH = "/"
