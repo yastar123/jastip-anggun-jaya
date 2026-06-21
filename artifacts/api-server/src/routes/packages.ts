@@ -231,7 +231,15 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
   try {
     const user = (req as any).user;
     const { barcode } = req.params;
-    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.barcode, barcode)).limit(1);
+    let pkgs = await db.select().from(packagesTable).where(eq(packagesTable.barcode, barcode)).limit(1);
+    if (!pkgs[0]) {
+      pkgs = await db.select().from(packagesTable).where(eq(packagesTable.resiNumber, barcode)).limit(1);
+    }
+    if (!pkgs[0] && barcode) {
+      const all = await db.select().from(packagesTable);
+      const found = all.find(p => p.packageNumber === barcode);
+      if (found) pkgs = [found];
+    }
     const pkg = pkgs[0];
 
     if (!pkg) { res.json({ valid: false, message: "Paket tidak ditemukan" }); return; }

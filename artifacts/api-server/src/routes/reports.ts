@@ -9,33 +9,47 @@ router.get("/", requireAuth, requireRole("owner"), async (req, res) => {
   try {
     const { type, date, month, year } = req.query as any;
     const packages = await db.select().from(packagesTable);
+    const now = new Date();
 
     let entries: { label: string; incoming: number; outgoing: number }[] = [];
     let periodLabel = "";
+    let filteredPkgs = packages;
 
     if (type === "daily") {
-      const targetDate = date || new Date().toISOString().split("T")[0];
+      const targetDate = date || now.toISOString().split("T")[0];
       periodLabel = targetDate;
-      // Hourly breakdown
+      filteredPkgs = packages.filter(p => p.createdAt.toISOString().startsWith(targetDate));
+
+      // Hourly breakdown 00-23
       for (let h = 0; h < 24; h++) {
         const label = `${String(h).padStart(2, "0")}:00`;
-        const incoming = packages.filter(p => {
-          const d = new Date(p.createdAt);
-          return p.createdAt.toISOString().startsWith(targetDate) && d.getHours() === h;
-        }).length;
-        const outgoing = packages.filter(p => {
-          if (!p.pickedUpAt) return false;
-          const d = new Date(p.pickedUpAt);
-          return p.pickedUpAt.toISOString().startsWith(targetDate) && d.getHours() === h;
-        }).length;
+        const incoming = packages.filter(p =>
+          p.createdAt.toISOString().startsWith(targetDate) && new Date(p.createdAt).getHours() === h
+        ).length;
+        const outgoing = packages.filter(p =>
+          p.pickedUpAt && p.pickedUpAt.toISOString().startsWith(targetDate) && new Date(p.pickedUpAt).getHours() === h
+        ).length;
         entries.push({ label, incoming, outgoing });
       }
+
     } else if (type === "monthly") {
-      const now = new Date();
-      const targetYear = year ? Number(year) : now.getFullYear();
-      const targetMonth = month ? Number(month) - 1 : now.getMonth();
+      // month can be "YYYY-MM" or just number; year is optional
+      let targetYear: number, targetMonth: number; // 0-indexed month
+      if (month && String(month).includes("-")) {
+        const parts = String(month).split("-");
+        targetYear = Number(parts[0]);
+        targetMonth = Number(parts[1]) - 1;
+      } else {
+        targetYear = year ? Number(year) : now.getFullYear();
+        targetMonth = month ? Number(month) - 1 : now.getMonth();
+      }
       const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
       periodLabel = new Date(targetYear, targetMonth, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+
+      filteredPkgs = packages.filter(p => {
+        const d = new Date(p.createdAt);
+        return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+      });
 
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -43,9 +57,13 @@ router.get("/", requireAuth, requireRole("owner"), async (req, res) => {
         const outgoing = packages.filter(p => p.pickedUpAt?.toISOString().startsWith(dateStr)).length;
         entries.push({ label: `${d}`, incoming, outgoing });
       }
+
     } else if (type === "yearly") {
-      const targetYear = year ? Number(year) : new Date().getFullYear();
+      const targetYear = year ? Number(year) : now.getFullYear();
       periodLabel = String(targetYear);
+
+      filteredPkgs = packages.filter(p => new Date(p.createdAt).getFullYear() === targetYear);
+
       for (let m = 0; m < 12; m++) {
         const label = new Date(targetYear, m, 1).toLocaleDateString("id-ID", { month: "long" });
         const incoming = packages.filter(p => {
@@ -60,18 +78,6 @@ router.get("/", requireAuth, requireRole("owner"), async (req, res) => {
         entries.push({ label, incoming, outgoing });
       }
     }
-
-    const filteredPkgs = packages.filter(p => {
-      if (type === "daily" && date) return p.createdAt.toISOString().startsWith(date);
-      if (type === "monthly" && month && year) {
-        const d = new Date(p.createdAt);
-        return d.getFullYear() === Number(year) && d.getMonth() === Number(month) - 1;
-      }
-      if (type === "yearly" && year) {
-        return new Date(p.createdAt).getFullYear() === Number(year);
-      }
-      return true;
-    });
 
     res.json({
       period: periodLabel,

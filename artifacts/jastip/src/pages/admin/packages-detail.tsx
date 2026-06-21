@@ -54,17 +54,32 @@ function BarcodeDisplay({ value }: { value: string }) {
     win.document.close();
   }
 
-  function downloadLabel() {
+  function downloadPNG() {
     const svg = svgRef.current;
     if (!svg) return;
     const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml" });
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
-    const a = document.createElement("a");
-    a.download = `barcode-${value}.svg`;
-    a.href = url;
-    a.click();
-    URL.revokeObjectURL(url);
+    const img = new Image();
+    img.onload = () => {
+      const scale = 3;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0);
+      }
+      URL.revokeObjectURL(url);
+      const a = document.createElement("a");
+      a.download = `barcode-${value}.png`;
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+    };
+    img.src = url;
   }
 
   return (
@@ -76,8 +91,8 @@ function BarcodeDisplay({ value }: { value: string }) {
         <Button variant="outline" className="flex-1" onClick={printLabel}>
           <Printer className="w-4 h-4 mr-2" /> Cetak Label
         </Button>
-        <Button variant="outline" className="flex-1" onClick={downloadLabel}>
-          Unduh SVG
+        <Button variant="outline" className="flex-1" onClick={downloadPNG}>
+          Unduh PNG
         </Button>
       </div>
     </div>

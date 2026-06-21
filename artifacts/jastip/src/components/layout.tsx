@@ -9,10 +9,10 @@ import {
 import {
   LogOut, Package, LayoutDashboard, ScanLine, History, Users, FileText,
   Settings, UserPlus, Barcode, FileSpreadsheet, FileInput, TrendingUp, Crown,
-  Wrench,
+  Wrench, UserCircle,
 } from "lucide-react";
 
-type NavItem = { name: string; href: string; icon: any };
+type NavItem = { name: string; href: string; icon: any; exact?: boolean };
 type NavSection = { label: string; items: NavItem[] };
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -25,42 +25,44 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const flatNav: Record<string, NavItem[]> = {
     customer: [
-      { name: "Dashboard", href: "/customer/dashboard", icon: LayoutDashboard },
+      { name: "Dashboard", href: "/customer/dashboard", icon: LayoutDashboard, exact: true },
       { name: "Paket Saya", href: "/customer/packages", icon: Package },
-      { name: "Scan Paket", href: "/customer/scan", icon: ScanLine },
-      { name: "Riwayat", href: "/customer/history", icon: History },
+      { name: "Scan Paket", href: "/customer/scan", icon: ScanLine, exact: true },
+      { name: "Riwayat", href: "/customer/history", icon: History, exact: true },
+      { name: "Profil", href: "/customer/profile", icon: UserCircle, exact: true },
     ],
     admin: [
-      { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+      { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, exact: true },
       { name: "Semua Paket", href: "/admin/packages", icon: Package },
-      { name: "Input Paket", href: "/admin/packages/new", icon: FileInput },
-      { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet },
-      { name: "Label Barcode", href: "/admin/barcode", icon: Barcode },
-      { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine },
+      { name: "Input Paket", href: "/admin/packages/new", icon: FileInput, exact: true },
+      { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet, exact: true },
+      { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
+      { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine, exact: true },
+      { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
     ],
   };
 
-  // Owner gets two sections
   const ownerSections: NavSection[] = [
     {
       label: "Owner",
       items: [
-        { name: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard },
+        { name: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard, exact: true },
         { name: "Monitor Paket", href: "/owner/packages", icon: Package },
-        { name: "Data Customer", href: "/owner/customers", icon: Users },
-        { name: "Data Admin", href: "/owner/admins", icon: UserPlus },
-        { name: "Keuangan", href: "/owner/finance", icon: TrendingUp },
-        { name: "Laporan", href: "/owner/reports", icon: FileText },
-        { name: "Manajemen User", href: "/owner/users", icon: Settings },
+        { name: "Data Customer", href: "/owner/customers", icon: Users, exact: true },
+        { name: "Data Admin", href: "/owner/admins", icon: UserPlus, exact: true },
+        { name: "Keuangan", href: "/owner/finance", icon: TrendingUp, exact: true },
+        { name: "Laporan", href: "/owner/reports", icon: FileText, exact: true },
+        { name: "Manajemen User", href: "/owner/users", icon: Settings, exact: true },
+        { name: "Profil", href: "/owner/profile", icon: UserCircle, exact: true },
       ],
     },
     {
       label: "Admin Tools",
       items: [
-        { name: "Input Paket", href: "/owner/packages/new", icon: FileInput },
-        { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet },
-        { name: "Label Barcode", href: "/owner/barcode", icon: Barcode },
-        { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine },
+        { name: "Input Paket", href: "/owner/packages/new", icon: FileInput, exact: true },
+        { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet, exact: true },
+        { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },
+        { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine, exact: true },
       ],
     },
   ];
@@ -68,12 +70,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isOwner = role === "owner";
   const navItems = flatNav[role as keyof typeof flatNav] || [];
 
-  function isActive(href: string) {
-    return location === href || location.startsWith(`${href}/`);
+  function isActive(item: NavItem) {
+    if (location === item.href) return true;
+    if (item.exact) return false;
+    // For non-exact items (like "Semua Paket"), only match numeric sub-paths (package detail /id)
+    if (!location.startsWith(item.href + "/")) return false;
+    const sub = location.slice(item.href.length + 1);
+    return /^\d+$/.test(sub);
   }
 
   function renderNavItem(item: NavItem) {
-    const active = isActive(item.href);
+    const active = isActive(item);
     return (
       <SidebarMenuItem key={item.href}>
         <SidebarMenuButton asChild isActive={active} tooltip={item.name}>

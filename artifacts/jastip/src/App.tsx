@@ -30,6 +30,7 @@ import OwnerAdmins from "@/pages/owner/admins";
 import OwnerReports from "@/pages/owner/reports";
 import OwnerUsers from "@/pages/owner/users";
 import OwnerFinance from "@/pages/owner/finance";
+import ProfilePage from "@/pages/profile";
 
 const queryClient = new QueryClient();
 
@@ -118,6 +119,11 @@ function Router() {
       <Route path="/owner/reports">{(params) => <ProtectedRoute role="owner" component={OwnerReports} params={params} />}</Route>
       <Route path="/owner/users">{(params) => <ProtectedRoute role="owner" component={OwnerUsers} params={params} />}</Route>
       <Route path="/owner/finance">{(params) => <ProtectedRoute role="owner" component={OwnerFinance} params={params} />}</Route>
+
+      {/* Profile routes — all roles */}
+      <Route path="/customer/profile">{(params) => <ProtectedRoute role="customer" component={ProfilePage} params={params} />}</Route>
+      <Route path="/admin/profile">{(params) => <ProtectedRoute role="admin" component={ProfilePage} params={params} />}</Route>
+      <Route path="/owner/profile">{(params) => <ProtectedRoute role="owner" component={ProfilePage} params={params} />}</Route>
 
       {/* Owner — Admin Tools (same components, both roles allowed) */}
       <Route path="/owner/packages/new">{(params) => <ProtectedRoute role="owner" component={AdminPackagesNew} params={params} />}</Route>

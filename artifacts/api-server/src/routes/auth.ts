@@ -85,6 +85,38 @@ router.get("/me", requireAuth, (req, res) => {
   res.json({ id: user.id, name: user.name, phone: user.phone, role: user.role, isActive: user.isActive, createdAt: user.createdAt });
 });
 
+// PATCH /api/auth/profile
+router.patch("/profile", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const { name, currentPassword, newPassword } = req.body;
+    if (!name && !newPassword) {
+      res.status(400).json({ error: "Provide name or newPassword" });
+      return;
+    }
+    const updates: any = { updatedAt: new Date() };
+    if (name && name.trim()) updates.name = name.trim();
+    if (newPassword) {
+      if (!currentPassword) {
+        res.status(400).json({ error: "Password lama wajib diisi" });
+        return;
+      }
+      const users = await db.select().from(usersTable).where(eq(usersTable.id, user.id)).limit(1);
+      if (!users[0] || users[0].password !== hashPassword(currentPassword)) {
+        res.status(400).json({ error: "Password lama salah" });
+        return;
+      }
+      updates.password = hashPassword(newPassword);
+    }
+    const updated = await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id)).returning();
+    const u = updated[0];
+    res.json({ id: u.id, name: u.name, phone: u.phone, role: u.role, isActive: u.isActive, createdAt: u.createdAt });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // POST /api/auth/logout
 router.post("/logout", requireAuth, async (req, res) => {
   try {
