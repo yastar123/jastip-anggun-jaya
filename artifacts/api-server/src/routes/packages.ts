@@ -124,7 +124,7 @@ router.post("/", requireAuth, requireRole("admin", "owner"), async (req, res) =>
       totalShipping: totalShipping !== null ? String(totalShipping) : null,
       weight: weight ? String(weight) : null,
       notes: notes || null,
-      status: "ready",
+      status: "in_transit",
       customerId: Number(customerId),
       adminId: user.id,
       packageDate: packageDate ? new Date(packageDate) : new Date(),
@@ -208,7 +208,7 @@ router.post("/import", requireAuth, requireRole("admin", "owner"), async (req, r
           price: price ? String(price) : null,
           totalShipping: totalShipping !== null ? String(totalShipping) : null,
           notes: notes ? String(notes) : null,
-          status: "ready",
+          status: "in_transit",
           customerId: customer[0].id,
           adminId: user.id,
           packageDate: packageDate ? new Date(String(packageDate)) : new Date(),
@@ -236,16 +236,19 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
 
     if (!pkg) { res.json({ valid: false, message: "Paket tidak ditemukan" }); return; }
     if (user.role === "customer" && pkg.customerId !== user.id) {
-      res.json({ valid: false, message: "Paket ini bukan milik Anda" }); return;
+      res.json({ valid: false, message: "Bukan barcode dari paket kamu" }); return;
     }
     if (pkg.status === "picked_up") { res.json({ valid: false, message: "Paket sudah diambil sebelumnya" }); return; }
-    if (pkg.status !== "ready") { res.json({ valid: false, message: "Paket belum siap untuk diambil" }); return; }
 
     const customer = await db.select().from(usersTable).where(eq(usersTable.id, pkg.customerId)).limit(1);
     const customerMap = new Map([[customer[0]?.id, customer[0]]]);
     const adminMap = new Map<number, any>();
+    if (pkg.adminId) {
+      const admin = await db.select().from(usersTable).where(eq(usersTable.id, pkg.adminId)).limit(1);
+      if (admin[0]) adminMap.set(admin[0].id, admin[0]);
+    }
 
-    res.json({ valid: true, message: "Paket valid dan siap diambil", package: formatPackage(pkg, customerMap, adminMap) });
+    res.json({ valid: true, message: "Paket ditemukan", package: formatPackage(pkg, customerMap, adminMap) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -292,6 +295,30 @@ router.patch("/:id", requireAuth, requireRole("admin", "owner"), async (req, res
     const customerMap = new Map([[customer[0]?.id, customer[0]]]);
     const adminMap = new Map<number, any>();
     res.json(formatPackage(pkg, customerMap, adminMap));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/packages/:id/customer-pickup  (customer marks their own package as picked up)
+router.post("/:id/customer-pickup", requireAuth, async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const id = Number(req.params.id);
+    const pkgs = await db.select().from(packagesTable).where(eq(packagesTable.id, id)).limit(1);
+    const pkg = pkgs[0];
+    if (!pkg) { res.status(404).json({ error: "Not found" }); return; }
+    if (user.role === "customer" && pkg.customerId !== user.id) {
+      res.status(403).json({ error: "Paket ini bukan milik Anda" }); return;
+    }
+    if (pkg.status === "picked_up") { res.status(400).json({ error: "Paket sudah diambil sebelumnya" }); return; }
+    const updated = await db.update(packagesTable).set({ status: "picked_up", pickedUpAt: new Date(), updatedAt: new Date() }).where(eq(packagesTable.id, id)).returning();
+    const updPkg = updated[0];
+    const customer = await db.select().from(usersTable).where(eq(usersTable.id, updPkg.customerId)).limit(1);
+    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
+    const adminMap = new Map<number, any>();
+    res.json(formatPackage(updPkg, customerMap, adminMap));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
