@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useGetReport, GetReportType } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/pagination";
 import { FileDown, Printer, Loader2 } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 export default function OwnerReports() {
   const [type, setType] = useState<GetReportType>("daily");
-  
+  const [page, setPage] = useState(1);
+
   const today = new Date();
   const currentYear = today.getFullYear().toString();
   const currentMonth = (today.getMonth() + 1).toString().padStart(2, '0');
@@ -26,16 +30,18 @@ export default function OwnerReports() {
     year: type === 'yearly' ? year : undefined,
   });
 
-  const exportExcel = () => {
-    if (!report || !report.entries.length) return;
-    
-    const headers = ["Label", "Paket Masuk", "Paket Keluar"];
-    const rows = report.entries.map(e => [e.label, e.incoming, e.outgoing]);
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(e => e.join(","))
-    ].join("\n");
+  const entries = report?.entries || [];
+  const total = entries.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const paginated = entries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  function handleTypeChange(v: any) { setType(v); setPage(1); }
+
+  const exportExcel = () => {
+    if (!report || !entries.length) return;
+    const headers = ["Label", "Paket Masuk", "Paket Keluar"];
+    const rows = entries.map(e => [e.label, e.incoming, e.outgoing]);
+    const csvContent = [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -46,10 +52,6 @@ export default function OwnerReports() {
     link.remove();
   };
 
-  const printReport = () => {
-    window.print();
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
@@ -58,13 +60,11 @@ export default function OwnerReports() {
           <p className="text-muted-foreground mt-1">Laporan harian, bulanan, dan tahunan.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportExcel} disabled={!report || report.entries.length === 0}>
-            <FileDown className="w-4 h-4 mr-2" />
-            Excel
+          <Button variant="outline" onClick={exportExcel} disabled={!report || entries.length === 0}>
+            <FileDown className="w-4 h-4 mr-2" />Excel
           </Button>
-          <Button onClick={printReport} disabled={!report}>
-            <Printer className="w-4 h-4 mr-2" />
-            Cetak PDF
+          <Button onClick={() => window.print()} disabled={!report}>
+            <Printer className="w-4 h-4 mr-2" />Cetak PDF
           </Button>
         </div>
       </div>
@@ -77,18 +77,17 @@ export default function OwnerReports() {
 
       <Card className="print:shadow-none print:border-none">
         <CardHeader className="print:hidden">
-          <Tabs value={type} onValueChange={(v: any) => setType(v)}>
+          <Tabs value={type} onValueChange={handleTypeChange}>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <TabsList>
                 <TabsTrigger value="daily">Harian</TabsTrigger>
                 <TabsTrigger value="monthly">Bulanan</TabsTrigger>
                 <TabsTrigger value="yearly">Tahunan</TabsTrigger>
               </TabsList>
-              
               <div className="w-[200px]">
-                {type === 'daily' && <Input type="date" value={date} onChange={e => setDate(e.target.value)} />}
-                {type === 'monthly' && <Input type="month" value={month} onChange={e => setMonth(e.target.value)} />}
-                {type === 'yearly' && <Input type="number" value={year} onChange={e => setYear(e.target.value)} placeholder="YYYY" />}
+                {type === 'daily' && <Input type="date" value={date} onChange={e => { setDate(e.target.value); setPage(1); }} />}
+                {type === 'monthly' && <Input type="month" value={month} onChange={e => { setMonth(e.target.value); setPage(1); }} />}
+                {type === 'yearly' && <Input type="number" value={year} onChange={e => { setYear(e.target.value); setPage(1); }} placeholder="YYYY" />}
               </div>
             </div>
           </Tabs>
@@ -125,8 +124,8 @@ export default function OwnerReports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report.entries.length > 0 ? (
-                      report.entries.map((entry, idx) => (
+                    {paginated.length > 0 ? (
+                      paginated.map((entry, idx) => (
                         <TableRow key={idx}>
                           <TableCell className="font-medium">{entry.label}</TableCell>
                           <TableCell className="text-right">{entry.incoming}</TableCell>
@@ -146,6 +145,7 @@ export default function OwnerReports() {
             </>
           ) : null}
         </CardContent>
+        <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
     </div>
   );

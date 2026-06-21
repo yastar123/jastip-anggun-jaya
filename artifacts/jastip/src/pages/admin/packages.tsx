@@ -3,10 +3,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
+import { Pagination } from "@/components/pagination";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Plus, Search, FileSpreadsheet, Barcode } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const PAGE_SIZE = 10;
 
 function formatRp(n: any) {
   if (!n) return "-";
@@ -24,12 +27,20 @@ function packagingLabel(t: string | null | undefined) {
 export default function AdminPackages() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
 
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
     status: status === "all" ? undefined : (status as PackageStatus),
   });
+
+  const total = packages?.length || 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const paginated = packages?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  function handleSearch(v: string) { setSearch(v); setPage(1); }
+  function handleStatus(v: string) { setStatus(v); setPage(1); }
 
   return (
     <div className="space-y-6">
@@ -40,19 +51,13 @@ export default function AdminPackages() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/packages/import">
-              <FileSpreadsheet className="w-4 h-4 mr-2" />Import Excel
-            </Link>
+            <Link href="/admin/packages/import"><FileSpreadsheet className="w-4 h-4 mr-2" />Import Excel</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/barcode">
-              <Barcode className="w-4 h-4 mr-2" />Label Barcode
-            </Link>
+            <Link href="/admin/barcode"><Barcode className="w-4 h-4 mr-2" />Label Barcode</Link>
           </Button>
           <Button size="sm" asChild>
-            <Link href="/admin/packages/new">
-              <Plus className="w-4 h-4 mr-2" />Input Paket Baru
-            </Link>
+            <Link href="/admin/packages/new"><Plus className="w-4 h-4 mr-2" />Input Paket Baru</Link>
           </Button>
         </div>
       </div>
@@ -61,9 +66,9 @@ export default function AdminPackages() {
         <div className="p-4 border-b flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Cari resi, no paket, nama customer..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder="Cari resi, no paket, nama customer..." className="pl-9" value={search} onChange={(e) => handleSearch(e.target.value)} />
           </div>
-          <Select value={status} onValueChange={setStatus}>
+          <Select value={status} onValueChange={handleStatus}>
             <SelectTrigger className="w-full md:w-[180px]">
               <SelectValue placeholder="Filter Status" />
             </SelectTrigger>
@@ -88,8 +93,8 @@ export default function AdminPackages() {
             <tbody>
               {isLoading ? (
                 <tr><td colSpan={17} className="h-24 text-center text-muted-foreground py-10">Memuat data...</td></tr>
-              ) : packages && packages.length > 0 ? (
-                packages.map((pkg) => (
+              ) : paginated && paginated.length > 0 ? (
+                paginated.map((pkg) => (
                   <tr key={pkg.id} className="border-b hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setLocation(`/admin/packages/${pkg.id}`)}>
                     <td className="py-3 px-3 whitespace-nowrap text-muted-foreground">{formatDate((pkg as any).packageDate || pkg.createdAt)}</td>
                     <td className="py-3 px-3 font-mono font-medium whitespace-nowrap">{pkg.resiNumber || "-"}</td>
@@ -110,8 +115,8 @@ export default function AdminPackages() {
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).price ? formatRp((pkg as any).price) : "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right font-semibold text-primary">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap"><StatusBadge status={pkg.status} /></td>
-                    <td className="py-3 px-3 whitespace-nowrap" onClick={(e)=>e.stopPropagation()}>
-                      <Button variant="ghost" size="sm" onClick={()=>setLocation(`/admin/packages/${pkg.id}`)}>Detail</Button>
+                    <td className="py-3 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" onClick={() => setLocation(`/admin/packages/${pkg.id}`)}>Detail</Button>
                     </td>
                   </tr>
                 ))
@@ -121,6 +126,7 @@ export default function AdminPackages() {
             </tbody>
           </table>
         </CardContent>
+        <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
     </div>
   );

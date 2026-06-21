@@ -3,10 +3,13 @@ import { useListPackages } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import JsBarcode from "jsbarcode";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/pagination";
 import { Download, Printer, Search, ArrowLeft, Barcode } from "lucide-react";
+
+const PAGE_SIZE = 10;
 
 function BarcodeItem({ pkg }: { pkg: any }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -15,23 +18,12 @@ function BarcodeItem({ pkg }: { pkg: any }) {
     if (svgRef.current) {
       try {
         JsBarcode(svgRef.current, pkg.resiNumber || pkg.id.toString(), {
-          format: "CODE128",
-          width: 2,
-          height: 60,
-          displayValue: true,
-          fontSize: 12,
-          margin: 8,
-          background: "#ffffff",
-          lineColor: "#000000",
+          format: "CODE128", width: 2, height: 60, displayValue: true,
+          fontSize: 12, margin: 8, background: "#ffffff", lineColor: "#000000",
         });
       } catch {
         JsBarcode(svgRef.current, pkg.id.toString(), {
-          format: "CODE128",
-          width: 2,
-          height: 60,
-          displayValue: true,
-          fontSize: 12,
-          margin: 8,
+          format: "CODE128", width: 2, height: 60, displayValue: true, fontSize: 12, margin: 8,
         });
       }
     }
@@ -43,28 +35,13 @@ function BarcodeItem({ pkg }: { pkg: any }) {
     const svgData = new XMLSerializer().serializeToString(svg);
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Barcode - ${pkg.resiNumber}</title>
-        <style>
-          body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; }
-          .label { text-align: center; padding: 16px; border: 2px solid #000; display: inline-block; border-radius: 8px; }
-          .pkg-info { font-size: 11px; color: #555; margin-top: 4px; }
-          .pkg-name { font-weight: bold; font-size: 13px; margin-bottom: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="label">
-          <div class="pkg-name">${pkg.resiNumber || "N/A"}</div>
-          ${svgData}
-          <div class="pkg-info">No Paket: ${pkg.packageNumber || "-"} | Customer: ${pkg.customerName || "-"}</div>
-        </div>
-        <script>window.onload = () => { window.print(); window.close(); }</script>
-      </body>
-      </html>
-    `);
+    win.document.write(`<!DOCTYPE html><html><head><title>Barcode - ${pkg.resiNumber}</title>
+      <style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;}
+      .label{text-align:center;padding:16px;border:2px solid #000;display:inline-block;border-radius:8px;}
+      .pkg-info{font-size:11px;color:#555;margin-top:4px;}.pkg-name{font-weight:bold;font-size:13px;margin-bottom:4px;}</style></head>
+      <body><div class="label"><div class="pkg-name">${pkg.resiNumber || "N/A"}</div>${svgData}
+      <div class="pkg-info">No Paket: ${pkg.packageNumber || "-"} | Customer: ${pkg.customerName || "-"}</div></div>
+      <script>window.onload=()=>{window.print();window.close();}</script></body></html>`);
     win.document.close();
   }
 
@@ -77,10 +54,8 @@ function BarcodeItem({ pkg }: { pkg: any }) {
     const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
     img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      ctx?.drawImage(img, 0, 0);
+      canvas.width = img.width; canvas.height = img.height;
+      canvas.getContext("2d")?.drawImage(img, 0, 0);
       URL.revokeObjectURL(url);
       const a = document.createElement("a");
       a.download = `barcode-${pkg.resiNumber || pkg.id}.png`;
@@ -99,15 +74,11 @@ function BarcodeItem({ pkg }: { pkg: any }) {
             <p className="text-xs text-muted-foreground">No Paket: {pkg.packageNumber || "-"}</p>
             <p className="text-xs text-muted-foreground">Customer: {pkg.customerName || "-"}</p>
           </div>
-          <Badge variant="outline" className="text-xs ml-2 shrink-0">
-            {pkg.status || "pending"}
-          </Badge>
+          <Badge variant="outline" className="text-xs ml-2 shrink-0">{pkg.status || "pending"}</Badge>
         </div>
-
         <div className="flex justify-center bg-white border rounded-lg p-2 mb-3">
           <svg ref={svgRef} />
         </div>
-
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={printBarcode}>
             <Printer className="w-3 h-3 mr-1" /> Cetak
@@ -124,6 +95,7 @@ function BarcodeItem({ pkg }: { pkg: any }) {
 export default function AdminBarcode() {
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const { data: packages, isLoading } = useListPackages();
 
   const filtered = (packages || []).filter((p: any) =>
@@ -133,6 +105,12 @@ export default function AdminBarcode() {
     (p.customerName || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  function handleSearch(v: string) { setSearch(v); setPage(1); }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -141,8 +119,7 @@ export default function AdminBarcode() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Barcode className="h-7 w-7 text-primary" />
-            Label Barcode Paket
+            <Barcode className="h-7 w-7 text-primary" />Label Barcode Paket
           </h1>
           <p className="text-muted-foreground mt-1">Cetak atau unduh barcode untuk setiap paket.</p>
         </div>
@@ -151,39 +128,35 @@ export default function AdminBarcode() {
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari no resi, no paket, customer..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Cari no resi, no paket, customer..." className="pl-9" value={search} onChange={(e) => handleSearch(e.target.value)} />
         </div>
-        <Badge variant="secondary">{filtered.length} paket</Badge>
+        <Badge variant="secondary">{total} paket</Badge>
       </div>
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="pt-4 h-48 bg-muted/20 rounded-xl" />
-            </Card>
+            <Card key={i} className="animate-pulse"><CardContent className="pt-4 h-48 bg-muted/20 rounded-xl" /></Card>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : total === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Barcode className="w-16 h-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium">Belum ada paket</p>
           <p className="text-sm mt-1">Tambah paket terlebih dahulu untuk membuat barcode</p>
-          <Button className="mt-4" onClick={() => setLocation("/admin/packages/new")}>
-            Input Paket Baru
-          </Button>
+          <Button className="mt-4" onClick={() => setLocation("/admin/packages/new")}>Input Paket Baru</Button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((pkg: any) => (
-            <BarcodeItem key={pkg.id} pkg={pkg} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            {paginated.map((pkg: any) => (
+              <BarcodeItem key={pkg.id} pkg={pkg} />
+            ))}
+          </div>
+          <div className="border rounded-lg">
+            <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          </div>
+        </>
       )}
     </div>
   );

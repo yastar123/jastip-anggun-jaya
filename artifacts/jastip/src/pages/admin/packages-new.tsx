@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,7 +8,6 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -31,12 +30,10 @@ const packageSchema = z.object({
   totalWeight: z.coerce.number().optional().nullable(),
   price: z.coerce.number().optional().nullable(),
   totalShipping: z.coerce.number().optional().nullable(),
-  notes: z.string().optional().nullable(),
 });
 
 type PackageFormValues = z.infer<typeof packageSchema>;
 
-// Format today's date as YYYY-MM-DD for input[type=date]
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
@@ -57,39 +54,8 @@ export default function AdminPackagesNew() {
       resiNumber: "",
       packageNumber: "",
       itemName: "",
-      notes: "",
     },
   });
-
-  const watchLength = form.watch("length");
-  const watchWidth = form.watch("width");
-  const watchHeight = form.watch("height");
-  const watchRealWeight = form.watch("realWeight");
-  const watchUsedWeight = form.watch("usedWeight");
-  const watchShippingRate = form.watch("shippingRate");
-
-  useEffect(() => {
-    const l = Number(watchLength) || 0;
-    const w = Number(watchWidth) || 0;
-    const h = Number(watchHeight) || 0;
-    if (l > 0 && w > 0 && h > 0) {
-      const volW = parseFloat(((l * w * h) / 6000).toFixed(2));
-      form.setValue("volumeWeight", volW);
-      const realW = Number(watchRealWeight) || 0;
-      const used = realW > 0 ? Math.max(realW, volW) : volW;
-      form.setValue("usedWeight", parseFloat(used.toFixed(2)));
-    } else if (watchRealWeight) {
-      form.setValue("usedWeight", Number(watchRealWeight));
-    }
-  }, [watchLength, watchWidth, watchHeight, watchRealWeight]);
-
-  useEffect(() => {
-    const used = Number(watchUsedWeight) || 0;
-    const rate = Number(watchShippingRate) || 0;
-    if (used > 0 && rate > 0) {
-      form.setValue("totalShipping", parseFloat((used * rate).toFixed(2)));
-    }
-  }, [watchUsedWeight, watchShippingRate]);
 
   async function onSubmit(values: PackageFormValues) {
     try {
@@ -128,7 +94,6 @@ export default function AdminPackagesNew() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Tanggal */}
               <FormField
                 control={form.control}
                 name="packageDate"
@@ -260,7 +225,6 @@ export default function AdminPackagesNew() {
                 />
               </div>
 
-              {/* P, L, T */}
               <div className="grid grid-cols-3 gap-4">
                 {[
                   { name: "length" as const, label: "P — Panjang (cm)" },
@@ -287,9 +251,8 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Berat Volume (Kg)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="Auto P×L×T÷6000" {...field} value={field.value ?? ""} readOnly className="bg-muted/50 text-muted-foreground" />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
-                      <p className="text-xs text-muted-foreground">Otomatis: P × L × T ÷ 6000</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -301,9 +264,8 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Berat Yang Digunakan (Kg)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="MAX(Real, Volume)" {...field} value={field.value ?? ""} readOnly className="bg-muted/50 text-muted-foreground" />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
-                      <p className="text-xs text-muted-foreground">Otomatis: MAX(Berat Real, Berat Volume)</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -339,7 +301,7 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Total Berat (Kg)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="Total semua paket konsumen" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -368,34 +330,13 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Total Ongkir (Rp)</FormLabel>
                       <FormControl>
-                        <Input type="number" step="100" placeholder="Otomatis: Berat × Ongkir/Kg" {...field} value={field.value ?? ""} readOnly className="bg-muted/50 font-semibold" />
+                        <Input type="number" step="100" placeholder="0" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)} />
                       </FormControl>
-                      <p className="text-xs text-muted-foreground">Otomatis: Berat Digunakan × Ongkir per Kg</p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          <Card>
-            <CardHeader><CardTitle className="text-base">Catatan</CardTitle></CardHeader>
-            <CardContent>
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Catatan Tambahan (Opsional)</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Tambahkan catatan atau keterangan khusus..." {...field} value={field.value || ""} rows={3} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
 

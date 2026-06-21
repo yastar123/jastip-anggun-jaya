@@ -6,15 +6,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Power, KeyRound } from "lucide-react";
 
+const PAGE_SIZE = 10;
+
 export default function OwnerUsers() {
   const { data: admins, isLoading } = useListAdmins();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [page, setPage] = useState(1);
 
   const createAdmin = useCreateAdmin();
   const toggleActive = useToggleAdminActive();
@@ -22,9 +26,12 @@ export default function OwnerUsers() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ name: "", phone: "", password: "" });
-
   const [resetId, setResetId] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState("");
+
+  const total = admins?.length || 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const paginated = admins?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleAddAdmin = async () => {
     try {
@@ -69,9 +76,7 @@ export default function OwnerUsers() {
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="w-4 h-4 mr-2" /> Tambah Admin
-            </Button>
+            <Button><UserPlus className="w-4 h-4 mr-2" /> Tambah Admin</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -94,9 +99,7 @@ export default function OwnerUsers() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddOpen(false)}>Batal</Button>
-              <Button onClick={handleAddAdmin} disabled={createAdmin.isPending || !newAdmin.name || !newAdmin.phone || !newAdmin.password}>
-                Simpan Admin
-              </Button>
+              <Button onClick={handleAddAdmin} disabled={createAdmin.isPending || !newAdmin.name || !newAdmin.phone || !newAdmin.password}>Simpan Admin</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -115,11 +118,9 @@ export default function OwnerUsers() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Memuat data...</TableCell>
-                </TableRow>
-              ) : admins && admins.length > 0 ? (
-                admins.map((admin) => (
+                <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Memuat data...</TableCell></TableRow>
+              ) : paginated && paginated.length > 0 ? (
+                paginated.map((admin) => (
                   <TableRow key={admin.id}>
                     <TableCell className="font-medium">{admin.name}</TableCell>
                     <TableCell>{admin.phone}</TableCell>
@@ -153,9 +154,7 @@ export default function OwnerUsers() {
                           </div>
                           <DialogFooter>
                             <Button variant="outline" onClick={() => setResetId(null)}>Batal</Button>
-                            <Button onClick={handleResetPassword} disabled={resetPassword.isPending || !newPassword}>
-                              Simpan Password
-                            </Button>
+                            <Button onClick={handleResetPassword} disabled={resetPassword.isPending || !newPassword}>Simpan Password</Button>
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
@@ -163,13 +162,12 @@ export default function OwnerUsers() {
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">Belum ada admin.</TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground">Belum ada admin.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
+        <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
     </div>
   );
