@@ -156,9 +156,9 @@ function formatRp(n: number | null | undefined) {
   return `Rp ${n.toLocaleString("id-ID")}`;
 }
 
-function parseQueryParams(location: string) {
+function parseQueryParams() {
   try {
-    const q = new URLSearchParams(location.split("?")[1] || "");
+    const q = new URLSearchParams(window.location.search);
     return {
       serviceType: q.get("serviceType") || undefined,
       packageMode: q.get("packageMode") || undefined,
@@ -182,7 +182,7 @@ export default function AdminPackagesNew() {
 
   const createPackage = useCreatePackage();
 
-  const params = parseQueryParams(location);
+  const params = parseQueryParams();
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
@@ -687,11 +687,20 @@ export default function AdminPackagesNew() {
                     <FormItem>
                       <FormLabel>Harga Barang (Rp)</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number" step="1000" placeholder="0"
-                          {...field} value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">Rp</span>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="0"
+                            className="pl-9"
+                            value={field.value != null ? Number(field.value).toLocaleString("id-ID") : ""}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\./g, "").replace(/[^0-9]/g, "");
+                              field.onChange(raw ? Number(raw) : null);
+                            }}
+                          />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plane, Ship, Package, Truck } from "lucide-react";
+import { ArrowLeft, Plane, Ship, Package, Truck, ChevronDown, ChevronUp } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useState } from "react";
 
 function formatRp(n: number) {
   return `Rp ${n.toLocaleString("id-ID")}`;
@@ -18,15 +18,21 @@ const SERVICES = [
     color: "text-green-600",
     bg: "bg-green-50",
     ringColor: "ring-green-500",
-    headerBg: "bg-green-50",
+    borderColor: "border-green-200",
+    badgeBg: "bg-green-100 text-green-700",
     rateType: "per-kg" as const,
-    ratePerKg: 10000,
-    rateNote: "Tarif Rp 10.000/kg",
-    rates: [
-      { label: "1 kg", value: 10000 },
-      { label: "2 kg", value: 20000 },
-      { label: "5 kg", value: 50000 },
-      { label: "10 kg", value: 100000 },
+    rateNote: "Tarif flat Rp 10.000/kg",
+    routes: [
+      {
+        route: "Surabaya → Manokwari",
+        rates: [
+          { label: "1 kg", ratePerKg: 10000, total: 10000 },
+          { label: "5 kg", ratePerKg: 10000, total: 50000 },
+          { label: "10 kg", ratePerKg: 10000, total: 100000 },
+          { label: "20 kg", ratePerKg: 10000, total: 200000 },
+        ],
+        flatRate: 10000,
+      },
     ],
   },
   {
@@ -37,41 +43,54 @@ const SERVICES = [
     color: "text-blue-600",
     bg: "bg-blue-50",
     ringColor: "ring-blue-500",
-    headerBg: "bg-blue-50",
+    borderColor: "border-blue-200",
+    badgeBg: "bg-blue-100 text-blue-700",
     rateType: "bracket" as const,
-    rateNote: "Tarif berdasarkan berat paket",
-    rates: [
-      { label: "1 – 200 gram", value: 15800 },
-      { label: "201 – 400 gram", value: 30800 },
-      { label: "401 – 500 gram", value: 38500 },
-      { label: "600 gram", value: 46200 },
-      { label: "700 gram", value: 53900 },
-      { label: "800 gram", value: 61600 },
-      { label: "900 gram", value: 69300 },
-      { label: "1 kg", value: 77000 },
-      { label: "2 kg", value: 154000 },
-      { label: "3 kg", value: 231000 },
-      { label: "5 kg", value: 385000 },
-      { label: "10 kg", value: 770000 },
+    rateNote: "Tarif per berat paket",
+    routes: [
+      {
+        route: "Jakarta → Manokwari",
+        flatRate: null,
+        rates: [
+          { label: "1 – 200 gram", ratePerKg: null, total: 15800 },
+          { label: "201 – 400 gram", ratePerKg: null, total: 30800 },
+          { label: "401 – 500 gram", ratePerKg: null, total: 38500 },
+          { label: "600 gram", ratePerKg: null, total: 46200 },
+          { label: "700 gram", ratePerKg: null, total: 53900 },
+          { label: "800 gram", ratePerKg: null, total: 61600 },
+          { label: "900 gram", ratePerKg: null, total: 69300 },
+          { label: "1 kg", ratePerKg: null, total: 77000 },
+          { label: "2 kg", ratePerKg: null, total: 154000 },
+          { label: "3 kg", ratePerKg: null, total: 231000 },
+          { label: "5 kg", ratePerKg: null, total: 385000 },
+          { label: "10 kg", ratePerKg: null, total: 770000 },
+        ],
+      },
     ],
   },
   {
     key: "jastip kargo",
     title: "Jastip Kargo",
-    route: "Jakarta/Surabaya → Manokwari",
+    route: "Jakarta / Surabaya → Manokwari",
     icon: Truck,
     color: "text-orange-600",
     bg: "bg-orange-50",
     ringColor: "ring-orange-500",
-    headerBg: "bg-orange-50",
+    borderColor: "border-orange-200",
+    badgeBg: "bg-orange-100 text-orange-700",
     rateType: "per-kg" as const,
-    ratePerKg: 7000,
-    rateNote: "Tarif Rp 7.000/kg",
-    rates: [
-      { label: "10 kg", value: 70000 },
-      { label: "20 kg", value: 140000 },
-      { label: "50 kg", value: 350000 },
-      { label: "100 kg", value: 700000 },
+    rateNote: "Tarif flat Rp 7.000/kg",
+    routes: [
+      {
+        route: "Jakarta / Surabaya → Manokwari",
+        flatRate: 7000,
+        rates: [
+          { label: "10 kg", ratePerKg: 7000, total: 70000 },
+          { label: "20 kg", ratePerKg: 7000, total: 140000 },
+          { label: "50 kg", ratePerKg: 7000, total: 350000 },
+          { label: "100 kg", ratePerKg: 7000, total: 700000 },
+        ],
+      },
     ],
   },
   {
@@ -82,176 +101,175 @@ const SERVICES = [
     color: "text-cyan-600",
     bg: "bg-cyan-50",
     ringColor: "ring-cyan-500",
-    headerBg: "bg-cyan-50",
+    borderColor: "border-cyan-200",
+    badgeBg: "bg-cyan-100 text-cyan-700",
     rateType: "tiered" as const,
     rateNote: "Tarif berjenjang per kg",
-    tieredRoutes: [
+    routes: [
       {
         route: "Jakarta → Manokwari",
-        tiers: [
-          { label: "1 – 10 kg", ratePerKg: 20000, example: "5 kg = Rp 100.000" },
-          { label: "11 – 20 kg", ratePerKg: 19000, example: "15 kg = Rp 285.000" },
-          { label: "21 – 40 kg", ratePerKg: 18000, example: "30 kg = Rp 540.000" },
-          { label: "41 – 80 kg", ratePerKg: 17000, example: "50 kg = Rp 850.000" },
+        flatRate: null,
+        rates: [
+          { label: "1 – 10 kg", ratePerKg: 20000, total: null },
+          { label: "11 – 20 kg", ratePerKg: 19000, total: null },
+          { label: "21 – 40 kg", ratePerKg: 18000, total: null },
+          { label: "41 – 80 kg", ratePerKg: 17000, total: null },
         ],
       },
       {
         route: "Surabaya → Manokwari",
-        tiers: [
-          { label: "1 – 10 kg", ratePerKg: 18000, example: "5 kg = Rp 90.000" },
-          { label: "11 – 20 kg", ratePerKg: 17000, example: "15 kg = Rp 255.000" },
-          { label: "21 – 40 kg", ratePerKg: 16000, example: "30 kg = Rp 480.000" },
-          { label: "41 – 80 kg", ratePerKg: 15500, example: "50 kg = Rp 775.000" },
+        flatRate: null,
+        rates: [
+          { label: "1 – 10 kg", ratePerKg: 18000, total: null },
+          { label: "11 – 20 kg", ratePerKg: 17000, total: null },
+          { label: "21 – 40 kg", ratePerKg: 16000, total: null },
+          { label: "41 – 80 kg", ratePerKg: 15500, total: null },
         ],
       },
     ],
-    rates: [],
   },
 ];
 
 export default function AdminPackagesType() {
-  const [selected, setSelected] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
+  const [openRates, setOpenRates] = useState<Record<string, boolean>>({});
 
-  function chooseMode(mode: "single" | "grup") {
-    if (!selected) return;
-    const q = new URLSearchParams({ serviceType: selected, packageMode: mode });
+  function navigate(serviceType: string, mode: "single" | "grup") {
+    const q = new URLSearchParams({ serviceType, packageMode: mode });
     setLocation(`${base}/packages/new?${q.toString()}`);
+  }
+
+  function toggleRates(key: string) {
+    setOpenRates((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setLocation(`${base}/packages`)}
-        >
+        <Button variant="outline" size="icon" onClick={() => setLocation(`${base}/packages`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pilih Jenis Jastip</h1>
-          <p className="text-muted-foreground mt-1">
-            Pilih jenis layanan dan lihat tarif ongkir sebelum mengisi data paket.
-          </p>
+          <p className="text-muted-foreground mt-1">Pilih jenis layanan dan mode input paket.</p>
         </div>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
         {SERVICES.map((s) => {
           const Icon = s.icon;
-          const isSelected = selected === s.key;
+          const isOpen = !!openRates[s.key];
           return (
-            <Card
-              key={s.key}
-              className={`cursor-pointer transition-all border-2 ${
-                isSelected
-                  ? `ring-2 ${s.ringColor} shadow-lg border-transparent`
-                  : "hover:shadow-md border-border"
-              }`}
-              onClick={() => setSelected(s.key)}
-            >
+            <Card key={s.key} className={`border-2 ${s.borderColor} transition-all`}>
               {/* Header */}
-              <CardHeader className={`pb-2 rounded-t-xl ${isSelected ? s.headerBg : ""}`}>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center shadow-sm`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center shadow-sm shrink-0`}>
                     <Icon className={`w-5 h-5 ${s.color}`} />
                   </div>
                   <div>
-                    <p className="font-bold">{s.title}</p>
+                    <p className="font-bold text-base">{s.title}</p>
                     <p className="text-xs font-normal text-muted-foreground">{s.route}</p>
                   </div>
+                  <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${s.badgeBg}`}>
+                    {s.rateType === "tiered" ? "Berjenjang" : s.rateType === "bracket" ? "Bracket" : "Flat/kg"}
+                  </span>
                 </CardTitle>
               </CardHeader>
 
-              <CardContent className="pt-2 pb-3 space-y-3">
-                {/* Rate label */}
-                <p className={`text-xs font-semibold ${s.color} uppercase tracking-wide`}>{s.rateNote}</p>
+              <CardContent className="pt-0 space-y-4">
+                {/* Mode buttons — always visible */}
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    className="w-full"
+                    onClick={() => navigate(s.key, "single")}
+                  >
+                    1 Paket
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className={`w-full border-2 ${s.borderColor}`}
+                    onClick={() => navigate(s.key, "grup")}
+                  >
+                    Grup Paket
+                  </Button>
+                </div>
 
-                {/* Rate table */}
-                {s.rateType === "bracket" && (
-                  <div className="border rounded-lg overflow-hidden text-xs">
-                    <div className="grid grid-cols-2 bg-muted/60 px-3 py-1.5 font-semibold text-muted-foreground">
-                      <span>Berat Paket</span>
-                      <span className="text-right">Ongkir</span>
-                    </div>
-                    <div className="divide-y max-h-52 overflow-y-auto">
-                      {s.rates.map((r, i) => (
-                        <div key={i} className="grid grid-cols-2 px-3 py-1.5 hover:bg-muted/30">
-                          <span className="text-muted-foreground">{r.label}</span>
-                          <span className="text-right font-semibold">{formatRp(r.value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Tarif ongkir — collapsible, at bottom */}
+                <div className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-muted/50 hover:bg-muted/80 transition-colors text-left"
+                    onClick={() => toggleRates(s.key)}
+                  >
+                    <span className={`text-xs font-semibold ${s.color} uppercase tracking-wide`}>
+                      {s.rateNote}
+                    </span>
+                    {isOpen ? (
+                      <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </button>
 
-                {s.rateType === "per-kg" && (
-                  <div className="border rounded-lg overflow-hidden text-xs">
-                    <div className="grid grid-cols-2 bg-muted/60 px-3 py-1.5 font-semibold text-muted-foreground">
-                      <span>Berat Paket</span>
-                      <span className="text-right">Ongkir</span>
-                    </div>
+                  {isOpen && (
                     <div className="divide-y">
-                      {s.rates.map((r, i) => (
-                        <div key={i} className="grid grid-cols-2 px-3 py-1.5 hover:bg-muted/30">
-                          <span className="text-muted-foreground">{r.label}</span>
-                          <span className="text-right font-semibold">{formatRp(r.value)}</span>
+                      {s.routes.map((rt) => (
+                        <div key={rt.route}>
+                          {/* Route sub-header (only if multiple routes) */}
+                          {s.routes.length > 1 && (
+                            <div className="px-3 py-1.5 bg-muted/30 text-xs font-semibold text-muted-foreground border-b">
+                              {rt.route}
+                            </div>
+                          )}
+                          {/* Column header */}
+                          {s.rateType === "tiered" ? (
+                            <div className="grid grid-cols-3 px-3 py-1.5 bg-muted/20 text-xs font-semibold text-muted-foreground border-b">
+                              <span>Berat</span>
+                              <span className="text-center">Tarif/kg</span>
+                              <span className="text-right">Contoh</span>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 px-3 py-1.5 bg-muted/20 text-xs font-semibold text-muted-foreground border-b">
+                              <span>Berat Paket</span>
+                              <span className="text-right">Ongkir</span>
+                            </div>
+                          )}
+                          {/* Rows */}
+                          <div className="divide-y max-h-52 overflow-y-auto text-xs">
+                            {rt.rates.map((r, i) => (
+                              <div
+                                key={i}
+                                className={`px-3 py-1.5 hover:bg-muted/20 ${s.rateType === "tiered" ? "grid grid-cols-3" : "grid grid-cols-2"}`}
+                              >
+                                <span className="text-muted-foreground">{r.label}</span>
+                                {s.rateType === "tiered" && r.ratePerKg != null ? (
+                                  <>
+                                    <span className="text-center font-semibold">{formatRp(r.ratePerKg)}</span>
+                                    <span className="text-right text-muted-foreground">
+                                      {r.label.split(" – ")[0].replace(" kg", "")} kg = {formatRp(Number(r.label.split(" – ")[0].replace(/[^0-9]/g, "") || "1") * r.ratePerKg)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-right font-semibold">
+                                    {r.total != null ? formatRp(r.total) : r.ratePerKg != null ? formatRp(r.ratePerKg) : "-"}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {rt.flatRate != null && (
+                            <div className="px-3 py-1.5 bg-muted/10 text-xs text-muted-foreground italic border-t">
+                              *Berat lainnya = berat × Rp {rt.flatRate.toLocaleString("id-ID")}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
-                    <div className="px-3 py-1.5 bg-muted/30 text-muted-foreground italic">
-                      *Berat lainnya dihitung otomatis
-                    </div>
-                  </div>
-                )}
-
-                {s.rateType === "tiered" && s.tieredRoutes && (
-                  <div className="space-y-2">
-                    {s.tieredRoutes.map((tr) => (
-                      <div key={tr.route} className="border rounded-lg overflow-hidden text-xs">
-                        <div className="bg-muted/60 px-3 py-1.5 font-semibold text-muted-foreground">
-                          {tr.route}
-                        </div>
-                        <div className="grid grid-cols-3 px-3 py-1 font-semibold text-muted-foreground bg-muted/30 border-b">
-                          <span>Berat</span>
-                          <span className="text-center">Tarif/kg</span>
-                          <span className="text-right">Contoh</span>
-                        </div>
-                        <div className="divide-y">
-                          {tr.tiers.map((tier, i) => (
-                            <div key={i} className="grid grid-cols-3 px-3 py-1.5 hover:bg-muted/30">
-                              <span className="text-muted-foreground">{tier.label}</span>
-                              <span className="text-center font-semibold">{formatRp(tier.ratePerKg)}</span>
-                              <span className="text-right text-muted-foreground">{tier.example}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Mode buttons when selected */}
-                {isSelected && (
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      className="flex-1"
-                      onClick={(e) => { e.stopPropagation(); chooseMode("single"); }}
-                    >
-                      1 Paket
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={(e) => { e.stopPropagation(); chooseMode("grup"); }}
-                    >
-                      Grup Paket
-                    </Button>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           );
