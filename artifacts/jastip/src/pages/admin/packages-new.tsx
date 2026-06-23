@@ -200,8 +200,6 @@ export default function AdminPackagesNew() {
   const width = form.watch("width");
   const height = form.watch("height");
   const realWeight = form.watch("realWeight");
-  const volumeWeight = form.watch("volumeWeight");
-  const usedWeight = form.watch("usedWeight");
   const packageMode = form.watch("packageMode");
   const packageDate = form.watch("packageDate");
 
@@ -216,37 +214,38 @@ export default function AdminPackagesNew() {
       form.setValue("deliveryRoute", "" as any, { shouldDirty: true });
       return;
     }
-    const selectedRoute = options.find((o) => o.value === deliveryRoute);
+    const currentRoute = form.getValues("deliveryRoute");
+    const selectedRoute = options.find((o) => o.value === currentRoute);
     if (!selectedRoute) {
       form.setValue("deliveryRoute", options[0].value, { shouldDirty: true });
     }
   }, [serviceType]);
 
-  // Auto-calculate volume weight
+  // Single consolidated effect: compute volumeWeight → usedWeight → shippingRate → totalShipping
   useEffect(() => {
+    const currentRoute = form.getValues("deliveryRoute");
+
+    // Step 1: volume weight
+    let vw: number | null = null;
     const divisor = serviceType ? volumeDivisor[serviceType] : undefined;
-    if (!divisor || !length || !width || !height) return;
-    const computed = Number(((length * width * height) / divisor).toFixed(3));
-    form.setValue("volumeWeight", computed, { shouldDirty: true });
-  }, [serviceType, length, width, height]);
-
-  // Auto-calculate used weight
-  useEffect(() => {
-    const real = realWeight ?? 0;
-    const volume = volumeWeight ?? 0;
-    const calc = Math.max(real, volume);
-    if (calc > 0) {
-      form.setValue("usedWeight", calc, { shouldDirty: true });
+    if (divisor && length && width && height && length > 0 && width > 0 && height > 0) {
+      vw = Number(((length * width * height) / divisor).toFixed(3));
     }
-  }, [realWeight, volumeWeight]);
+    form.setValue("volumeWeight", vw, { shouldDirty: true });
 
-  // Auto-calculate shipping rate and total shipping
-  useEffect(() => {
-    const rate = getShippingRate(serviceType, deliveryRoute, usedWeight);
-    const total = getTotalShipping(serviceType, deliveryRoute, usedWeight);
+    // Step 2: used weight — use freshly-computed vw, not stale watched value
+    const real = realWeight ?? 0;
+    const volume = vw ?? 0;
+    const uw = Math.max(real, volume);
+    form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
+
+    // Step 3: shipping rate + total shipping
+    const effectiveRoute = currentRoute || deliveryRoute;
+    const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
+    const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
     form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
     form.setValue("totalShipping", total ?? null, { shouldDirty: true });
-  }, [serviceType, deliveryRoute, usedWeight]);
+  }, [serviceType, deliveryRoute, realWeight, length, width, height]);
 
   async function onSubmit(values: PackageFormValues) {
     try {
