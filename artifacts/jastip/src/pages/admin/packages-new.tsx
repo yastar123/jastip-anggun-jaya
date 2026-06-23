@@ -184,6 +184,10 @@ export default function AdminPackagesNew() {
 
   const params = parseQueryParams();
 
+  const defaultRoute = params.serviceType
+    ? (deliveryRouteOptions[params.serviceType]?.[0]?.value ?? undefined)
+    : undefined;
+
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
     defaultValues: {
@@ -194,6 +198,7 @@ export default function AdminPackagesNew() {
       customerName: params.customerName || "",
       serviceType: params.serviceType,
       packageMode: params.packageMode,
+      deliveryRoute: defaultRoute,
     },
   });
 
@@ -488,32 +493,43 @@ export default function AdminPackagesNew() {
                 <FormField
                   control={form.control}
                   name="deliveryRoute"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lokasi Pengiriman</FormLabel>
-                      <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || ""}
-                          disabled={!serviceType}
-                        >
+                  render={({ field }) => {
+                    const routeOpts = deliveryRouteOptions[serviceType || ""] || [];
+                    const isSingleRoute = params.serviceType && routeOpts.length === 1;
+                    return (
+                      <FormItem>
+                        <FormLabel>Lokasi Pengiriman</FormLabel>
+                        {isSingleRoute ? (
+                          <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                            {field.value || routeOpts[0]?.label || "-"}
+                            <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                          </div>
+                        ) : (
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={serviceType ? "Pilih lokasi pengiriman" : "Pilih jenis jastip dahulu"} />
-                            </SelectTrigger>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || ""}
+                              disabled={!serviceType}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder={serviceType ? "Pilih lokasi pengiriman" : "Pilih jenis jastip dahulu"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {routeOpts.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </FormControl>
-                          <SelectContent>
-                            {(deliveryRouteOptions[serviceType || ""] || []).map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
             </CardContent>
