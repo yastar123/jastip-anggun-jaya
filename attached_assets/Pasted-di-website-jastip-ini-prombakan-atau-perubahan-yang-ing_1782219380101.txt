@@ -1,0 +1,83 @@
+di website jastip ini prombakan atau perubahan yang ingin saya lakukan,
+
+1. hapus role, fitur dan menu mengenai costumer jadi hanya ada 2 role admin dan owner
+2. di page /admin/barcode buat jad ada 2 menu yaitu barcode 1 paket dan barcode grup paket
+3. di page /admin/barcode buat pagination yang menampilkan 10 per pagination
+4. di page atau menu input paket hapus input nama barang
+5. di page atau menu input barang jenis jastipnya itu otomatis terisi dengan jenis jastip yang kita pilih sebelumnya
+6. di page atau menu input barang nomor paket 
+7.  di page atau menu input barang jenis paking itu input manual
+8. di page atau menu paket untuk input berat volume dan berat yang di gunakan itu sama dari input p x l x t yang secara otomatis terisi
+     Volume = P × L × T / ekspedisi
+     espedisi: Pesawat 5.000, Hemat 4.000, Pelni 4.000, Cargo 1.000.000.
+9. di page atau menu input paket pada form Ongkir & Harga otomatis terisi berdasarkan data-data di bawahini
+
+Jastip Pesawat Jakarta → Manokwari
+Tarif: Rp 77.000/kg
+
+| Berat Paket | Ongkir |
+| -------------- | ---------: |
+| 1 - 200 gram | Rp 15.800 |
+| 201 - 400 gram | Rp 30.800 |
+| 401 - 500 gram | Rp 38.500 |
+| 600 gram | Rp 46.200 |
+| 700 gram | Rp 53.900 |
+| 800 gram | Rp 61.600 |
+| 900 gram | Rp 69.300 |
+| 1 kg | Rp 77.000 |
+| 2 kg | Rp 154.000 |
+| 3 kg | Rp 231.000 |
+| 5 kg | Rp 385.000 |
+| 10 kg | Rp 770.000 |
+
+Jastip Hemat+
+Surabaya → Manokwari
+Tarif: Rp 10.000/kg
+| Berat Paket | Ongkir |
+| ----------- | ---------: |
+| 1 kg | Rp 10.000 |
+| 2 kg | Rp 20.000 |
+| 5 kg | Rp 50.000 |
+| 10 kg | Rp 100.000 |
+
+
+Jastip Cargo Jakarta/Surabaya → Manokwari
+Tarif: Rp 7.000/kg
+| Berat Paket | Ongkir |
+| ----------- | ---------: |
+| 10 kg | Rp 70.000 |
+| 20 kg | Rp 140.000 |
+| 50 kg | Rp 350.000 |
+| 100 kg | Rp 700.000 |
+
+Jastip Pelni Jakarta → Manokwari
+| Berat Paket | Tarif/kg | Total Ongkir |
+| ----------- | --------: | -----------------------: |
+| 1 - 10 kg | Rp 20.000 | Misal 5 kg = Rp 100.000 |
+| 11 - 20 kg | Rp 19.000 | Misal 15 kg = Rp 285.000 |
+| 21 - 40 kg | Rp 18.000 | Misal 30 kg = Rp 540.000 |
+| 41 - 80 kg | Rp 17.000 | Misal 50 kg = Rp 850.000 |
+
+Jastip Pelni Surabaya → Manokwari
+| Berat Paket | Tarif/kg | Total Ongkir |
+| ----------- | --------: | -----------------------: |
+| 1 - 10 kg | Rp 18.000 | Misal 5 kg = Rp 90.000 |
+| 11 - 20 kg | Rp 17.000 | Misal 15 kg = Rp 255.000 |
+| 21 - 40 kg | Rp 16.000 | Misal 30 kg = Rp 480.000 |
+| 41 - 80 kg | Rp 15.500 | Misal 50 kg = Rp 775.000 |
+
+10. di page input paket untuk total ongkir itu otomatis dan bisa di rename 
+
+10. untuk flownya menjadi seperti ini
+     admin login -> admin ke menu input paket -> di page itu ada card -> jenis jastip -> saat di klick salah satu jastip kemudian muncul tombol, 1 paket dan grup paket
+
+      input paket ( 1 paket ) -> admin input data-data -> generate barcode 
+
+      input paket ( paket grup ) -> admin input data-data -> ada tombol next untuk input data-data kembali -> admin input data-data tapi  nama konsumen, jenis jastip, tanggal terisi otomatis sesuai dengan data sebelumnya -> kalau klick selesai maka barcode ke generate otomatis 
+ 
+
+11. ukuran barcode saat di print sebesar 1 halaman tapi di bawah barcode ada teks berdasarkan data barcode no seri, nama, jenis jastip, dan berat volume
+
+12. untuk saat scan itu akan memuncul kan data-data terkait barcodenya dan disitu da notifikas ada tombol serahkan paket atau tolak yang mana ketika di serahkan status                 paket menjadi di serahkan jika di tolah status paket pending
+
+13. status paket ada 2 pending dan sudah di serahkan

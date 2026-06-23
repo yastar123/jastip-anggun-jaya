@@ -33,28 +33,27 @@ Platform manajemen jastip ekspedisi untuk bisnis "Jastip Anggun Jaya" — mengel
 
 ## Architecture decisions
 
-- 3 roles: customer, admin, owner — different sidebar navigation per role
+- 2 active roles: admin, owner — customer role removed from frontend/routing
 - Token auth via localStorage (`jaj_token`) + sessions table with 7-day expiry
 - Password hashed with SHA-256 + `jaj_salt_2024`
-- Packages default to `ready` status when admin inputs them (langsung siap ambil)
+- Package statuses: only `pending` and `diserahkan` (no in_transit/ready/picked_up)
+- packageMode: "single" or "grup" — grup paket keeps customer/service/date across entries
 - Barcode format: `JAJ-<timestamp-base36>-<random-hex>`
+- Ongkir auto-calc from bracket tables; pesawat uses total bracket (not per-kg×weight)
+- Label barcode cetak: full A4 page dengan info paket lengkap
 
 ## Product
 
-**3 Roles:**
-- **Customer**: Dashboard, Paket Saya, Scan Paket, Riwayat Pengambilan
-- **Admin**: Dashboard + chart, Input Paket (manual + import JSON/Excel), Konfirmasi Pengambilan, Cetak Barcode
-- **Owner**: Dashboard, Monitoring Paket/Customer/Admin, Laporan (harian/bulanan/tahunan) + Export, Manajemen User (Admin)
+**2 Active Roles:**
+- **Admin**: Dashboard + chart, Input Paket (1 Paket / Grup Paket), Import Excel, Label Barcode (tab 1 Paket / Grup), Scan Barcode (Serahkan/Tolak)
+- **Owner**: Dashboard, Monitor Paket, Data Admin, Keuangan, Laporan, Manajemen User
 
 ## Demo Credentials
 
 | Role | Nomor HP | Password |
 |------|----------|----------|
-| Owner | 08000000000 | owner123 |
-| Admin | 08111111111 | admin123 |
-| Admin 2 | 08111111112 | admin123 |
-| Customer (Andi) | 08222222221 | cust123 |
-| Customer (Dewi) | 08222222222 | cust123 |
+| Owner | 081200000000 | owner123 |
+| Admin | 081200000001 | admin123 |
 
 ## Gotchas
 

@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { StatusBadge } from "@/components/status-badge";
-import { Camera, Upload, ScanLine, X, AlertCircle, Hash } from "lucide-react";
+import { Camera, Upload, ScanLine, X, AlertCircle, Hash, CheckCircle2, XCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
 function formatRp(n: any) {
@@ -15,10 +14,6 @@ function formatRp(n: any) {
 function formatDate(d: string | null | undefined) {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-function packagingLabel(t: string | null | undefined) {
-  const map: Record<string, string> = { karton:"Karton", plastik:"Plastik", kayu:"Kayu", bubble_wrap:"Bubble Wrap", sack:"Karung", lainnya:"Lainnya" };
-  return t ? (map[t] || t) : "-";
 }
 
 type ScanState = "idle" | "camera" | "result";
@@ -30,8 +25,10 @@ export default function AdminScan() {
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [foundPackage, setFoundPackage] = useState<any>(null);
   const [notFound, setNotFound] = useState(false);
+  const [notFoundMsg, setNotFoundMsg] = useState("");
   const [resiInput, setResiInput] = useState("");
   const [isLooking, setIsLooking] = useState(false);
+  const [isActioning, setIsActioning] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -39,14 +36,15 @@ export default function AdminScan() {
 
   async function lookupCode(code: string) {
     setIsLooking(true);
+    setFoundPackage(null);
+    setNotFound(false);
     try {
       const token = localStorage.getItem("jaj_token");
-      // Try barcode scan endpoint first
       const r = await fetch(`/api/packages/scan/${encodeURIComponent(code)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await r.json();
-      if (data.valid && data.package) {
+      if (data.package) {
         setFoundPackage(data.package);
         setNotFound(false);
         setScanState("result");
@@ -64,11 +62,13 @@ export default function AdminScan() {
       } else {
         setFoundPackage(null);
         setNotFound(true);
+        setNotFoundMsg("Paket tidak ditemukan. Pastikan nomor resi atau barcode sudah benar.");
         setScanState("result");
       }
     } catch {
       setFoundPackage(null);
       setNotFound(true);
+      setNotFoundMsg("Terjadi kesalahan saat mencari paket.");
       setScanState("result");
     } finally {
       setIsLooking(false);
@@ -134,6 +134,7 @@ export default function AdminScan() {
   async function handleResiSearch(e: React.FormEvent) {
     e.preventDefault();
     if (!resiInput.trim()) return;
+    setScanState("result");
     await lookupCode(resiInput.trim());
     setResiInput("");
   }
@@ -142,10 +143,52 @@ export default function AdminScan() {
     setScanState("idle");
     setFoundPackage(null);
     setNotFound(false);
+    setNotFoundMsg("");
     setResiInput("");
   }
 
+  async function serahkanPaket() {
+    if (!foundPackage) return;
+    setIsActioning(true);
+    try {
+      const token = localStorage.getItem("jaj_token");
+      const r = await fetch(`/api/packages/${foundPackage.id}/serahkan`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      if (!r.ok) throw new Error("Gagal menyerahkan paket");
+      const updated = await r.json();
+      setFoundPackage(updated);
+      toast({ title: "Paket Diserahkan", description: `Paket ${foundPackage.resiNumber} berhasil diserahkan ke konsumen.` });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Gagal", description: err.message });
+    } finally {
+      setIsActioning(false);
+    }
+  }
+
+  async function tolakPaket() {
+    if (!foundPackage) return;
+    setIsActioning(true);
+    try {
+      const token = localStorage.getItem("jaj_token");
+      const r = await fetch(`/api/packages/${foundPackage.id}/tolak`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      if (!r.ok) throw new Error("Gagal menolak paket");
+      const updated = await r.json();
+      setFoundPackage(updated);
+      toast({ title: "Paket Ditolak", description: `Status paket ${foundPackage.resiNumber} dikembalikan ke Pending.` });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Gagal", description: err.message });
+    } finally {
+      setIsActioning(false);
+    }
+  }
+
   const pkg = foundPackage;
+  const isDiserahkan = pkg?.status === "diserahkan";
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -153,10 +196,9 @@ export default function AdminScan() {
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
           <ScanLine className="h-7 w-7 text-primary" />Scan Barcode Paket
         </h1>
-        <p className="text-muted-foreground mt-1">Scan, upload gambar, atau ketik nomor resi.</p>
+        <p className="text-muted-foreground mt-1">Scan, upload gambar, atau ketik nomor resi untuk menyerahkan paket.</p>
       </div>
 
-      {/* Scanner area */}
       <div id={SCANNER_ID} className={scanState === "camera" ? "w-full rounded-xl overflow-hidden border" : "hidden"} />
 
       {scanState === "idle" && (
@@ -184,12 +226,12 @@ export default function AdminScan() {
           </div>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><Hash className="h-4 w-4" />Input Nomor Resi</CardTitle>
-              <CardDescription>Ketik nomor resi atau nomor paket secara manual</CardDescription>
+              <CardTitle className="text-base flex items-center gap-2"><Hash className="h-4 w-4" />Input Nomor Resi / Barcode</CardTitle>
+              <CardDescription>Ketik nomor resi, barcode, atau nomor paket secara manual</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleResiSearch} className="flex gap-2">
-                <Input value={resiInput} onChange={e => setResiInput(e.target.value)} placeholder="Contoh: JNE123456789 atau PKT-001" className="font-mono" />
+                <Input value={resiInput} onChange={e => setResiInput(e.target.value)} placeholder="Contoh: JAJ-ABC123 atau JNE123456789" className="font-mono" />
                 <Button type="submit" disabled={!resiInput.trim() || isLooking}>{isLooking ? "Mencari..." : "Cari"}</Button>
               </form>
             </CardContent>
@@ -217,56 +259,92 @@ export default function AdminScan() {
             <Card className="border-destructive/50">
               <CardContent className="flex items-center gap-3 py-8 text-destructive">
                 <AlertCircle className="w-6 h-6 shrink-0" />
-                <div><p className="font-semibold">Paket tidak ditemukan</p><p className="text-sm text-muted-foreground mt-1">Pastikan nomor resi atau barcode sudah benar.</p></div>
+                <div><p className="font-semibold">Paket tidak ditemukan</p><p className="text-sm text-muted-foreground mt-1">{notFoundMsg || "Pastikan nomor resi atau barcode sudah benar."}</p></div>
               </CardContent>
             </Card>
           ) : (
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base text-green-700 flex items-center gap-2">✓ Paket Ditemukan</CardTitle>
-                  <StatusBadge status={pkg.status} />
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ScanLine className="h-4 w-4 text-primary" />
+                    Paket Ditemukan
+                  </CardTitle>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isDiserahkan ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                    {isDiserahkan ? "✓ Diserahkan" : "● Pending"}
+                  </span>
                 </div>
                 <CardDescription>
-                  Customer: <span className="font-medium text-foreground">{pkg.customerName}</span>
-                  {pkg.customerPhone && <> &mdash; <span className="font-mono">{pkg.customerPhone}</span></>}
+                  Konsumen: <span className="font-medium text-foreground">{pkg.customerName}</span>
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[900px]">
-                    <thead>
-                      <tr className="border-y bg-muted/30">
-                        {["Tanggal","No Resi","No Paket","Nama Konsumen","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Jenis Paking","Berat Digunakan","Ongkir/Kg","Total Berat","Harga","Total Ongkir","Status"].map(h => (
-                          <th key={h} className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td className="py-3 px-3 whitespace-nowrap text-muted-foreground">{formatDate(pkg.packageDate || pkg.createdAt)}</td>
-                        <td className="py-3 px-3 font-mono font-medium whitespace-nowrap">{pkg.resiNumber || "-"}</td>
-                        <td className="py-3 px-3 font-mono whitespace-nowrap">{pkg.packageNumber || "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap font-medium">{pkg.customerName || "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{pkg.realWeight ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{pkg.length ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{pkg.width ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{pkg.height ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{pkg.volumeWeight ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap">{packagingLabel(pkg.packagingType)}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right font-medium">{pkg.usedWeight ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{formatRp(pkg.shippingRate)}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{pkg.totalWeight ?? "-"}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right">{formatRp(pkg.price)}</td>
-                        <td className="py-3 px-3 whitespace-nowrap text-right font-semibold text-primary">{formatRp(pkg.totalShipping)}</td>
-                        <td className="py-3 px-3 whitespace-nowrap"><StatusBadge status={pkg.status} /></td>
-                      </tr>
-                    </tbody>
-                  </table>
+              <CardContent className="space-y-4">
+                {/* Package info grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { label: "No. Barcode", value: pkg.barcode, mono: true },
+                    { label: "No. Resi", value: pkg.resiNumber, mono: true },
+                    { label: "No. Paket", value: pkg.packageNumber || "-" },
+                    { label: "Jenis Jastip", value: pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-" },
+                    { label: "Rute", value: pkg.deliveryRoute || "-" },
+                    { label: "Tanggal", value: pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID") : "-" },
+                    { label: "Berat Real", value: pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-" },
+                    { label: "Berat Volume", value: pkg.volumeWeight != null ? `${pkg.volumeWeight} Kg` : "-" },
+                    { label: "Berat Digunakan", value: pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-" },
+                    { label: "Jenis Paking", value: pkg.packagingType || "-" },
+                    { label: "Total Ongkir", value: formatRp(pkg.totalShipping) },
+                    { label: "Harga Barang", value: formatRp(pkg.price) },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-muted/40 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-0.5">{item.label}</p>
+                      <p className={`text-sm font-medium ${item.mono ? "font-mono" : ""}`}>{item.value}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="p-4 border-t flex gap-3">
-                  <Button variant="outline" size="sm" onClick={() => setLocation(`/admin/packages/${pkg.id}`)}>Lihat Detail Lengkap</Button>
-                </div>
+
+                {/* Action buttons */}
+                {!isDiserahkan ? (
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700 gap-2"
+                      onClick={serahkanPaket}
+                      disabled={isActioning}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {isActioning ? "Memproses..." : "Serahkan Paket"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50 gap-2"
+                      onClick={tolakPaket}
+                      disabled={isActioning}
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Tolak
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 pt-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-green-800">Paket sudah diserahkan</p>
+                      {pkg.pickedUpAt && (
+                        <p className="text-xs text-green-600">
+                          Diserahkan: {formatDate(pkg.pickedUpAt)}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-50"
+                      onClick={tolakPaket}
+                      disabled={isActioning}
+                    >
+                      Kembalikan ke Pending
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

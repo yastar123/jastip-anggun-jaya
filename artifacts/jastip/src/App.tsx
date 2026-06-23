@@ -8,12 +8,6 @@ import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
 import Login from "@/pages/login";
-import Register from "@/pages/register";
-
-import CustomerDashboard from "@/pages/customer/dashboard";
-import CustomerPackages from "@/pages/customer/packages";
-import CustomerScan from "@/pages/customer/scan";
-import CustomerHistory from "@/pages/customer/history";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminPackages from "@/pages/admin/packages";
@@ -26,7 +20,6 @@ import AdminScan from "@/pages/admin/scan";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
-import OwnerCustomers from "@/pages/owner/customers";
 import OwnerAdmins from "@/pages/owner/admins";
 import OwnerReports from "@/pages/owner/reports";
 import OwnerUsers from "@/pages/owner/users";
@@ -39,7 +32,6 @@ function ProtectedRoute({ component: Component, roles, role, ...rest }: any) {
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Accept single role or array of roles
   const allowedRoles: string[] = roles ? roles : role ? [role] : [];
 
   useEffect(() => {
@@ -59,9 +51,7 @@ function ProtectedRoute({ component: Component, roles, role, ...rest }: any) {
           <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-4xl animate-pulse shadow-lg">
             J
           </div>
-          <div className="text-muted-foreground animate-pulse">
-            Memuat data...
-          </div>
+          <div className="text-muted-foreground animate-pulse">Memuat data...</div>
         </div>
       </div>
     );
@@ -104,247 +94,77 @@ function Router() {
     <Switch>
       <Route path="/" component={RedirectToDashboard} />
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-
-      {/* Customer Routes */}
-      <Route path="/customer/dashboard">
-        {(params) => (
-          <ProtectedRoute
-            role="customer"
-            component={CustomerDashboard}
-            params={params}
-          />
-        )}
-      </Route>
-      <Route path="/customer/packages">
-        {(params) => (
-          <ProtectedRoute
-            role="customer"
-            component={CustomerPackages}
-            params={params}
-          />
-        )}
-      </Route>
-      <Route path="/customer/scan">
-        {(params) => (
-          <ProtectedRoute
-            role="customer"
-            component={CustomerScan}
-            params={params}
-          />
-        )}
-      </Route>
-      <Route path="/customer/history">
-        {(params) => (
-          <ProtectedRoute
-            role="customer"
-            component={CustomerHistory}
-            params={params}
-          />
-        )}
-      </Route>
 
       {/* Admin Routes */}
       <Route path="/admin/dashboard">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminDashboard}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminDashboard} params={params} />}
       </Route>
       <Route path="/admin/packages">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminPackages}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminPackages} params={params} />}
       </Route>
       <Route path="/admin/packages/type">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminPackagesType}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminPackagesType} params={params} />}
       </Route>
       <Route path="/admin/packages/new">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminPackagesNew}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminPackagesNew} params={params} />}
       </Route>
       <Route path="/admin/packages/import">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminPackagesImport}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminPackagesImport} params={params} />}
       </Route>
       <Route path="/admin/packages/:id">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminPackagesDetail}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminPackagesDetail} params={params} />}
       </Route>
       <Route path="/admin/barcode">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={AdminBarcode}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminBarcode} params={params} />}
       </Route>
       <Route path="/admin/scan">
-        {(params) => (
-          <ProtectedRoute role="admin" component={AdminScan} params={params} />
-        )}
+        {(params) => <ProtectedRoute role="admin" component={AdminScan} params={params} />}
+      </Route>
+      <Route path="/admin/profile">
+        {(params) => <ProtectedRoute role="admin" component={ProfilePage} params={params} />}
       </Route>
 
       {/* Owner Routes */}
       <Route path="/owner/dashboard">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={OwnerDashboard}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={OwnerDashboard} params={params} />}
       </Route>
       <Route path="/owner/packages">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={OwnerPackages}
-            params={params}
-          />
-        )}
-      </Route>
-      <Route path="/owner/customers">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={OwnerCustomers}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={OwnerPackages} params={params} />}
       </Route>
       <Route path="/owner/admins">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={OwnerAdmins}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={OwnerAdmins} params={params} />}
       </Route>
       <Route path="/owner/reports">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={OwnerReports}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={OwnerReports} params={params} />}
       </Route>
       <Route path="/owner/users">
-        {(params) => (
-          <ProtectedRoute role="owner" component={OwnerUsers} params={params} />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={OwnerUsers} params={params} />}
       </Route>
       <Route path="/owner/finance">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={OwnerFinance}
-            params={params}
-          />
-        )}
-      </Route>
-
-      {/* Profile routes — all roles */}
-      <Route path="/customer/profile">
-        {(params) => (
-          <ProtectedRoute
-            role="customer"
-            component={ProfilePage}
-            params={params}
-          />
-        )}
-      </Route>
-      <Route path="/admin/profile">
-        {(params) => (
-          <ProtectedRoute
-            role="admin"
-            component={ProfilePage}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={OwnerFinance} params={params} />}
       </Route>
       <Route path="/owner/profile">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={ProfilePage}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={ProfilePage} params={params} />}
       </Route>
 
-      {/* Owner — Admin Tools (same components, both roles allowed) */}
+      {/* Owner — Admin Tools */}
       <Route path="/owner/packages/type">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={AdminPackagesType}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={AdminPackagesType} params={params} />}
       </Route>
       <Route path="/owner/packages/new">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={AdminPackagesNew}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={AdminPackagesNew} params={params} />}
       </Route>
       <Route path="/owner/packages/import">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={AdminPackagesImport}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={AdminPackagesImport} params={params} />}
+      </Route>
+      <Route path="/owner/packages/:id">
+        {(params) => <ProtectedRoute role="owner" component={AdminPackagesDetail} params={params} />}
       </Route>
       <Route path="/owner/barcode">
-        {(params) => (
-          <ProtectedRoute
-            role="owner"
-            component={AdminBarcode}
-            params={params}
-          />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={AdminBarcode} params={params} />}
       </Route>
       <Route path="/owner/scan">
-        {(params) => (
-          <ProtectedRoute role="owner" component={AdminScan} params={params} />
-        )}
+        {(params) => <ProtectedRoute role="owner" component={AdminScan} params={params} />}
       </Route>
 
       <Route component={NotFound} />

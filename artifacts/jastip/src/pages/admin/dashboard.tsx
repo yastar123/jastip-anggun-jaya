@@ -18,10 +18,8 @@ function formatDate(d: string | null | undefined) {
 }
 
 const statusStyles: Record<string, string> = {
-  pending:   "bg-yellow-100 text-yellow-800",
-  in_transit:"bg-blue-100 text-blue-800",
-  ready:     "bg-green-100 text-green-800",
-  picked_up: "bg-gray-100 text-gray-700",
+  pending:    "bg-yellow-100 text-yellow-800",
+  diserahkan: "bg-green-100 text-green-800",
 };
 
 export default function AdminDashboard() {

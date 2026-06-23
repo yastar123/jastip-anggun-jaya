@@ -122,7 +122,7 @@ export default function AdminPackagesDetail() {
   const id = parseInt(params.id || "0");
   const [, setLocation] = useLocation();
 
-  const { data: pkg, isLoading } = useGetPackage(id, { query: { enabled: !!id } });
+  const { data: pkg, isLoading } = useGetPackage(id, { query: { queryKey: ["package", id], enabled: !!id } });
 
   if (isLoading) return <div className="p-12 text-center animate-pulse text-muted-foreground">Memuat detail paket...</div>;
   if (!pkg) return <div className="p-12 text-center text-destructive">Paket tidak ditemukan.</div>;

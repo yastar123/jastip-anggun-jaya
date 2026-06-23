@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useAuth } from "@/lib/auth";
-import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,6 @@ const loginSchema = z.object({
 const demoAccounts = [
   { label: "Owner", phone: "081200000000", password: "owner123", color: "bg-amber-500" },
   { label: "Admin", phone: "081200000001", password: "admin123", color: "bg-blue-500" },
-  { label: "Customer", phone: "081200000010", password: "customer123", color: "bg-green-500" },
 ];
 
 const services = [
@@ -56,13 +54,11 @@ export default function Login() {
     <div className="min-h-screen w-full flex">
       {/* LEFT — Branding */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative bg-red-700 flex-col overflow-hidden">
-        {/* Decorative shapes */}
         <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-red-600/50" />
         <div className="absolute -bottom-32 -right-32 w-[400px] h-[400px] rounded-full bg-red-800/60" />
         <div className="absolute top-1/2 right-16 w-56 h-56 rounded-full bg-red-500/30" />
 
         <div className="relative z-10 flex flex-col h-full px-12 py-12">
-          {/* Logo & Brand */}
           <div className="flex items-center gap-4 mb-10">
             <img src={logoImg} alt="Jastip Anggun Jaya" className="h-16 w-auto rounded-xl shadow-2xl" />
             <div>
@@ -71,7 +67,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Tagline */}
           <div className="mb-8">
             <p className="text-red-100 text-lg font-medium leading-relaxed">
               Layanan pengiriman paket & kendaraan ke Papua
@@ -81,7 +76,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Services */}
           <div className="mb-10 flex-1">
             <p className="text-red-200 text-xs font-semibold uppercase tracking-widest mb-4">Layanan Kami</p>
             <div className="space-y-3">
@@ -94,7 +88,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Contact */}
           <div className="border-t border-red-600/60 pt-6 space-y-2">
             <div className="flex items-center gap-2.5 text-red-100 text-sm">
               <MapPin className="w-4 h-4 text-red-300 shrink-0" />
@@ -114,7 +107,6 @@ export default function Login() {
 
       {/* RIGHT — Login Form */}
       <div className="w-full lg:w-1/2 xl:w-2/5 flex flex-col items-center justify-center bg-white px-6 py-12 overflow-y-auto">
-        {/* Mobile logo */}
         <div className="flex flex-col items-center mb-6 lg:hidden">
           <img src={logoImg} alt="Jastip Anggun Jaya" className="h-20 w-auto mb-2 rounded-xl" />
           <p className="text-base font-bold text-gray-900">Jastip Anggun Jaya</p>
@@ -132,7 +124,7 @@ export default function Login() {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Akun Demo — Klik untuk isi otomatis
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {demoAccounts.map((acc) => (
                 <button
                   key={acc.label}
@@ -184,15 +176,6 @@ export default function Login() {
               </Button>
             </form>
           </Form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Belum punya akun?{" "}
-              <Link href="/register" className="text-red-600 hover:text-red-700 font-semibold hover:underline">
-                Daftar sekarang
-              </Link>
-            </p>
-          </div>
         </div>
       </div>
     </div>

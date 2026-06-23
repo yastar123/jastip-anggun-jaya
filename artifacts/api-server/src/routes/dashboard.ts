@@ -20,9 +20,9 @@ router.get("/summary", requireAuth, async (req, res) => {
 
     res.json({
       totalPackages: packages.length,
-      pendingPackages: packages.filter(p => p.status !== "picked_up").length,
-      readyPackages: packages.filter(p => p.status === "ready").length,
-      pickedUpPackages: packages.filter(p => p.status === "picked_up").length,
+      pendingPackages: packages.filter(p => p.status === "pending").length,
+      readyPackages: 0,
+      pickedUpPackages: packages.filter(p => p.status === "diserahkan").length,
       totalCustomers: customers.length,
       totalAdmins: admins.filter(a => a.isActive).length,
     });

@@ -18,7 +18,6 @@ import {
   Package,
   LayoutDashboard,
   ScanLine,
-  History,
   Users,
   FileText,
   Settings,
@@ -43,157 +42,45 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const role = user.role;
 
-  const flatNav: Record<string, NavItem[]> = {
-    customer: [
-      {
-        name: "Dashboard",
-        href: "/customer/dashboard",
-        icon: LayoutDashboard,
-        exact: true,
-      },
-      { name: "Paket Saya", href: "/customer/packages", icon: Package },
-      {
-        name: "Scan Paket",
-        href: "/customer/scan",
-        icon: ScanLine,
-        exact: true,
-      },
-      {
-        name: "Riwayat",
-        href: "/customer/history",
-        icon: History,
-        exact: true,
-      },
-      {
-        name: "Profil",
-        href: "/customer/profile",
-        icon: UserCircle,
-        exact: true,
-      },
-    ],
-    admin: [
-      {
-        name: "Dashboard",
-        href: "/admin/dashboard",
-        icon: LayoutDashboard,
-        exact: true,
-      },
-      { name: "Semua Paket", href: "/admin/packages", icon: Package },
-      {
-        name: "Input Paket",
-        href: "/admin/packages/type",
-        icon: FileInput,
-        exact: true,
-      },
-      {
-        name: "Import Excel",
-        href: "/admin/packages/import",
-        icon: FileSpreadsheet,
-        exact: true,
-      },
-      {
-        name: "Label Barcode",
-        href: "/admin/barcode",
-        icon: Barcode,
-        exact: true,
-      },
-      {
-        name: "Scan Barcode",
-        href: "/admin/scan",
-        icon: ScanLine,
-        exact: true,
-      },
-      { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
-    ],
-  };
+  const adminNav: NavItem[] = [
+    { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, exact: true },
+    { name: "Semua Paket", href: "/admin/packages", icon: Package },
+    { name: "Input Paket", href: "/admin/packages/type", icon: FileInput, exact: true },
+    { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet, exact: true },
+    { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
+    { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine, exact: true },
+    { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
+  ];
 
   const ownerSections: NavSection[] = [
     {
       label: "Owner",
       items: [
-        {
-          name: "Dashboard",
-          href: "/owner/dashboard",
-          icon: LayoutDashboard,
-          exact: true,
-        },
+        { name: "Dashboard", href: "/owner/dashboard", icon: LayoutDashboard, exact: true },
         { name: "Monitor Paket", href: "/owner/packages", icon: Package },
-        {
-          name: "Data Customer",
-          href: "/owner/customers",
-          icon: Users,
-          exact: true,
-        },
-        {
-          name: "Data Admin",
-          href: "/owner/admins",
-          icon: UserPlus,
-          exact: true,
-        },
-        {
-          name: "Keuangan",
-          href: "/owner/finance",
-          icon: TrendingUp,
-          exact: true,
-        },
-        {
-          name: "Laporan",
-          href: "/owner/reports",
-          icon: FileText,
-          exact: true,
-        },
-        {
-          name: "Manajemen User",
-          href: "/owner/users",
-          icon: Settings,
-          exact: true,
-        },
-        {
-          name: "Profil",
-          href: "/owner/profile",
-          icon: UserCircle,
-          exact: true,
-        },
+        { name: "Data Admin", href: "/owner/admins", icon: UserPlus, exact: true },
+        { name: "Keuangan", href: "/owner/finance", icon: TrendingUp, exact: true },
+        { name: "Laporan", href: "/owner/reports", icon: FileText, exact: true },
+        { name: "Manajemen User", href: "/owner/users", icon: Settings, exact: true },
+        { name: "Profil", href: "/owner/profile", icon: UserCircle, exact: true },
       ],
     },
     {
       label: "Admin Tools",
       items: [
-        {
-          name: "Input Paket",
-          href: "/owner/packages/type",
-          icon: FileInput,
-          exact: true,
-        },
-        {
-          name: "Import Excel",
-          href: "/owner/packages/import",
-          icon: FileSpreadsheet,
-          exact: true,
-        },
-        {
-          name: "Label Barcode",
-          href: "/owner/barcode",
-          icon: Barcode,
-          exact: true,
-        },
-        {
-          name: "Scan Barcode",
-          href: "/owner/scan",
-          icon: ScanLine,
-          exact: true,
-        },
+        { name: "Input Paket", href: "/owner/packages/type", icon: FileInput, exact: true },
+        { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet, exact: true },
+        { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },
+        { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine, exact: true },
       ],
     },
   ];
 
   const isOwner = role === "owner";
-  const navItems = flatNav[role as keyof typeof flatNav] || [];
 
   function isActive(item: NavItem) {
     if (location === item.href) return true;
     if (item.exact) return false;
-    // For non-exact items (like "Semua Paket"), only match numeric sub-paths (package detail /id)
     if (!location.startsWith(item.href + "/")) return false;
     const sub = location.slice(item.href.length + 1);
     return /^\d+$/.test(sub);
@@ -219,24 +106,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar className="border-r bg-sidebar">
           <SidebarHeader className="p-4 border-b border-border/50">
             <div className="flex items-center gap-3">
-              <img
-                src={logoImg}
-                alt="Jastip Anggun Jaya"
-                className="h-10 w-auto rounded"
-              />
+              <img src={logoImg} alt="Jastip Anggun Jaya" className="h-10 w-auto rounded" />
               <div className="flex flex-col">
-                <span className="font-bold tracking-tight text-primary leading-tight">
-                  JASTIP
-                </span>
-                <span className="text-xs text-muted-foreground font-semibold leading-none">
-                  ANGGUN JAYA
-                </span>
+                <span className="font-bold tracking-tight text-primary leading-tight">JASTIP</span>
+                <span className="text-xs text-muted-foreground font-semibold leading-none">ANGGUN JAYA</span>
               </div>
             </div>
           </SidebarHeader>
           <SidebarContent className="p-2">
             {isOwner ? (
-              ownerSections.map((section) => (
+              ownerSections.map((section, idx) => (
                 <div key={section.label} className="mb-3">
                   <div className="flex items-center gap-2 px-3 py-1.5 mb-1">
                     {section.label === "Owner" ? (
@@ -249,29 +128,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     </span>
                   </div>
                   <SidebarMenu>{section.items.map(renderNavItem)}</SidebarMenu>
-                  {section.label !==
-                    ownerSections[ownerSections.length - 1].label && (
+                  {idx < ownerSections.length - 1 && (
                     <div className="mx-3 mt-3 border-t border-border/40" />
                   )}
                 </div>
               ))
             ) : (
-              <SidebarMenu>{navItems.map(renderNavItem)}</SidebarMenu>
+              <SidebarMenu>{adminNav.map(renderNavItem)}</SidebarMenu>
             )}
           </SidebarContent>
           <SidebarFooter className="p-4 border-t border-border/50">
             <div className="flex flex-col gap-3">
               <div className="flex flex-col">
                 <span className="font-medium text-sm">{user.name}</span>
-                <span className="text-xs text-muted-foreground capitalize">
-                  {user.role}
-                </span>
+                <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
               </div>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-destructive"
-                onClick={() => logout()}
-              >
+              <Button variant="outline" className="w-full justify-start text-destructive" onClick={() => logout()}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Keluar
               </Button>

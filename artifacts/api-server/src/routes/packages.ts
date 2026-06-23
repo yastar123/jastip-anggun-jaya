@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, packagesTable, usersTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -22,32 +22,11 @@ function getShippingRate(
   serviceType: string | null | undefined,
   deliveryRoute: string | null | undefined,
   weight: number | null | undefined,
-) {
-  if (!serviceType || !deliveryRoute || !weight || weight <= 0) {
-    return null;
-  }
-
-  if (
-    serviceType === "jastip pesawat" &&
-    deliveryRoute === "Jakarta → Manokwari"
-  ) {
-    return 77000;
-  }
-
-  if (
-    serviceType === "jastip hemat" &&
-    deliveryRoute === "Surabaya → Manokwari"
-  ) {
-    return 10000;
-  }
-
-  if (
-    serviceType === "jastip kargo" &&
-    deliveryRoute === "Jakarta/Surabaya → Manokwari"
-  ) {
-    return 7000;
-  }
-
+): number | null {
+  if (!serviceType || !weight || weight <= 0) return null;
+  if (serviceType === "jastip pesawat") return 77000;
+  if (serviceType === "jastip hemat") return 10000;
+  if (serviceType === "jastip kargo") return 7000;
   if (serviceType === "jastip pelni") {
     if (deliveryRoute === "Jakarta → Manokwari") {
       if (weight <= 10) return 20000;
@@ -55,12 +34,59 @@ function getShippingRate(
       if (weight <= 40) return 18000;
       return 17000;
     }
-
     if (deliveryRoute === "Surabaya → Manokwari") {
       if (weight <= 10) return 18000;
       if (weight <= 20) return 17000;
       if (weight <= 40) return 16000;
       return 15500;
+    }
+  }
+  return null;
+}
+
+function getTotalShipping(
+  serviceType: string | null | undefined,
+  deliveryRoute: string | null | undefined,
+  weight: number | null | undefined,
+): number | null {
+  if (!serviceType || !weight || weight <= 0) return null;
+
+  if (serviceType === "jastip pesawat" && deliveryRoute === "Jakarta → Manokwari") {
+    if (weight <= 0.2) return 15800;
+    if (weight <= 0.4) return 30800;
+    if (weight <= 0.5) return 38500;
+    if (weight <= 0.6) return 46200;
+    if (weight <= 0.7) return 53900;
+    if (weight <= 0.8) return 61600;
+    if (weight <= 0.9) return 69300;
+    if (weight <= 1) return 77000;
+    if (weight <= 2) return 154000;
+    if (weight <= 3) return 231000;
+    if (weight <= 5) return 385000;
+    if (weight <= 10) return 770000;
+    return Math.round(weight * 77000);
+  }
+
+  if (serviceType === "jastip hemat" && deliveryRoute === "Surabaya → Manokwari") {
+    return Math.round(weight * 10000);
+  }
+
+  if (serviceType === "jastip kargo" && deliveryRoute === "Jakarta/Surabaya → Manokwari") {
+    return Math.round(weight * 7000);
+  }
+
+  if (serviceType === "jastip pelni") {
+    if (deliveryRoute === "Jakarta → Manokwari") {
+      if (weight <= 10) return Math.round(weight * 20000);
+      if (weight <= 20) return Math.round(weight * 19000);
+      if (weight <= 40) return Math.round(weight * 18000);
+      return Math.round(weight * 17000);
+    }
+    if (deliveryRoute === "Surabaya → Manokwari") {
+      if (weight <= 10) return Math.round(weight * 18000);
+      if (weight <= 20) return Math.round(weight * 17000);
+      if (weight <= 40) return Math.round(weight * 16000);
+      return Math.round(weight * 15500);
     }
   }
 
@@ -112,28 +138,18 @@ router.get("/", requireAuth, async (req, res) => {
     const { status, customerId, adminId, dateFrom, dateTo, search } =
       req.query as any;
 
-    const customers = await db
-      .select({
-        id: usersTable.id,
-        name: usersTable.name,
-        phone: usersTable.phone,
-      })
-      .from(usersTable)
-      .where(eq(usersTable.role, "customer"));
     const admins = await db
       .select({ id: usersTable.id, name: usersTable.name })
       .from(usersTable)
       .where(eq(usersTable.role, "admin"));
-    const customerMap = new Map(customers.map((c) => [c.id, c]));
     const adminMap = new Map(admins.map((a) => [a.id, a]));
+    const customerMap = new Map<number, any>();
 
     let rows = await db
       .select()
       .from(packagesTable)
       .orderBy(packagesTable.createdAt);
 
-    if (user.role === "customer")
-      rows = rows.filter((p) => p.customerId === user.id);
     if (status) rows = rows.filter((p) => p.status === status);
     if (customerId)
       rows = rows.filter((p) => p.customerId === Number(customerId));
@@ -149,9 +165,10 @@ router.get("/", requireAuth, async (req, res) => {
       rows = rows.filter(
         (p) =>
           p.resiNumber.toLowerCase().includes(s) ||
-          p.itemName.toLowerCase().includes(s) ||
+          (p.itemName ?? "").toLowerCase().includes(s) ||
           p.barcode.toLowerCase().includes(s) ||
-          (p.packageNumber ?? "").toLowerCase().includes(s),
+          (p.packageNumber ?? "").toLowerCase().includes(s) ||
+          (p.customerName ?? "").toLowerCase().includes(s),
       );
     }
 
@@ -173,6 +190,7 @@ router.post(
       const {
         resiNumber,
         packageNumber,
+        packageMode,
         itemName,
         realWeight,
         length,
@@ -182,6 +200,7 @@ router.post(
         deliveryRoute,
         packagingType,
         shippingRate,
+        totalShipping: totalShippingInput,
         totalWeight,
         price,
         weight,
@@ -198,7 +217,6 @@ router.post(
         return;
       }
 
-      // Auto-calculate volumeWeight and usedWeight
       const divisor = getVolumeDivisor(serviceType);
       let volumeWeight: number | null = null;
       if (length && width && height) {
@@ -213,41 +231,40 @@ router.post(
       const effectiveShippingRate =
         getShippingRate(serviceType, deliveryRoute, usedWeight) ??
         (shippingRate ? Number(shippingRate) : null);
-      const totalShipping =
-        usedWeight !== null && effectiveShippingRate !== null
-          ? usedWeight * effectiveShippingRate
-          : null;
+
+      // totalShipping: use provided value if given, otherwise auto-calculate
+      let totalShipping: number | null = null;
+      if (totalShippingInput !== undefined && totalShippingInput !== null && totalShippingInput !== "") {
+        totalShipping = Number(totalShippingInput);
+      } else {
+        totalShipping = getTotalShipping(serviceType, deliveryRoute, usedWeight);
+      }
 
       const barcode = generateBarcode();
       const insertData: Record<string, any> = {
         barcode,
         resiNumber,
-        itemName: itemName || resiNumber,
-        status: "in_transit",
+        itemName: itemName || null,
+        status: "pending",
         adminId: user.id,
         packageDate: packageDate ? new Date(packageDate) : new Date(),
         ...(packageNumber ? { packageNumber } : {}),
+        ...(packageMode ? { packageMode } : {}),
         ...(realWeight ? { realWeight: String(realWeight) } : {}),
         ...(length ? { length: String(length) } : {}),
         ...(width ? { width: String(width) } : {}),
         ...(height ? { height: String(height) } : {}),
-        ...(volumeWeight !== null
-          ? { volumeWeight: String(volumeWeight) }
-          : {}),
+        ...(volumeWeight !== null ? { volumeWeight: String(volumeWeight) } : {}),
         ...(serviceType ? { serviceType } : {}),
+        ...(deliveryRoute ? { deliveryRoute } : {}),
         ...(packagingType ? { packagingType } : {}),
         ...(usedWeight !== null ? { usedWeight: String(usedWeight) } : {}),
-        ...(effectiveShippingRate !== null
-          ? { shippingRate: String(effectiveShippingRate) }
-          : {}),
+        ...(effectiveShippingRate !== null ? { shippingRate: String(effectiveShippingRate) } : {}),
         ...(totalWeight ? { totalWeight: String(totalWeight) } : {}),
         ...(price ? { price: String(price) } : {}),
-        ...(totalShipping !== null
-          ? { totalShipping: String(totalShipping) }
-          : {}),
+        ...(totalShipping !== null ? { totalShipping: String(totalShipping) } : {}),
         ...(weight ? { weight: String(weight) } : {}),
         ...(notes ? { notes } : {}),
-        ...(deliveryRoute ? { deliveryRoute } : {}),
         ...(customerName ? { customerName } : {}),
         ...(customerId ? { customerId: Number(customerId) } : {}),
       };
@@ -257,12 +274,6 @@ router.post(
         .returning();
 
       const pkg = inserted[0];
-      const customer = await db
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.id, pkg.customerId))
-        .limit(1);
-      const customerMap = new Map([[customer[0]?.id, customer[0]]]);
       const adminMap = new Map<number, any>();
       if (pkg.adminId) {
         const admin = await db
@@ -273,7 +284,7 @@ router.post(
         if (admin[0]) adminMap.set(admin[0].id, admin[0]);
       }
 
-      res.status(201).json(formatPackage(pkg, customerMap, adminMap));
+      res.status(201).json(formatPackage(pkg, new Map(), adminMap));
     } catch (err) {
       req.log.error(err);
       res.status(500).json({ error: "Server error" });
@@ -303,7 +314,7 @@ router.post(
           const {
             resiNumber,
             packageNumber,
-            customerPhone,
+            customerName,
             itemName,
             realWeight,
             length,
@@ -315,53 +326,38 @@ router.post(
             price,
             notes,
             packageDate,
+            serviceType,
+            deliveryRoute,
           } = row;
 
-          if (!resiNumber || !customerPhone) {
+          if (!resiNumber || !customerName) {
             failed++;
             errors.push(
-              `Row missing resiNumber or customerPhone: ${JSON.stringify(row)}`,
+              `Row missing resiNumber or customerName: ${JSON.stringify(row)}`,
             );
             continue;
           }
-          const customer = await db
-            .select()
-            .from(usersTable)
-            .where(
-              and(
-                eq(usersTable.phone, String(customerPhone)),
-                eq(usersTable.role, "customer"),
-              ),
-            )
-            .limit(1);
-          if (!customer[0]) {
-            failed++;
-            errors.push(`Customer not found for phone: ${customerPhone}`);
-            continue;
-          }
 
-          // Auto-calculate volumeWeight
+          const divisor = getVolumeDivisor(serviceType);
           let volumeWeight: number | null = null;
           if (length && width && height) {
             volumeWeight =
-              (Number(length) * Number(width) * Number(height)) / 6000;
+              (Number(length) * Number(width) * Number(height)) / divisor;
           }
           const effectiveRealWeight = realWeight ? Number(realWeight) : null;
           const usedWeight =
             effectiveRealWeight !== null && volumeWeight !== null
               ? Math.max(effectiveRealWeight, volumeWeight)
               : (effectiveRealWeight ?? volumeWeight);
-          const totalShipping =
-            usedWeight && shippingRate
-              ? usedWeight * Number(shippingRate)
-              : null;
+          const totalShipping = getTotalShipping(serviceType, deliveryRoute, usedWeight);
 
           const barcode = generateBarcode();
           await db.insert(packagesTable).values({
             barcode,
             resiNumber: String(resiNumber),
             packageNumber: packageNumber ? String(packageNumber) : null,
-            itemName: itemName ? String(itemName) : String(resiNumber),
+            itemName: itemName ? String(itemName) : null,
+            customerName: String(customerName),
             realWeight: realWeight ? String(realWeight) : null,
             length: length ? String(length) : null,
             width: width ? String(width) : null,
@@ -372,15 +368,13 @@ router.post(
             shippingRate: shippingRate ? String(shippingRate) : null,
             totalWeight: totalWeight ? String(totalWeight) : null,
             price: price ? String(price) : null,
-            totalShipping:
-              totalShipping !== null ? String(totalShipping) : null,
+            totalShipping: totalShipping !== null ? String(totalShipping) : null,
             notes: notes ? String(notes) : null,
-            status: "in_transit",
-            customerId: customer[0].id,
+            status: "pending",
             adminId: user.id,
-            packageDate: packageDate
-              ? new Date(String(packageDate))
-              : new Date(),
+            serviceType: serviceType ? String(serviceType) : null,
+            deliveryRoute: deliveryRoute ? String(deliveryRoute) : null,
+            packageDate: packageDate ? new Date(String(packageDate)) : new Date(),
           });
           success++;
         } catch (e) {
@@ -399,7 +393,6 @@ router.post(
 // GET /api/packages/scan/:barcode
 router.get("/scan/:barcode", requireAuth, async (req, res) => {
   try {
-    const user = (req as any).user;
     const barcode = String(req.params.barcode);
     let pkgs = await db
       .select()
@@ -424,21 +417,11 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
       res.json({ valid: false, message: "Paket tidak ditemukan" });
       return;
     }
-    if (user.role === "customer" && pkg.customerId !== user.id) {
-      res.json({ valid: false, message: "Bukan barcode dari paket kamu" });
-      return;
-    }
-    if (pkg.status === "picked_up") {
-      res.json({ valid: false, message: "Paket sudah diambil sebelumnya" });
+    if (pkg.status === "diserahkan") {
+      res.json({ valid: false, message: "Paket sudah diserahkan sebelumnya", package: formatPackage(pkg, new Map(), new Map()) });
       return;
     }
 
-    const customer = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, pkg.customerId))
-      .limit(1);
-    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
     const adminMap = new Map<number, any>();
     if (pkg.adminId) {
       const admin = await db
@@ -452,7 +435,7 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
     res.json({
       valid: true,
       message: "Paket ditemukan",
-      package: formatPackage(pkg, customerMap, adminMap),
+      package: formatPackage(pkg, new Map(), adminMap),
     });
   } catch (err) {
     req.log.error(err);
@@ -474,15 +457,7 @@ router.get("/:id", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-
-    const customer = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, pkg.customerId))
-      .limit(1);
-    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
     const adminMap = new Map<number, any>();
-
     if (pkg.adminId) {
       const admin = await db
         .select()
@@ -491,8 +466,7 @@ router.get("/:id", requireAuth, async (req, res) => {
         .limit(1);
       if (admin[0]) adminMap.set(admin[0].id, admin[0]);
     }
-
-    res.json(formatPackage(pkg, customerMap, adminMap));
+    res.json(formatPackage(pkg, new Map(), adminMap));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Server error" });
@@ -511,7 +485,7 @@ router.patch(
       const updateData: any = { updatedAt: new Date() };
       if (status) updateData.status = status;
       if (notes !== undefined) updateData.notes = notes;
-      if (status === "picked_up") updateData.pickedUpAt = new Date();
+      if (status === "diserahkan") updateData.pickedUpAt = new Date();
       const updated = await db
         .update(packagesTable)
         .set(updateData)
@@ -522,14 +496,8 @@ router.patch(
         res.status(404).json({ error: "Not found" });
         return;
       }
-      const customer = await db
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.id, pkg.customerId))
-        .limit(1);
-      const customerMap = new Map([[customer[0]?.id, customer[0]]]);
       const adminMap = new Map<number, any>();
-      res.json(formatPackage(pkg, customerMap, adminMap));
+      res.json(formatPackage(pkg, new Map(), adminMap));
     } catch (err) {
       req.log.error(err);
       res.status(500).json({ error: "Server error" });
@@ -537,56 +505,9 @@ router.patch(
   },
 );
 
-// POST /api/packages/:id/customer-pickup  (customer marks their own package as picked up)
-router.post("/:id/customer-pickup", requireAuth, async (req, res) => {
-  try {
-    const user = (req as any).user;
-    const id = Number(req.params.id);
-    const pkgs = await db
-      .select()
-      .from(packagesTable)
-      .where(eq(packagesTable.id, id))
-      .limit(1);
-    const pkg = pkgs[0];
-    if (!pkg) {
-      res.status(404).json({ error: "Not found" });
-      return;
-    }
-    if (user.role === "customer" && pkg.customerId !== user.id) {
-      res.status(403).json({ error: "Paket ini bukan milik Anda" });
-      return;
-    }
-    if (pkg.status === "picked_up") {
-      res.status(400).json({ error: "Paket sudah diambil sebelumnya" });
-      return;
-    }
-    const updated = await db
-      .update(packagesTable)
-      .set({
-        status: "picked_up",
-        pickedUpAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(packagesTable.id, id))
-      .returning();
-    const updPkg = updated[0];
-    const customer = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, updPkg.customerId))
-      .limit(1);
-    const customerMap = new Map([[customer[0]?.id, customer[0]]]);
-    const adminMap = new Map<number, any>();
-    res.json(formatPackage(updPkg, customerMap, adminMap));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// POST /api/packages/:id/confirm-pickup
+// POST /api/packages/:id/serahkan
 router.post(
-  "/:id/confirm-pickup",
+  "/:id/serahkan",
   requireAuth,
   requireRole("admin", "owner"),
   async (req, res) => {
@@ -594,11 +515,7 @@ router.post(
       const id = Number(req.params.id);
       const updated = await db
         .update(packagesTable)
-        .set({
-          status: "picked_up",
-          pickedUpAt: new Date(),
-          updatedAt: new Date(),
-        })
+        .set({ status: "diserahkan", pickedUpAt: new Date(), updatedAt: new Date() })
         .where(eq(packagesTable.id, id))
         .returning();
       const pkg = updated[0];
@@ -606,14 +523,33 @@ router.post(
         res.status(404).json({ error: "Not found" });
         return;
       }
-      const customer = await db
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.id, pkg.customerId))
-        .limit(1);
-      const customerMap = new Map([[customer[0]?.id, customer[0]]]);
-      const adminMap = new Map<number, any>();
-      res.json(formatPackage(pkg, customerMap, adminMap));
+      res.json(formatPackage(pkg, new Map(), new Map()));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "Server error" });
+    }
+  },
+);
+
+// POST /api/packages/:id/tolak
+router.post(
+  "/:id/tolak",
+  requireAuth,
+  requireRole("admin", "owner"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updated = await db
+        .update(packagesTable)
+        .set({ status: "pending", updatedAt: new Date() })
+        .where(eq(packagesTable.id, id))
+        .returning();
+      const pkg = updated[0];
+      if (!pkg) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(formatPackage(pkg, new Map(), new Map()));
     } catch (err) {
       req.log.error(err);
       res.status(500).json({ error: "Server error" });
@@ -635,17 +571,12 @@ router.get("/:id/barcode", requireAuth, async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const customer = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, pkg.customerId))
-      .limit(1);
     res.json({
       barcode: pkg.barcode,
       packageId: pkg.id,
       resiNumber: pkg.resiNumber,
       itemName: pkg.itemName,
-      customerName: customer[0]?.name ?? "",
+      customerName: pkg.customerName ?? "",
     });
   } catch (err) {
     req.log.error(err);

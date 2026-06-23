@@ -15,14 +15,15 @@ export const packagesTable = pgTable("packages", {
   barcode: text("barcode").notNull().unique(),
   resiNumber: text("resi_number").notNull(),
   packageNumber: text("package_number"),
-  itemName: text("item_name").notNull(),
+  itemName: text("item_name"),
+  packageMode: text("package_mode"),
   // Berat Real Kg
   realWeight: numeric("real_weight", { precision: 10, scale: 2 }),
   // Dimensi (cm)
   length: numeric("length", { precision: 10, scale: 2 }),
   width: numeric("width", { precision: 10, scale: 2 }),
   height: numeric("height", { precision: 10, scale: 2 }),
-  // Berat Volume = P x L x T / 6000
+  // Berat Volume = P x L x T / divisor
   volumeWeight: numeric("volume_weight", { precision: 10, scale: 2 }),
   // Jenis Paking
   packagingType: text("packaging_type"),
@@ -37,16 +38,16 @@ export const packagesTable = pgTable("packages", {
   totalWeight: numeric("total_weight", { precision: 10, scale: 2 }),
   // Harga barang
   price: numeric("price", { precision: 15, scale: 2 }),
-  // Total Ongkir = usedWeight * shippingRate
+  // Total Ongkir
   totalShipping: numeric("total_shipping", { precision: 15, scale: 2 }),
   // Legacy weight (kept for backward compat)
   weight: numeric("weight", { precision: 10, scale: 2 }),
   notes: text("notes"),
   status: text("status", {
-    enum: ["pending", "in_transit", "ready", "picked_up"],
+    enum: ["pending", "diserahkan"],
   })
     .notNull()
-    .default("ready"),
+    .default("pending"),
   customerName: text("customer_name").notNull(),
   customerId: integer("customer_id").references(() => usersTable.id),
   adminId: integer("admin_id").references(() => usersTable.id),

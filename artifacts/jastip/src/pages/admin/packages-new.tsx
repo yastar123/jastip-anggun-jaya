@@ -27,7 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calculator, CalendarDays } from "lucide-react";
+import { ArrowLeft, Calculator, CalendarDays, CheckCircle2, Plus } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 const packageSchema = z.object({
   packageDate: z.string().optional().nullable(),
@@ -35,14 +36,13 @@ const packageSchema = z.object({
   customerName: z.string().min(1, "Nama konsumen wajib diisi"),
   resiNumber: z.string().min(1, "No Resi wajib diisi"),
   packageNumber: z.string().optional().nullable(),
-  itemName: z.string().min(1, "Nama barang wajib diisi"),
   serviceType: z.string().optional().nullable(),
   packageMode: z.string().optional().nullable(),
+  deliveryRoute: z.string().min(1, "Pilih lokasi pengiriman"),
   realWeight: z.coerce.number().optional().nullable(),
   length: z.coerce.number().optional().nullable(),
   width: z.coerce.number().optional().nullable(),
   height: z.coerce.number().optional().nullable(),
-  deliveryRoute: z.string().min(1, "Pilih lokasi pengiriman"),
   volumeWeight: z.coerce.number().optional().nullable(),
   packagingType: z.string().optional().nullable(),
   usedWeight: z.coerce.number().optional().nullable(),
@@ -65,56 +65,25 @@ const volumeDivisor: Record<string, number> = {
   "jastip kargo": 1000000,
 };
 
-const deliveryRouteOptions: Record<string, { value: string; label: string }[]> =
-  {
-    "jastip pesawat": [
-      { value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" },
-    ],
-    "jastip hemat": [
-      { value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" },
-    ],
-    "jastip kargo": [
-      {
-        value: "Jakarta/Surabaya → Manokwari",
-        label: "Jakarta/Surabaya → Manokwari",
-      },
-    ],
-    "jastip pelni": [
-      { value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" },
-      { value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" },
-    ],
-  };
+const deliveryRouteOptions: Record<string, { value: string; label: string }[]> = {
+  "jastip pesawat": [{ value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" }],
+  "jastip hemat": [{ value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" }],
+  "jastip kargo": [{ value: "Jakarta/Surabaya → Manokwari", label: "Jakarta/Surabaya → Manokwari" }],
+  "jastip pelni": [
+    { value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" },
+    { value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" },
+  ],
+};
 
 function getShippingRate(
   serviceType: string | null | undefined,
   deliveryRoute: string | null | undefined,
   weight: number | null | undefined,
-) {
-  if (!serviceType || !deliveryRoute || !weight || weight <= 0) {
-    return null;
-  }
-
-  if (
-    serviceType === "jastip pesawat" &&
-    deliveryRoute === "Jakarta → Manokwari"
-  ) {
-    return 77000;
-  }
-
-  if (
-    serviceType === "jastip hemat" &&
-    deliveryRoute === "Surabaya → Manokwari"
-  ) {
-    return 10000;
-  }
-
-  if (
-    serviceType === "jastip kargo" &&
-    deliveryRoute === "Jakarta/Surabaya → Manokwari"
-  ) {
-    return 7000;
-  }
-
+): number | null {
+  if (!serviceType || !weight || weight <= 0) return null;
+  if (serviceType === "jastip pesawat") return 77000;
+  if (serviceType === "jastip hemat") return 10000;
+  if (serviceType === "jastip kargo") return 7000;
   if (serviceType === "jastip pelni") {
     if (deliveryRoute === "Jakarta → Manokwari") {
       if (weight <= 10) return 20000;
@@ -122,7 +91,6 @@ function getShippingRate(
       if (weight <= 40) return 18000;
       return 17000;
     }
-
     if (deliveryRoute === "Surabaya → Manokwari") {
       if (weight <= 10) return 18000;
       if (weight <= 20) return 17000;
@@ -130,8 +98,75 @@ function getShippingRate(
       return 15500;
     }
   }
+  return null;
+}
+
+function getTotalShipping(
+  serviceType: string | null | undefined,
+  deliveryRoute: string | null | undefined,
+  weight: number | null | undefined,
+): number | null {
+  if (!serviceType || !deliveryRoute || !weight || weight <= 0) return null;
+
+  if (serviceType === "jastip pesawat" && deliveryRoute === "Jakarta → Manokwari") {
+    if (weight <= 0.2) return 15800;
+    if (weight <= 0.4) return 30800;
+    if (weight <= 0.5) return 38500;
+    if (weight <= 0.6) return 46200;
+    if (weight <= 0.7) return 53900;
+    if (weight <= 0.8) return 61600;
+    if (weight <= 0.9) return 69300;
+    if (weight <= 1) return 77000;
+    if (weight <= 2) return 154000;
+    if (weight <= 3) return 231000;
+    if (weight <= 5) return 385000;
+    if (weight <= 10) return 770000;
+    return Math.round(weight * 77000);
+  }
+
+  if (serviceType === "jastip hemat" && deliveryRoute === "Surabaya → Manokwari") {
+    return Math.round(weight * 10000);
+  }
+
+  if (serviceType === "jastip kargo" && deliveryRoute === "Jakarta/Surabaya → Manokwari") {
+    return Math.round(weight * 7000);
+  }
+
+  if (serviceType === "jastip pelni") {
+    if (deliveryRoute === "Jakarta → Manokwari") {
+      if (weight <= 10) return Math.round(weight * 20000);
+      if (weight <= 20) return Math.round(weight * 19000);
+      if (weight <= 40) return Math.round(weight * 18000);
+      return Math.round(weight * 17000);
+    }
+    if (deliveryRoute === "Surabaya → Manokwari") {
+      if (weight <= 10) return Math.round(weight * 18000);
+      if (weight <= 20) return Math.round(weight * 17000);
+      if (weight <= 40) return Math.round(weight * 16000);
+      return Math.round(weight * 15500);
+    }
+  }
 
   return null;
+}
+
+function formatRp(n: number | null | undefined) {
+  if (n == null) return "-";
+  return `Rp ${n.toLocaleString("id-ID")}`;
+}
+
+function parseQueryParams(location: string) {
+  try {
+    const q = new URLSearchParams(location.split("?")[1] || "");
+    return {
+      serviceType: q.get("serviceType") || undefined,
+      packageMode: q.get("packageMode") || undefined,
+      customerName: q.get("customerName") || undefined,
+      packageDate: q.get("packageDate") || undefined,
+    };
+  } catch {
+    return {};
+  }
 }
 
 export default function AdminPackagesNew() {
@@ -139,33 +174,23 @@ export default function AdminPackagesNew() {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [savedGrup, setSavedGrup] = useState<{ customerName: string; serviceType: string; packageDate: string } | null>(null);
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
 
   const createPackage = useCreatePackage();
+
+  const params = parseQueryParams(location);
 
   const form = useForm<PackageFormValues>({
     resolver: zodResolver(packageSchema),
     defaultValues: {
-      packageDate: todayStr(),
+      packageDate: params.packageDate || todayStr(),
       resiNumber: "",
       packageNumber: "",
-      itemName: "",
-      // read defaults from query params (serviceType, packageMode)
-      serviceType: (() => {
-        try {
-          const q = new URLSearchParams(location.split("?")[1] || "");
-          return q.get("serviceType") || undefined;
-        } catch {
-          return undefined;
-        }
-      })(),
-      packageMode: (() => {
-        try {
-          const q = new URLSearchParams(location.split("?")[1] || "");
-          return q.get("packageMode") || undefined;
-        } catch {
-          return undefined;
-        }
-      })(),
+      customerName: params.customerName || "",
+      serviceType: params.serviceType,
+      packageMode: params.packageMode,
     },
   });
 
@@ -177,108 +202,103 @@ export default function AdminPackagesNew() {
   const realWeight = form.watch("realWeight");
   const volumeWeight = form.watch("volumeWeight");
   const usedWeight = form.watch("usedWeight");
+  const packageMode = form.watch("packageMode");
+  const packageDate = form.watch("packageDate");
 
+  // Auto-set delivery route when service type changes
   useEffect(() => {
     if (!serviceType) {
-      form.setValue("deliveryRoute", "", {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+      form.setValue("deliveryRoute", "" as any, { shouldDirty: true });
       return;
     }
-
     const options = deliveryRouteOptions[serviceType] ?? [];
     if (options.length === 0) {
-      form.setValue("deliveryRoute", "", {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+      form.setValue("deliveryRoute", "" as any, { shouldDirty: true });
       return;
     }
-
-    const selectedRoute = options.find(
-      (option) => option.value === deliveryRoute,
-    );
+    const selectedRoute = options.find((o) => o.value === deliveryRoute);
     if (!selectedRoute) {
-      form.setValue("deliveryRoute", options[0].value, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+      form.setValue("deliveryRoute", options[0].value, { shouldDirty: true });
     }
-  }, [serviceType, deliveryRoute, form]);
+  }, [serviceType]);
 
+  // Auto-calculate volume weight
   useEffect(() => {
     const divisor = serviceType ? volumeDivisor[serviceType] : undefined;
-    if (!divisor || !length || !width || !height) {
-      return;
-    }
+    if (!divisor || !length || !width || !height) return;
+    const computed = Number(((length * width * height) / divisor).toFixed(3));
+    form.setValue("volumeWeight", computed, { shouldDirty: true });
+  }, [serviceType, length, width, height]);
 
-    const computedVolumeWeight = Number(
-      ((length * width * height) / divisor).toFixed(2),
-    );
-    form.setValue("volumeWeight", computedVolumeWeight, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-  }, [serviceType, length, width, height, form]);
-
+  // Auto-calculate used weight
   useEffect(() => {
     const real = realWeight ?? 0;
     const volume = volumeWeight ?? 0;
-    const calculatedUsedWeight = Math.max(real, volume);
-
-    if (calculatedUsedWeight > 0) {
-      form.setValue("usedWeight", calculatedUsedWeight, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+    const calc = Math.max(real, volume);
+    if (calc > 0) {
+      form.setValue("usedWeight", calc, { shouldDirty: true });
     }
-  }, [realWeight, volumeWeight, form]);
+  }, [realWeight, volumeWeight]);
 
+  // Auto-calculate shipping rate and total shipping
   useEffect(() => {
     const rate = getShippingRate(serviceType, deliveryRoute, usedWeight);
-    if (rate !== null && usedWeight != null) {
-      form.setValue("shippingRate", rate, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-      form.setValue("totalShipping", Math.round(rate * usedWeight), {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-      return;
-    }
-
-    form.setValue("shippingRate", null, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    form.setValue("totalShipping", null, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-  }, [serviceType, deliveryRoute, usedWeight, form]);
+    const total = getTotalShipping(serviceType, deliveryRoute, usedWeight);
+    form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
+    form.setValue("totalShipping", total ?? null, { shouldDirty: true });
+  }, [serviceType, deliveryRoute, usedWeight]);
 
   async function onSubmit(values: PackageFormValues) {
     try {
       setIsSubmitting(true);
       await createPackage.mutateAsync({ data: values as any });
       queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({
-        title: "Berhasil",
-        description: "Paket baru berhasil ditambahkan. Barcode siap dicetak.",
-      });
-      setLocation("/admin/barcode");
+
+      if (values.packageMode === "grup") {
+        setSavedGrup({
+          customerName: values.customerName,
+          serviceType: values.serviceType || "",
+          packageDate: values.packageDate || todayStr(),
+        });
+        form.reset({
+          packageDate: values.packageDate || todayStr(),
+          resiNumber: "",
+          packageNumber: "",
+          customerName: values.customerName,
+          serviceType: values.serviceType,
+          packageMode: "grup",
+          deliveryRoute: values.deliveryRoute,
+        });
+        toast({ title: "Paket disimpan", description: "Silakan input paket berikutnya atau klik Selesai." });
+      } else {
+        toast({ title: "Berhasil", description: "Paket baru berhasil ditambahkan. Barcode siap dicetak." });
+        setLocation(`${base}/barcode`);
+      }
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Gagal",
-        description: error.message || "Terjadi kesalahan",
-      });
+      toast({ variant: "destructive", title: "Gagal", description: error.message || "Terjadi kesalahan" });
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  function goNextPackage() {
+    if (!savedGrup) return;
+    const q = new URLSearchParams({
+      serviceType: savedGrup.serviceType,
+      packageMode: "grup",
+      customerName: savedGrup.customerName,
+      packageDate: savedGrup.packageDate,
+    });
+    setSavedGrup(null);
+    setLocation(`${base}/packages/new?${q.toString()}`);
+  }
+
+  const serviceLabel: Record<string, string> = {
+    "jastip pesawat": "Jastip Pesawat",
+    "jastip hemat": "Jastip Hemat",
+    "jastip kargo": "Jastip Kargo",
+    "jastip pelni": "Jastip Pelni",
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -286,27 +306,49 @@ export default function AdminPackagesNew() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => setLocation("/admin/packages")}
+          onClick={() => setLocation(`${base}/packages/type`)}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Input Paket Baru
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight">Input Paket Baru</h1>
           <p className="text-muted-foreground mt-1">
-            Masukkan data lengkap paket yang diterima.
+            {serviceType ? (
+              <>
+                <span className="font-medium text-foreground">{serviceLabel[serviceType] || serviceType}</span>
+                {packageMode === "grup" ? " — Grup Paket" : " — 1 Paket"}
+              </>
+            ) : (
+              "Masukkan data lengkap paket yang diterima."
+            )}
           </p>
-          {form.getValues("serviceType") && (
-            <p className="text-sm text-muted-foreground mt-1">
-              Jenis: <strong>{form.getValues("serviceType")}</strong>
-              {form.getValues("packageMode")
-                ? ` — ${form.getValues("packageMode") === "single" ? "Jastip 1 Barang" : "Jastip Gabungan"}`
-                : ""}
-            </p>
-          )}
         </div>
       </div>
+
+      {/* Grup success banner */}
+      {savedGrup && (
+        <Card className="border-green-500 bg-green-50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-green-800">Paket berhasil disimpan!</p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  Konsumen: <strong>{savedGrup.customerName}</strong> · {serviceLabel[savedGrup.serviceType] || savedGrup.serviceType}
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Button size="sm" variant="outline" className="gap-1 border-green-400" onClick={goNextPackage}>
+                    <Plus className="h-3.5 w-3.5" /> Input Paket Berikutnya
+                  </Button>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setLocation(`${base}/barcode`)}>
+                    Selesai &amp; Cetak Barcode
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -319,26 +361,39 @@ export default function AdminPackagesNew() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="packageDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Tanggal <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        value={field.value || ""}
-                        className="w-full md:w-56"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="packageDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tanggal <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="customerName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nama Konsumen <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Masukkan nama konsumen"
+                          {...field}
+                          value={field.value || ""}
+                          readOnly={packageMode === "grup" && !!savedGrup}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -346,9 +401,7 @@ export default function AdminPackagesNew() {
                   name="resiNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        No Resi <span className="text-destructive">*</span>
-                      </FormLabel>
+                      <FormLabel>No Resi <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input placeholder="Contoh: JNE123456789" {...field} />
                       </FormControl>
@@ -358,33 +411,38 @@ export default function AdminPackagesNew() {
                 />
                 <FormField
                   control={form.control}
+                  name="packageNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>No Paket</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Contoh: PKT-001" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
                   name="serviceType"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Jenis Jastip</FormLabel>
                       <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value || ""}
-                        >
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Pilih jenis jastip" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="jastip pesawat">
-                              Jastip Pesawat
-                            </SelectItem>
-                            <SelectItem value="jastip hemat">
-                              Jastip Hemat
-                            </SelectItem>
-                            <SelectItem value="jastip kargo">
-                              Jastip Kargo
-                            </SelectItem>
-                            <SelectItem value="jastip pelni">
-                              Jastip Pelni
-                            </SelectItem>
+                            <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
+                            <SelectItem value="jastip hemat">Jastip Hemat</SelectItem>
+                            <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
+                            <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>
@@ -400,27 +458,18 @@ export default function AdminPackagesNew() {
                       <FormItem>
                         <FormLabel>Lokasi Pengiriman</FormLabel>
                         <FormControl>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value || ""}
-                            disabled={!serviceType}
-                          >
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Pilih lokasi pengiriman" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {(deliveryRouteOptions[serviceType] || []).map(
-                                (option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </SelectItem>
-                                ),
-                              )}
+                              {(deliveryRouteOptions[serviceType] || []).map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </FormControl>
@@ -429,63 +478,7 @@ export default function AdminPackagesNew() {
                     )}
                   />
                 )}
-                <FormField
-                  control={form.control}
-                  name="packageNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>No Paket</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Contoh: PKT-001"
-                          {...field}
-                          value={field.value || ""}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
-
-              <FormField
-                control={form.control}
-                name="customerName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Nama Konsumen <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Masukkan nama konsumen"
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="itemName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Nama Barang <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Contoh: Baju, Sepatu, Elektronik"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
 
@@ -504,19 +497,12 @@ export default function AdminPackagesNew() {
                   name="realWeight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Berat Real Kg</FormLabel>
+                      <FormLabel>Berat Real (Kg)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? Number(e.target.value) : null,
-                            )
-                          }
+                          type="number" step="0.001" placeholder="0.000"
+                          {...field} value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -529,26 +515,13 @@ export default function AdminPackagesNew() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Jenis Paking</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value || ""}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih jenis paking" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="karton">Karton</SelectItem>
-                          <SelectItem value="plastik">Plastik</SelectItem>
-                          <SelectItem value="kayu">Kayu</SelectItem>
-                          <SelectItem value="bubble_wrap">
-                            Bubble Wrap
-                          </SelectItem>
-                          <SelectItem value="sack">Karung/Sack</SelectItem>
-                          <SelectItem value="lainnya">Lainnya</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input
+                          placeholder="Contoh: Karton, Plastik, Kayu..."
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -570,16 +543,9 @@ export default function AdminPackagesNew() {
                         <FormLabel>{label}</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            step="0.1"
-                            placeholder="0"
-                            {...field}
-                            value={field.value ?? ""}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value ? Number(e.target.value) : null,
-                              )
-                            }
+                            type="number" step="0.1" placeholder="0"
+                            {...field} value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -598,17 +564,14 @@ export default function AdminPackagesNew() {
                       <FormLabel>Berat Volume (Kg)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Otomatis dihitung"
-                          {...field}
-                          value={field.value ?? ""}
-                          readOnly
+                          type="number" step="0.001" placeholder="Otomatis dihitung"
+                          {...field} value={field.value ?? ""} readOnly
+                          className="bg-muted/50"
                         />
                       </FormControl>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Volume = P × L × T / divisor. Divisor: Pesawat 5.000,
-                        Hemat 4.000, Pelni 4.000, Cargo 1.000.000.
+                        Volume = P × L × T ÷{" "}
+                        {serviceType ? volumeDivisor[serviceType]?.toLocaleString("id-ID") : "divisor"}
                       </p>
                       <FormMessage />
                     </FormItem>
@@ -622,18 +585,12 @@ export default function AdminPackagesNew() {
                       <FormLabel>Berat Yang Digunakan (Kg)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? Number(e.target.value) : null,
-                            )
-                          }
+                          type="number" step="0.001" placeholder="0.000"
+                          {...field} value={field.value ?? ""} readOnly
+                          className="bg-muted/50"
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">MAX(Berat Real, Berat Volume)</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -654,15 +611,12 @@ export default function AdminPackagesNew() {
                   name="shippingRate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Ongkir Per Paket (Rp/Kg)</FormLabel>
+                      <FormLabel>Tarif Ongkir (Rp/Kg)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="100"
-                          placeholder="Otomatis dihitung"
-                          {...field}
-                          value={field.value ?? ""}
-                          readOnly
+                          type="number" step="100" placeholder="Otomatis dihitung"
+                          {...field} value={field.value ?? ""} readOnly
+                          className="bg-muted/50"
                         />
                       </FormControl>
                       <FormMessage />
@@ -677,16 +631,9 @@ export default function AdminPackagesNew() {
                       <FormLabel>Total Berat (Kg)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? Number(e.target.value) : null,
-                            )
-                          }
+                          type="number" step="0.001" placeholder="0.000"
+                          {...field} value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -704,16 +651,9 @@ export default function AdminPackagesNew() {
                       <FormLabel>Harga Barang (Rp)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="1000"
-                          placeholder="0"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? Number(e.target.value) : null,
-                            )
-                          }
+                          type="number" step="1000" placeholder="0"
+                          {...field} value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                         />
                       </FormControl>
                       <FormMessage />
@@ -725,17 +665,22 @@ export default function AdminPackagesNew() {
                   name="totalShipping"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Total Ongkir (Rp)</FormLabel>
+                      <FormLabel>
+                        Total Ongkir (Rp)
+                        {form.watch("totalShipping") != null && (
+                          <span className="ml-2 text-xs text-primary font-normal">
+                            = {formatRp(form.watch("totalShipping"))}
+                          </span>
+                        )}
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          step="100"
-                          placeholder="Otomatis dihitung"
-                          {...field}
-                          value={field.value ?? ""}
-                          readOnly
+                          type="number" step="100" placeholder="Otomatis dihitung, bisa diubah"
+                          {...field} value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">Nilai otomatis berdasarkan tarif. Bisa diubah manual.</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -748,12 +693,16 @@ export default function AdminPackagesNew() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setLocation("/admin/packages")}
+              onClick={() => setLocation(`${base}/packages/type`)}
             >
               Batal
             </Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-36">
-              {isSubmitting ? "Menyimpan..." : "Simpan Paket"}
+              {isSubmitting
+                ? "Menyimpan..."
+                : packageMode === "grup"
+                ? "Simpan & Input Berikutnya"
+                : "Simpan & Cetak Barcode"}
             </Button>
           </div>
         </form>

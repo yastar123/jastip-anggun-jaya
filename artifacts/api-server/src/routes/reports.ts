@@ -82,8 +82,8 @@ router.get("/", requireAuth, requireRole("owner"), async (req, res) => {
     res.json({
       period: periodLabel,
       totalPackages: filteredPkgs.length,
-      pickedUp: filteredPkgs.filter(p => p.status === "picked_up").length,
-      pending: filteredPkgs.filter(p => p.status !== "picked_up").length,
+      pickedUp: filteredPkgs.filter(p => p.status === "diserahkan").length,
+      pending: filteredPkgs.filter(p => p.status === "pending").length,
       entries,
     });
   } catch (err) {

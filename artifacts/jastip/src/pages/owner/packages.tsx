@@ -62,9 +62,7 @@ export default function OwnerPackages() {
             <SelectContent>
               <SelectItem value="all">Semua Status</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_transit">Transit</SelectItem>
-              <SelectItem value="ready">Siap Diambil</SelectItem>
-              <SelectItem value="picked_up">Sudah Diambil</SelectItem>
+              <SelectItem value="diserahkan">Diserahkan</SelectItem>
             </SelectContent>
           </Select>
         </div>

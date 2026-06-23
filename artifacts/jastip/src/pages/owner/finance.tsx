@@ -28,7 +28,7 @@ export default function OwnerFinance() {
     const pkgs = packages || [];
     const totalOngkir = pkgs.reduce((s, p: any) => s + (Number(p.totalShipping) || 0), 0);
     const totalHarga = pkgs.reduce((s, p: any) => s + (Number(p.price) || 0), 0);
-    const pickedUp = pkgs.filter((p: any) => p.status === "picked_up");
+    const pickedUp = pkgs.filter((p: any) => p.status === "diserahkan");
     const ongkirCollected = pickedUp.reduce((s, p: any) => s + (Number(p.totalShipping) || 0), 0);
 
     // Monthly revenue
@@ -47,13 +47,11 @@ export default function OwnerFinance() {
     }));
 
     // Status breakdown for pie
-    const statusCount = { pending: 0, in_transit: 0, ready: 0, picked_up: 0 };
+    const statusCount = { pending: 0, diserahkan: 0 };
     pkgs.forEach((p: any) => { if (statusCount.hasOwnProperty(p.status)) (statusCount as any)[p.status]++; });
     const pieData = [
       { name: "Pending", value: statusCount.pending },
-      { name: "Transit", value: statusCount.in_transit },
-      { name: "Siap Ambil", value: statusCount.ready },
-      { name: "Sudah Diambil", value: statusCount.picked_up },
+      { name: "Diserahkan", value: statusCount.diserahkan },
     ].filter(d => d.value > 0);
 
     return { totalOngkir, totalHarga, ongkirCollected, monthlyData, pieData, totalPkgs: pkgs.length, pickedUpCount: pickedUp.length };

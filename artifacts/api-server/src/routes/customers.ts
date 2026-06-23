@@ -34,8 +34,8 @@ router.get("/", requireAuth, requireRole("admin", "owner"), async (req, res) => 
         isActive: c.isActive,
         createdAt: c.createdAt.toISOString(),
         totalPackages: pkgs.length,
-        pendingPackages: pkgs.filter(p => p.status !== "picked_up").length,
-        pickedUpPackages: pkgs.filter(p => p.status === "picked_up").length,
+        pendingPackages: pkgs.filter(p => p.status === "pending").length,
+        pickedUpPackages: pkgs.filter(p => p.status === "diserahkan").length,
       };
     });
     res.json(result);
@@ -61,8 +61,8 @@ router.get("/:id", requireAuth, requireRole("admin", "owner"), async (req, res) 
       isActive: c.isActive,
       createdAt: c.createdAt.toISOString(),
       totalPackages: pkgs.length,
-      pendingPackages: pkgs.filter(p => p.status !== "picked_up").length,
-      pickedUpPackages: pkgs.filter(p => p.status === "picked_up").length,
+      pendingPackages: pkgs.filter(p => p.status === "pending").length,
+      pickedUpPackages: pkgs.filter(p => p.status === "diserahkan").length,
     });
   } catch (err) {
     req.log.error(err);
