@@ -40,7 +40,6 @@ const packageSchema = z.object({
   serviceType: z.string().optional().nullable(),
   packageMode: z.string().optional().nullable(),
   deliveryRoute: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
   realWeight: z.coerce.number().optional().nullable(),
   length: z.coerce.number().optional().nullable(),
   width: z.coerce.number().optional().nullable(),
@@ -176,7 +175,8 @@ export default function AdminPackagesNew() {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [savedGrup, setSavedGrup] = useState<{ customerName: string; serviceType: string; packageDate: string } | null>(null);
+  const [savedGrup, setSavedGrup] = useState<{ customerName: string; serviceType: string; packageDate: string; deliveryRoute: string } | null>(null);
+  const [grupPackageIds, setGrupPackageIds] = useState<number[]>([]);
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
@@ -191,7 +191,6 @@ export default function AdminPackagesNew() {
       resiNumber: "",
       packageNumber: "",
       itemName: "",
-      notes: "",
       customerName: params.customerName || "",
       serviceType: params.serviceType,
       packageMode: params.packageMode,
@@ -254,19 +253,23 @@ export default function AdminPackagesNew() {
   async function onSubmit(values: PackageFormValues) {
     try {
       setIsSubmitting(true);
-      await createPackage.mutateAsync({ data: values as any });
+      const result = await createPackage.mutateAsync({ data: values as any });
       queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
 
       if (values.packageMode === "grup") {
+        const newId = (result as any)?.id;
+        if (newId) setGrupPackageIds((prev) => [...prev, newId]);
         setSavedGrup({
           customerName: values.customerName,
           serviceType: values.serviceType || "",
           packageDate: values.packageDate || todayStr(),
+          deliveryRoute: values.deliveryRoute || "",
         });
         form.reset({
           packageDate: values.packageDate || todayStr(),
           resiNumber: "",
           packageNumber: "",
+          itemName: "",
           customerName: values.customerName,
           serviceType: values.serviceType,
           packageMode: "grup",
@@ -275,7 +278,8 @@ export default function AdminPackagesNew() {
         toast({ title: "Paket disimpan", description: "Silakan input paket berikutnya atau klik Selesai." });
       } else {
         toast({ title: "Berhasil", description: "Paket baru berhasil ditambahkan. Barcode siap dicetak." });
-        setLocation(`${base}/barcode`);
+        const newId = (result as any)?.id;
+        setLocation(`${base}/barcode${newId ? `?ids=${newId}` : ""}`);
       }
     } catch (error: any) {
       toast({ variant: "destructive", title: "Gagal", description: error.message || "Terjadi kesalahan" });
@@ -286,18 +290,16 @@ export default function AdminPackagesNew() {
 
   function goNextPackage() {
     if (!savedGrup) return;
-    const currentRoute = form.getValues("deliveryRoute");
     setSavedGrup(null);
     form.reset({
       packageDate: savedGrup.packageDate,
       resiNumber: "",
       packageNumber: "",
       itemName: "",
-      notes: "",
       customerName: savedGrup.customerName,
       serviceType: savedGrup.serviceType,
       packageMode: "grup",
-      deliveryRoute: currentRoute,
+      deliveryRoute: savedGrup.deliveryRoute,
     });
   }
 
@@ -348,7 +350,11 @@ export default function AdminPackagesNew() {
                   <Button size="sm" variant="outline" className="gap-1 border-green-400" onClick={goNextPackage}>
                     <Plus className="h-3.5 w-3.5" /> Input Paket Berikutnya
                   </Button>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setLocation(`${base}/barcode`)}>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => setLocation(`${base}/barcode${grupPackageIds.length > 0 ? `?ids=${grupPackageIds.join(",")}` : ""}`)}
+                  >
                     Selesai &amp; Cetak Barcode
                   </Button>
                 </div>
@@ -453,21 +459,28 @@ export default function AdminPackagesNew() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Jenis Jastip</FormLabel>
-                      <FormControl>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih jenis jastip" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-                            <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
-                            <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
-                            <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
+                      {params.serviceType ? (
+                        <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                          {serviceLabel[field.value || ""] || field.value || params.serviceType}
+                          <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                        </div>
+                      ) : (
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Pilih jenis jastip" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
+                              <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
+                              <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
+                              <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -710,33 +723,6 @@ export default function AdminPackagesNew() {
                   )}
                 />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Section: Catatan */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Catatan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Catatan / Keterangan</FormLabel>
-                    <FormControl>
-                      <textarea
-                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                        placeholder="Catatan tambahan untuk paket ini..."
-                        {...field}
-                        value={field.value || ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </CardContent>
           </Card>
 

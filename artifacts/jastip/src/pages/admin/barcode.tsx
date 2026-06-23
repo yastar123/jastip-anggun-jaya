@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useListPackages } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
-import JsBarcode from "jsbarcode";
+import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
-import { Download, Printer, Search, ArrowLeft, Barcode, Package, Layers } from "lucide-react";
+import { Download, Printer, Search, ArrowLeft, QrCode, Package, Layers, CheckCircle2 } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -17,57 +17,32 @@ function formatRp(n: any) {
 }
 
 function BarcodeItem({ pkg }: { pkg: any }) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    if (svgRef.current) {
-      try {
-        JsBarcode(svgRef.current, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
-          format: "CODE128",
-          width: 2,
-          height: 80,
-          displayValue: true,
-          fontSize: 11,
-          margin: 10,
-          background: "#ffffff",
-          lineColor: "#000000",
-        });
-      } catch {
-        JsBarcode(svgRef.current, pkg.id.toString(), {
-          format: "CODE128",
-          width: 2,
-          height: 80,
-          displayValue: true,
-          fontSize: 11,
-          margin: 10,
-        });
-      }
+    if (canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
+        width: 160,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      }).catch(() => {});
     }
   }, [pkg]);
 
-  function printBarcode() {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const win = window.open("", "_blank");
-    if (!win) return;
-    // Build a larger barcode SVG for print
-    const printSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  async function printBarcode() {
+    const qrValue = pkg.barcode || pkg.resiNumber || pkg.id.toString();
+    let qrDataUrl = "";
     try {
-      JsBarcode(printSvg, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
-        format: "CODE128",
-        width: 3,
-        height: 140,
-        displayValue: true,
-        fontSize: 16,
-        margin: 14,
-        background: "#ffffff",
-        lineColor: "#000000",
+      qrDataUrl = await QRCode.toDataURL(qrValue, {
+        width: 400,
+        margin: 3,
+        color: { dark: "#000000", light: "#ffffff" },
       });
     } catch {
-      JsBarcode(printSvg, pkg.id.toString(), { format: "CODE128", width: 3, height: 140, displayValue: true });
+      return;
     }
-    const printSvgData = new XMLSerializer().serializeToString(printSvg);
+    const win = window.open("", "_blank");
+    if (!win) return;
 
     win.document.write(`<!DOCTYPE html>
 <html>
@@ -91,64 +66,57 @@ function BarcodeItem({ pkg }: { pkg: any }) {
       flex-direction: column;
       overflow: hidden;
     }
-    /* Header */
     .header {
       background: #c00;
       color: #fff;
       padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
     }
     .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
     .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
-    /* Barcode section */
-    .barcode-wrap {
+    .body-wrap {
       flex: 1;
       display: flex;
+      flex-direction: row;
+      align-items: stretch;
+    }
+    .qr-wrap {
+      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 24px 40px;
-      border-bottom: 2px dashed #ddd;
-      background: #fff;
+      padding: 24px 20px;
+      border-right: 2px dashed #ddd;
+      min-width: 180px;
     }
-    .barcode-wrap svg {
-      width: 100%;
-      height: auto;
-      display: block;
-      max-height: 200px;
-    }
-    /* Info grid */
-    .info-section { padding: 16px 20px; }
+    .qr-wrap img { width: 150px; height: 150px; display: block; }
+    .qr-label { font-size: 8px; color: #999; margin-top: 6px; font-family: monospace; text-align:center; word-break:break-all; max-width:150px; }
+    .info-section { flex: 1; padding: 16px 20px; }
+    .customer { font-size: 20px; font-weight: 900; color: #111; margin-bottom: 12px; border-bottom: 1.5px solid #eee; padding-bottom: 10px; }
     .info-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px 16px;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
     }
-    .info-item { display: flex; flex-direction: column; gap: 3px; }
-    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.6px; }
-    .info-value { font-size: 13px; font-weight: 700; color: #111; line-height: 1.3; }
-    .info-value.mono { font-family: monospace; font-size: 12px; }
-    .info-value.big { font-size: 16px; }
+    .info-item { display: flex; flex-direction: column; gap: 2px; }
+    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info-value { font-size: 12px; font-weight: 700; color: #111; line-height: 1.3; }
+    .info-value.mono { font-family: monospace; font-size: 11px; }
+    .info-value.red { color: #c00; font-size: 14px; }
     .full { grid-column: 1 / -1; }
-    .two { grid-column: span 2; }
-    .divider { border: none; border-top: 1.5px solid #eee; margin: 0 20px; }
-    /* Status badge */
     .status {
       display: inline-block;
-      padding: 3px 10px;
+      padding: 2px 8px;
       border-radius: 20px;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       background: ${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"};
       color: ${pkg.status === "diserahkan" ? "#166534" : "#713f12"};
     }
-    /* Footer */
     .footer {
       background: #f8f8f8;
       border-top: 1px solid #eee;
       padding: 8px 20px;
-      font-size: 10px;
+      font-size: 9px;
       color: #aaa;
       text-align: center;
     }
@@ -157,91 +125,70 @@ function BarcodeItem({ pkg }: { pkg: any }) {
 <body>
   <div class="label">
     <div class="header">
-      <div>
-        <div class="brand-name">JASTIP ANGGUN JAYA</div>
-        <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Makassar → Manokwari, Papua</div>
+      <div class="brand-name">JASTIP ANGGUN JAYA</div>
+      <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+    </div>
+    <div class="body-wrap">
+      <div class="qr-wrap">
+        <img src="${qrDataUrl}" alt="QR Code" />
+        <div class="qr-label">${qrValue}</div>
+      </div>
+      <div class="info-section">
+        <div class="customer">${pkg.customerName || "-"}</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">No. Resi</span>
+            <span class="info-value mono">${pkg.resiNumber || "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">No. Paket</span>
+            <span class="info-value mono">${pkg.packageNumber || "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Tanggal</span>
+            <span class="info-value">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Status</span>
+            <span class="info-value"><span class="status">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Jenis Jastip</span>
+            <span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Rute</span>
+            <span class="info-value">${pkg.deliveryRoute || "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Berat Real</span>
+            <span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Berat Digunakan</span>
+            <span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Jenis Paking</span>
+            <span class="info-value">${pkg.packagingType || "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Nama Barang</span>
+            <span class="info-value">${pkg.itemName || "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Harga Barang</span>
+            <span class="info-value">${pkg.price != null ? "Rp " + Number(pkg.price).toLocaleString("id-ID") : "-"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Total Ongkir</span>
+            <span class="info-value red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span>
+          </div>
+        </div>
       </div>
     </div>
-
-    <div class="barcode-wrap">
-      ${printSvgData}
-    </div>
-
-    <div class="info-section">
-      <div class="info-grid">
-        <div class="info-item full">
-          <span class="info-label">Nama Konsumen</span>
-          <span class="info-value big">${pkg.customerName || "-"}</span>
-        </div>
-        <div class="info-item two">
-          <span class="info-label">No. Barcode / Seri</span>
-          <span class="info-value mono">${pkg.barcode || "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Status</span>
-          <span class="info-value"><span class="status">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">No. Resi</span>
-          <span class="info-value mono">${pkg.resiNumber || "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">No. Paket</span>
-          <span class="info-value mono">${pkg.packageNumber || "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Tanggal</span>
-          <span class="info-value">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="info-section">
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">Jenis Jastip</span>
-          <span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span>
-        </div>
-        <div class="info-item two">
-          <span class="info-label">Rute Pengiriman</span>
-          <span class="info-value">${pkg.deliveryRoute || "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Berat Real</span>
-          <span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Berat Volume</span>
-          <span class="info-value">${pkg.volumeWeight != null ? pkg.volumeWeight + " Kg" : "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Berat Digunakan</span>
-          <span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Jenis Paking</span>
-          <span class="info-value">${pkg.packagingType || "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Nama / Jenis Barang</span>
-          <span class="info-value">${pkg.itemName || "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Harga Barang</span>
-          <span class="info-value">${pkg.price != null ? "Rp " + Number(pkg.price).toLocaleString("id-ID") : "-"}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">Total Ongkir</span>
-          <span class="info-value" style="color:#c00;font-size:15px;">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span>
-        </div>
-      </div>
-      ${pkg.notes ? `<div style="margin-top:12px;padding:8px 10px;background:#fafafa;border:1px solid #eee;border-radius:6px;font-size:11px;color:#555;"><strong>Catatan:</strong> ${pkg.notes}</div>` : ""}
-    </div>
-
     <div class="footer">
-      Dicetak oleh sistem Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari
+      Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari
     </div>
   </div>
   <script>window.onload = () => { window.print(); window.close(); }</script>
@@ -251,24 +198,12 @@ function BarcodeItem({ pkg }: { pkg: any }) {
   }
 
   function downloadBarcode() {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const canvas = document.createElement("canvas");
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const img = new Image();
-    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      canvas.getContext("2d")?.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-      const a = document.createElement("a");
-      a.download = `barcode-${pkg.barcode || pkg.resiNumber || pkg.id}.png`;
-      a.href = canvas.toDataURL("image/png");
-      a.click();
-    };
-    img.src = url;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.download = `qr-${pkg.barcode || pkg.resiNumber || pkg.id}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
   }
 
   return (
@@ -293,7 +228,7 @@ function BarcodeItem({ pkg }: { pkg: any }) {
           </div>
         </div>
         <div className="flex justify-center bg-white border rounded-lg p-2 mb-3">
-          <svg ref={svgRef} />
+          <canvas ref={canvasRef} />
         </div>
         <div className="grid grid-cols-2 gap-1 mb-2 text-xs text-muted-foreground">
           {pkg.usedWeight != null && <span>Berat: {pkg.usedWeight} Kg</span>}
@@ -315,18 +250,23 @@ function BarcodeItem({ pkg }: { pkg: any }) {
 type TabKey = "single" | "grup";
 
 export default function AdminBarcode() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState<TabKey>("single");
   const { data: packages, isLoading } = useListPackages();
 
+  const idsParam = new URLSearchParams(location.split("?")[1] || "").get("ids");
+  const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
+
   const allPackages = packages || [];
 
-  const byTab = allPackages.filter((p: any) => {
-    if (activeTab === "grup") return p.packageMode === "grup";
-    return !p.packageMode || p.packageMode === "single";
-  });
+  const byTab = highlightIds
+    ? allPackages.filter((p: any) => highlightIds.includes(p.id))
+    : allPackages.filter((p: any) => {
+        if (activeTab === "grup") return p.packageMode === "grup";
+        return !p.packageMode || p.packageMode === "single";
+      });
 
   const filtered = byTab.filter(
     (p: any) =>
@@ -375,37 +315,64 @@ export default function AdminBarcode() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Barcode className="h-7 w-7 text-primary" />
+            <QrCode className="h-7 w-7 text-primary" />
             Label Barcode Paket
           </h1>
-          <p className="text-muted-foreground mt-1">Cetak atau unduh barcode untuk setiap paket.</p>
+          <p className="text-muted-foreground mt-1">Cetak atau unduh QR code untuk setiap paket.</p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b pb-0">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => switchTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                isActive
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-              <Badge variant={isActive ? "default" : "secondary"} className="text-xs ml-1">
-                {tab.count}
-              </Badge>
-            </button>
-          );
-        })}
-      </div>
+      {/* Grup session banner */}
+      {highlightIds && highlightIds.length > 0 && (
+        <Card className="border-green-500 bg-green-50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-green-800">
+                  Barcode siap — {highlightIds.length} paket dalam sesi Grup ini
+                </p>
+                <p className="text-sm text-green-700 mt-0.5">Silakan cetak atau unduh barcode di bawah.</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-green-400 text-green-700"
+                onClick={() => setLocation("/admin/barcode")}
+              >
+                Lihat Semua
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tabs — only show when not in grup session mode */}
+      {!highlightIds && (
+        <div className="flex gap-2 border-b pb-0">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => switchTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+                <Badge variant={isActive ? "default" : "secondary"} className="text-xs ml-1">
+                  {tab.count}
+                </Badge>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -430,7 +397,7 @@ export default function AdminBarcode() {
         </div>
       ) : total === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
-          <Barcode className="w-16 h-16 mx-auto mb-4 opacity-20" />
+          <QrCode className="w-16 h-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium">Belum ada paket</p>
           <p className="text-sm mt-1">Tambah paket terlebih dahulu untuk membuat barcode</p>
           <Button className="mt-4" onClick={() => setLocation("/admin/packages/type")}>
