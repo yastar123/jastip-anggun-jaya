@@ -25,10 +25,10 @@ function BarcodeItem({ pkg }: { pkg: any }) {
         JsBarcode(svgRef.current, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
           format: "CODE128",
           width: 2,
-          height: 60,
+          height: 80,
           displayValue: true,
-          fontSize: 12,
-          margin: 8,
+          fontSize: 11,
+          margin: 10,
           background: "#ffffff",
           lineColor: "#000000",
         });
@@ -36,10 +36,10 @@ function BarcodeItem({ pkg }: { pkg: any }) {
         JsBarcode(svgRef.current, pkg.id.toString(), {
           format: "CODE128",
           width: 2,
-          height: 60,
+          height: 80,
           displayValue: true,
-          fontSize: 12,
-          margin: 8,
+          fontSize: 11,
+          margin: 10,
         });
       }
     }
@@ -51,110 +51,197 @@ function BarcodeItem({ pkg }: { pkg: any }) {
     const svgData = new XMLSerializer().serializeToString(svg);
     const win = window.open("", "_blank");
     if (!win) return;
+    // Build a larger barcode SVG for print
+    const printSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    try {
+      JsBarcode(printSvg, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
+        format: "CODE128",
+        width: 3,
+        height: 140,
+        displayValue: true,
+        fontSize: 16,
+        margin: 14,
+        background: "#ffffff",
+        lineColor: "#000000",
+      });
+    } catch {
+      JsBarcode(printSvg, pkg.id.toString(), { format: "CODE128", width: 3, height: 140, displayValue: true });
+    }
+    const printSvgData = new XMLSerializer().serializeToString(printSvg);
+
     win.document.write(`<!DOCTYPE html>
 <html>
 <head>
-  <title>Barcode - ${pkg.resiNumber || pkg.barcode}</title>
+  <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
   <style>
-    @page { size: A4 portrait; margin: 0; }
-    * { box-sizing: border-box; }
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
       font-family: 'Arial', sans-serif;
       background: #fff;
-      padding: 32px;
+      height: calc(297mm - 24mm);
+      display: flex;
+      align-items: stretch;
     }
     .label {
-      text-align: center;
-      padding: 32px;
-      border: 3px solid #000;
-      border-radius: 12px;
+      border: 3px solid #222;
+      border-radius: 10px;
       width: 100%;
-      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
-    .brand {
-      font-size: 22px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      color: #c00;
-      margin-bottom: 6px;
+    /* Header */
+    .header {
+      background: #c00;
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
-    .sub-brand {
-      font-size: 11px;
-      color: #666;
-      margin-bottom: 16px;
-      letter-spacing: 1px;
+    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    /* Barcode section */
+    .barcode-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 40px;
+      border-bottom: 2px dashed #ddd;
+      background: #fff;
     }
-    svg {
+    .barcode-wrap svg {
       width: 100%;
-      max-width: 520px;
       height: auto;
       display: block;
-      margin: 0 auto;
+      max-height: 200px;
     }
-    .divider { border: none; border-top: 1.5px dashed #999; margin: 16px 0; }
+    /* Info grid */
+    .info-section { padding: 16px 20px; }
     .info-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 20px;
-      text-align: left;
-      margin-top: 4px;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px 16px;
     }
-    .info-item { display: flex; flex-direction: column; gap: 2px; }
-    .info-label { font-size: 9px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-    .info-value { font-size: 13px; font-weight: 600; color: #111; }
+    .info-item { display: flex; flex-direction: column; gap: 3px; }
+    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.6px; }
+    .info-value { font-size: 13px; font-weight: 700; color: #111; line-height: 1.3; }
     .info-value.mono { font-family: monospace; font-size: 12px; }
+    .info-value.big { font-size: 16px; }
     .full { grid-column: 1 / -1; }
+    .two { grid-column: span 2; }
+    .divider { border: none; border-top: 1.5px solid #eee; margin: 0 20px; }
+    /* Status badge */
+    .status {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      background: ${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"};
+      color: ${pkg.status === "diserahkan" ? "#166534" : "#713f12"};
+    }
+    /* Footer */
+    .footer {
+      background: #f8f8f8;
+      border-top: 1px solid #eee;
+      padding: 8px 20px;
+      font-size: 10px;
+      color: #aaa;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
   <div class="label">
-    <div class="brand">JASTIP ANGGUN JAYA</div>
-    <div class="sub-brand">Layanan Pengiriman Paket ke Papua</div>
-    ${svgData}
-    <hr class="divider" />
-    <div class="info-grid">
-      <div class="info-item">
-        <span class="info-label">No. Seri / Barcode</span>
-        <span class="info-value mono">${pkg.barcode || "-"}</span>
+    <div class="header">
+      <div>
+        <div class="brand-name">JASTIP ANGGUN JAYA</div>
+        <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Makassar → Manokwari, Papua</div>
       </div>
-      <div class="info-item">
-        <span class="info-label">No. Resi</span>
-        <span class="info-value mono">${pkg.resiNumber || "-"}</span>
+    </div>
+
+    <div class="barcode-wrap">
+      ${printSvgData}
+    </div>
+
+    <div class="info-section">
+      <div class="info-grid">
+        <div class="info-item full">
+          <span class="info-label">Nama Konsumen</span>
+          <span class="info-value big">${pkg.customerName || "-"}</span>
+        </div>
+        <div class="info-item two">
+          <span class="info-label">No. Barcode / Seri</span>
+          <span class="info-value mono">${pkg.barcode || "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Status</span>
+          <span class="info-value"><span class="status">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">No. Resi</span>
+          <span class="info-value mono">${pkg.resiNumber || "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">No. Paket</span>
+          <span class="info-value mono">${pkg.packageNumber || "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Tanggal</span>
+          <span class="info-value">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</span>
+        </div>
       </div>
-      <div class="info-item full">
-        <span class="info-label">Nama Konsumen</span>
-        <span class="info-value">${pkg.customerName || "-"}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="info-section">
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Jenis Jastip</span>
+          <span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span>
+        </div>
+        <div class="info-item two">
+          <span class="info-label">Rute Pengiriman</span>
+          <span class="info-value">${pkg.deliveryRoute || "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Berat Real</span>
+          <span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Berat Volume</span>
+          <span class="info-value">${pkg.volumeWeight != null ? pkg.volumeWeight + " Kg" : "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Berat Digunakan</span>
+          <span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Jenis Paking</span>
+          <span class="info-value">${pkg.packagingType || "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Nama / Jenis Barang</span>
+          <span class="info-value">${pkg.itemName || "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Harga Barang</span>
+          <span class="info-value">${pkg.price != null ? "Rp " + Number(pkg.price).toLocaleString("id-ID") : "-"}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Total Ongkir</span>
+          <span class="info-value" style="color:#c00;font-size:15px;">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span>
+        </div>
       </div>
-      <div class="info-item">
-        <span class="info-label">Jenis Jastip</span>
-        <span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Rute</span>
-        <span class="info-value">${pkg.deliveryRoute || "-"}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Berat Volume</span>
-        <span class="info-value">${pkg.volumeWeight != null ? pkg.volumeWeight + " Kg" : "-"}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Berat Digunakan</span>
-        <span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Total Ongkir</span>
-        <span class="info-value">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span>
-      </div>
-      <div class="info-item">
-        <span class="info-label">Jenis Paking</span>
-        <span class="info-value">${pkg.packagingType || "-"}</span>
-      </div>
+      ${pkg.notes ? `<div style="margin-top:12px;padding:8px 10px;background:#fafafa;border:1px solid #eee;border-radius:6px;font-size:11px;color:#555;"><strong>Catatan:</strong> ${pkg.notes}</div>` : ""}
+    </div>
+
+    <div class="footer">
+      Dicetak oleh sistem Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari
     </div>
   </div>
   <script>window.onload = () => { window.print(); window.close(); }</script>

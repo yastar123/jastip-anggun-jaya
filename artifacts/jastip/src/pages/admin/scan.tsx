@@ -284,22 +284,33 @@ export default function AdminScan() {
                   {[
                     { label: "No. Barcode", value: pkg.barcode, mono: true },
                     { label: "No. Resi", value: pkg.resiNumber, mono: true },
-                    { label: "No. Paket", value: pkg.packageNumber || "-" },
-                    { label: "Jenis Jastip", value: pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-" },
-                    { label: "Rute", value: pkg.deliveryRoute || "-" },
+                    { label: "No. Paket", value: pkg.packageNumber || "-", mono: true },
                     { label: "Tanggal", value: pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID") : "-" },
+                    { label: "Mode Paket", value: pkg.packageMode === "grup" ? "Grup Paket" : pkg.packageMode === "single" ? "1 Paket" : "-" },
+                    { label: "Admin Input", value: pkg.adminName || "-" },
+                    { label: "Nama / Jenis Barang", value: pkg.itemName || "-" },
+                    { label: "Jenis Jastip", value: pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-" },
+                    { label: "Rute Pengiriman", value: pkg.deliveryRoute || "-" },
                     { label: "Berat Real", value: pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-" },
                     { label: "Berat Volume", value: pkg.volumeWeight != null ? `${pkg.volumeWeight} Kg` : "-" },
                     { label: "Berat Digunakan", value: pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-" },
+                    { label: "Total Berat", value: pkg.totalWeight != null ? `${pkg.totalWeight} Kg` : "-" },
                     { label: "Jenis Paking", value: pkg.packagingType || "-" },
+                    { label: "Tarif Ongkir/kg", value: formatRp(pkg.shippingRate) },
                     { label: "Total Ongkir", value: formatRp(pkg.totalShipping) },
                     { label: "Harga Barang", value: formatRp(pkg.price) },
                   ].map((item) => (
                     <div key={item.label} className="bg-muted/40 rounded-lg p-3">
                       <p className="text-xs text-muted-foreground mb-0.5">{item.label}</p>
-                      <p className={`text-sm font-medium ${item.mono ? "font-mono" : ""}`}>{item.value}</p>
+                      <p className={`text-sm font-medium ${(item as any).mono ? "font-mono" : ""}`}>{item.value}</p>
                     </div>
                   ))}
+                  {pkg.notes && (
+                    <div className="col-span-2 md:col-span-3 bg-muted/40 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-0.5">Catatan</p>
+                      <p className="text-sm font-medium">{pkg.notes}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action buttons */}

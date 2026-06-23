@@ -1,6 +1,6 @@
 import { useListPackages } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, DollarSign, Package, PackageCheck, AlertCircle } from "lucide-react";
+import { Package, PackageCheck } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell, Pie, PieChart, Legend } from "recharts";
 import { useMemo, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -66,49 +66,31 @@ export default function OwnerFinance() {
         <p className="text-muted-foreground mt-1">Pantau arus ongkir dan pendapatan bisnis Jastip Anggun Jaya.</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-l-4 border-l-primary">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ongkir</CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatRp(stats.totalOngkir)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Dari {stats.totalPkgs} paket</p>
-          </CardContent>
-        </Card>
-
+      {/* KPI Cards — 2 status cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card className="border-l-4 border-l-green-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ongkir Terkumpul</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium">Paket Diserahkan</CardTitle>
+            <PackageCheck className="h-5 w-5 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatRp(stats.ongkirCollected)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Dari {stats.pickedUpCount} paket diambil</p>
+            <div className="text-4xl font-bold text-green-600">{stats.pickedUpCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">paket</p>
+            <p className="text-sm font-semibold text-green-700 mt-2">{formatRp(stats.ongkirCollected)}</p>
+            <p className="text-xs text-muted-foreground">Total ongkir terkumpul</p>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-blue-500">
+        <Card className="border-l-4 border-l-amber-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Nilai Barang</CardTitle>
-            <Package className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium">Paket Pending</CardTitle>
+            <Package className="h-5 w-5 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatRp(stats.totalHarga)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Nilai deklarasi paket</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-orange-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ongkir Belum Lunas</CardTitle>
-            <AlertCircle className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatRp(stats.totalOngkir - stats.ongkirCollected)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Paket belum diambil</p>
+            <div className="text-4xl font-bold text-amber-600">{stats.totalPkgs - stats.pickedUpCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">paket</p>
+            <p className="text-sm font-semibold text-amber-700 mt-2">{formatRp(stats.totalOngkir - stats.ongkirCollected)}</p>
+            <p className="text-xs text-muted-foreground">Ongkir belum terkumpul</p>
           </CardContent>
         </Card>
       </div>

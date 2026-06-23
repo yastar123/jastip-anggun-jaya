@@ -34,11 +34,13 @@ const packageSchema = z.object({
   packageDate: z.string().optional().nullable(),
   customerId: z.coerce.number().optional().nullable(),
   customerName: z.string().min(1, "Nama konsumen wajib diisi"),
+  itemName: z.string().optional().nullable(),
   resiNumber: z.string().min(1, "No Resi wajib diisi"),
   packageNumber: z.string().optional().nullable(),
   serviceType: z.string().optional().nullable(),
   packageMode: z.string().optional().nullable(),
-  deliveryRoute: z.string().min(1, "Pilih lokasi pengiriman"),
+  deliveryRoute: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
   realWeight: z.coerce.number().optional().nullable(),
   length: z.coerce.number().optional().nullable(),
   width: z.coerce.number().optional().nullable(),
@@ -188,6 +190,8 @@ export default function AdminPackagesNew() {
       packageDate: params.packageDate || todayStr(),
       resiNumber: "",
       packageNumber: "",
+      itemName: "",
+      notes: "",
       customerName: params.customerName || "",
       serviceType: params.serviceType,
       packageMode: params.packageMode,
@@ -282,14 +286,19 @@ export default function AdminPackagesNew() {
 
   function goNextPackage() {
     if (!savedGrup) return;
-    const q = new URLSearchParams({
+    const currentRoute = form.getValues("deliveryRoute");
+    setSavedGrup(null);
+    form.reset({
+      packageDate: savedGrup.packageDate,
+      resiNumber: "",
+      packageNumber: "",
+      itemName: "",
+      notes: "",
+      customerName: savedGrup.customerName,
       serviceType: savedGrup.serviceType,
       packageMode: "grup",
-      customerName: savedGrup.customerName,
-      packageDate: savedGrup.packageDate,
+      deliveryRoute: currentRoute,
     });
-    setSavedGrup(null);
-    setLocation(`${base}/packages/new?${q.toString()}`);
   }
 
   const serviceLabel: Record<string, string> = {
@@ -423,6 +432,20 @@ export default function AdminPackagesNew() {
                 />
               </div>
 
+              <FormField
+                control={form.control}
+                name="itemName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nama / Jenis Barang</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Contoh: Sepatu, Baju, Elektronik..." {...field} value={field.value || ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -449,34 +472,36 @@ export default function AdminPackagesNew() {
                     </FormItem>
                   )}
                 />
-                {serviceType && (
-                  <FormField
-                    control={form.control}
-                    name="deliveryRoute"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lokasi Pengiriman</FormLabel>
-                        <FormControl>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Pilih lokasi pengiriman" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {(deliveryRouteOptions[serviceType] || []).map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <FormField
+                  control={form.control}
+                  name="deliveryRoute"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lokasi Pengiriman</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value || ""}
+                          disabled={!serviceType}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={serviceType ? "Pilih lokasi pengiriman" : "Pilih jenis jastip dahulu"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {(deliveryRouteOptions[serviceType || ""] || []).map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </CardContent>
           </Card>
@@ -685,6 +710,33 @@ export default function AdminPackagesNew() {
                   )}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Section: Catatan */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Catatan</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Catatan / Keterangan</FormLabel>
+                    <FormControl>
+                      <textarea
+                        className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                        placeholder="Catatan tambahan untuk paket ini..."
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
