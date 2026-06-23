@@ -562,7 +562,17 @@ components:
 
     Package:
       type: object
-      required: [id, barcode, resiNumber, itemName, status, customerId, customerName, createdAt]
+      required:
+        [
+          id,
+          barcode,
+          resiNumber,
+          itemName,
+          status,
+          customerId,
+          customerName,
+          createdAt,
+        ]
       properties:
         id:
           type: integer
@@ -621,6 +631,8 @@ components:
           type: string
         updatedAt:
           type: string
+          serviceType:
+            type: ["string", "null"]
 
     PackageInput:
       type: object
@@ -662,6 +674,8 @@ components:
           type: integer
         packageDate:
           type: ["string", "null"]
+          serviceType:
+            type: ["string", "null"]
 
     PackageUpdate:
       type: object
@@ -763,7 +777,16 @@ components:
 
     CustomerWithStats:
       type: object
-      required: [id, name, phone, isActive, totalPackages, pendingPackages, pickedUpPackages]
+      required:
+        [
+          id,
+          name,
+          phone,
+          isActive,
+          totalPackages,
+          pendingPackages,
+          pickedUpPackages,
+        ]
       properties:
         id:
           type: integer
@@ -827,7 +850,15 @@ components:
 
     DashboardSummary:
       type: object
-      required: [totalPackages, pendingPackages, pickedUpPackages, totalCustomers, totalAdmins, readyPackages]
+      required:
+        [
+          totalPackages,
+          pendingPackages,
+          pickedUpPackages,
+          totalCustomers,
+          totalAdmins,
+          readyPackages,
+        ]
       properties:
         totalPackages:
           type: integer
