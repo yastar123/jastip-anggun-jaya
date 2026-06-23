@@ -25,7 +25,7 @@ function getShippingRate(
 ): number | null {
   if (!serviceType || !weight || weight <= 0) return null;
   if (serviceType === "jastip pesawat") return 77000;
-  if (serviceType === "jastip hemat") return 10000;
+  if (serviceType === "jastip hemat+") return 10000;
   if (serviceType === "jastip kargo") return 7000;
   if (serviceType === "jastip pelni") {
     if (deliveryRoute === "Jakarta → Manokwari") {
@@ -67,7 +67,7 @@ function getTotalShipping(
     return Math.round(weight * 77000);
   }
 
-  if (serviceType === "jastip hemat" && deliveryRoute === "Surabaya → Manokwari") {
+  if (serviceType === "jastip hemat+" && deliveryRoute === "Surabaya → Manokwari") {
     return Math.round(weight * 10000);
   }
 
@@ -95,7 +95,7 @@ function getTotalShipping(
 
 function getVolumeDivisor(serviceType: string | null | undefined) {
   if (serviceType === "jastip pesawat") return 5000;
-  if (serviceType === "jastip hemat") return 4000;
+  if (serviceType === "jastip hemat+") return 4000;
   if (serviceType === "jastip pelni") return 4000;
   if (serviceType === "jastip kargo") return 1000000;
   return 6000;

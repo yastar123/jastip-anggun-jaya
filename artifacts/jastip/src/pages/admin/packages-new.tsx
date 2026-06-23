@@ -60,14 +60,14 @@ function todayStr() {
 
 const volumeDivisor: Record<string, number> = {
   "jastip pesawat": 5000,
-  "jastip hemat": 4000,
+  "jastip hemat+": 4000,
   "jastip pelni": 4000,
   "jastip kargo": 1000000,
 };
 
 const deliveryRouteOptions: Record<string, { value: string; label: string }[]> = {
   "jastip pesawat": [{ value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" }],
-  "jastip hemat": [{ value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" }],
+  "jastip hemat+": [{ value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" }],
   "jastip kargo": [{ value: "Jakarta/Surabaya → Manokwari", label: "Jakarta/Surabaya → Manokwari" }],
   "jastip pelni": [
     { value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" },
@@ -82,7 +82,7 @@ function getShippingRate(
 ): number | null {
   if (!serviceType || !weight || weight <= 0) return null;
   if (serviceType === "jastip pesawat") return 77000;
-  if (serviceType === "jastip hemat") return 10000;
+  if (serviceType === "jastip hemat+") return 10000;
   if (serviceType === "jastip kargo") return 7000;
   if (serviceType === "jastip pelni") {
     if (deliveryRoute === "Jakarta → Manokwari") {
@@ -124,7 +124,7 @@ function getTotalShipping(
     return Math.round(weight * 77000);
   }
 
-  if (serviceType === "jastip hemat" && deliveryRoute === "Surabaya → Manokwari") {
+  if (serviceType === "jastip hemat+" && deliveryRoute === "Surabaya → Manokwari") {
     return Math.round(weight * 10000);
   }
 
@@ -294,7 +294,7 @@ export default function AdminPackagesNew() {
 
   const serviceLabel: Record<string, string> = {
     "jastip pesawat": "Jastip Pesawat",
-    "jastip hemat": "Jastip Hemat",
+    "jastip hemat+": "Jastip Hemat+",
     "jastip kargo": "Jastip Kargo",
     "jastip pelni": "Jastip Pelni",
   };
@@ -439,7 +439,7 @@ export default function AdminPackagesNew() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-                            <SelectItem value="jastip hemat">Jastip Hemat</SelectItem>
+                            <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
                             <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
                             <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
                           </SelectContent>

@@ -22,7 +22,7 @@ const demoAccounts = [
 
 const services = [
   "Jastip Cargo – hemat untuk paket besar",
-  "Jastip Hemat – lebih cepat, harga tetap terjangkau",
+  "Jastip Hemat+ – lebih cepat, harga tetap terjangkau",
   "Jastip Pelni – pengiriman kapal cepat",
   "Jastip Pesawat – paling cepat",
   "Jasa Belanja – gratis jasa",

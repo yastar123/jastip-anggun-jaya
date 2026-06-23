@@ -7,8 +7,8 @@ import { useAuth } from "@/lib/auth";
 
 const SERVICES = [
   {
-    key: "jastip hemat",
-    title: "Jastip Hemat",
+    key: "jastip hemat+",
+    title: "Jastip Hemat+",
     desc: "Surabaya → Manokwari. Tarif Rp 10.000/kg. Pilihan hemat untuk paket kecil & sedang.",
     icon: Package,
     color: "text-green-600",
