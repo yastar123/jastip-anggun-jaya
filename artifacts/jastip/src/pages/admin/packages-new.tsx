@@ -547,7 +547,7 @@ export default function AdminPackagesNew() {
                       className="bg-blue-600 hover:bg-blue-700"
                       onClick={() => setLocation(`${base}/barcode${allGrupIds.length > 0 ? `?ids=${allGrupIds.join(",")}` : ""}`)}
                     >
-                      <QrCode className="h-4 w-4 mr-1" /> Generate Barcode
+                      <QrCode className="h-4 w-4 mr-1" /> Generate {allGrupIds.length} Barcode Paket
                     </Button>
                   )}
                 </div>

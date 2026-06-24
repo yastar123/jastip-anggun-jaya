@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Printer, Search, ArrowLeft, QrCode, Package, Layers, CheckCircle2, Pencil, Trash2, Users, ExternalLink } from "lucide-react";
+import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12;
 
 function formatRp(n: any) {
   if (n == null) return "-";
@@ -218,103 +218,10 @@ function BarcodeItem({
   );
 }
 
-function GrupGroupCard({
-  customerName,
-  packages,
-  onOpenDetail,
-  onDeleteAll,
-}: {
-  customerName: string;
-  packages: any[];
-  onOpenDetail: () => void;
-  onDeleteAll: () => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const firstPkg = packages[0];
-  const totalWeight = packages.reduce((s, p) => s + Number(p.realWeight || 0), 0);
-  const totalShipping = packages.reduce((s, p) => s + Number(p.totalShipping || 0), 0);
-  const pending = packages.filter((p) => p.status !== "diserahkan").length;
-  const done = packages.filter((p) => p.status === "diserahkan").length;
-
-  useEffect(() => {
-    if (canvasRef.current && firstPkg) {
-      QRCode.toCanvas(canvasRef.current, firstPkg.barcode || firstPkg.resiNumber || String(firstPkg.id), {
-        width: 120, margin: 2,
-      }).catch(() => {});
-    }
-  }, [firstPkg]);
-
-  async function printAll() {
-    if (!packages.length) return;
-    const qrUrls = await Promise.all(
-      packages.map((p) =>
-        QRCode.toDataURL(p.barcode || p.resiNumber || String(p.id), { width: 180, margin: 2 }).catch(() => "")
-      )
-    );
-    const win = window.open("", "_blank");
-    if (!win) return;
-    const rows = packages.map((p, i) => `
-      <div style="display:flex;gap:10px;align-items:center;border:1px solid #ddd;border-radius:6px;padding:10px;margin-bottom:8px;">
-        <div style="text-align:center;min-width:80px;"><img src="${qrUrls[i]}" width="70" height="70"/><div style="font-size:7px;color:#999;margin-top:2px;word-break:break-all;max-width:75px;">${p.barcode || p.resiNumber}</div></div>
-        <div style="flex:1;">
-          <div style="font-size:12px;font-weight:700;font-family:monospace;">${p.resiNumber || "-"}</div>
-          <div style="font-size:10px;color:#555;margin-top:2px;">${p.serviceType || "-"} · Berat: ${p.realWeight != null ? p.realWeight + " Kg" : "-"} · Ongkir: Rp ${Number(p.totalShipping || 0).toLocaleString("id-ID")}</div>
-        </div>
-        <div style="font-size:10px;padding:2px 8px;border-radius:20px;${p.status === "diserahkan" ? "background:#dcfce7;color:#166534" : "background:#fef9c3;color:#713f12"}">${p.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</div>
-      </div>
-    `).join("");
-    win.document.write(`<!DOCTYPE html><html><head><title>Grup — ${customerName}</title>
-      <style>@page{size:A4;margin:10mm}body{font-family:Arial,sans-serif}</style></head><body>
-      <div style="background:#c00;color:#fff;padding:10px 16px;border-radius:6px;margin-bottom:12px;"><div style="font-size:18px;font-weight:900;">JASTIP ANGGUN JAYA</div><div style="font-size:10px;opacity:.85;">Layanan Pengiriman Paket</div></div>
-      <div style="font-size:20px;font-weight:900;margin:8px 0 12px;border-bottom:2px solid #eee;padding-bottom:8px;">📦 ${customerName} — ${packages.length} Paket</div>
-      ${rows}
-      <div style="margin-top:12px;font-size:11px;color:#777;border-top:1px dashed #ddd;padding-top:8px;">Total ${packages.length} paket · Berat: ${totalWeight.toFixed(3)} Kg · Ongkir: Rp ${totalShipping.toLocaleString("id-ID")}</div>
-      <script>window.onload=()=>{window.print();window.close();}</script></body></html>`);
-    win.document.close();
-  }
-
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="pt-4 pb-3">
-        <div className="flex items-center gap-2 mb-3">
-          <Users className="w-4 h-4 text-primary shrink-0" />
-          <p className="font-semibold text-base flex-1 truncate">{customerName}</p>
-          <Badge variant="secondary" className="text-xs shrink-0">{packages.length} paket</Badge>
-        </div>
-        <div className="flex justify-center bg-white border rounded-lg p-2 mb-3">
-          <canvas ref={canvasRef} />
-        </div>
-        <div className="grid grid-cols-2 gap-1 mb-3 text-xs text-muted-foreground">
-          <span>Berat: {totalWeight.toFixed(3)} Kg</span>
-          <span>Ongkir: {formatRp(totalShipping)}</span>
-          {pending > 0 && <span className="text-amber-700">{pending} pending</span>}
-          {done > 0 && <span className="text-green-700">{done} diserahkan</span>}
-        </div>
-        <div className="flex gap-1.5 mb-1.5">
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={printAll}>
-            <Printer className="w-3 h-3 mr-1" /> Cetak Semua
-          </Button>
-        </div>
-        <div className="flex gap-1.5">
-          <Button size="sm" variant="outline" className="flex-1 text-xs border-blue-300 text-blue-700 hover:bg-blue-50" onClick={onOpenDetail}>
-            <ExternalLink className="w-3 h-3 mr-1" /> Detail & Edit
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={onDeleteAll}>
-            <Trash2 className="w-3 h-3 mr-1" /> Hapus Grup
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-type TabKey = "single" | "grup";
-
 export default function AdminBarcode() {
   const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<TabKey>("single");
   const { data: packages, isLoading } = useListPackages();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -331,34 +238,16 @@ export default function AdminBarcode() {
 
   const [deletePkg, setDeletePkg] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteGrupName, setDeleteGrupName] = useState<string | null>(null);
-  const [isDeletingGrup, setIsDeletingGrup] = useState(false);
 
   const idsParam = new URLSearchParams(location.split("?")[1] || "").get("ids");
   const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
   const allPackages = packages || [];
 
-  // For grup tab: group by customerName
-  const grupPackages = allPackages.filter((p: any) => p.packageMode === "grup");
-  const grupGroups: Record<string, any[]> = {};
-  for (const p of grupPackages) {
-    const name = p.customerName || "(Tanpa Nama)";
-    if (!grupGroups[name]) grupGroups[name] = [];
-    grupGroups[name].push(p);
-  }
-  const grupGroupList = Object.entries(grupGroups)
-    .filter(([name]) => !search || name.toLowerCase().includes(search.toLowerCase()))
-    .map(([name, pkgs]) => ({ name, pkgs }));
-
-  const byTab = highlightIds
+  const filtered = (highlightIds
     ? allPackages.filter((p: any) => highlightIds.includes(p.id))
-    : allPackages.filter((p: any) => {
-        if (activeTab === "grup") return p.packageMode === "grup";
-        return !p.packageMode || p.packageMode === "single";
-      });
-
-  const filtered = byTab.filter(
+    : allPackages
+  ).filter(
     (p: any) =>
       !search ||
       (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -367,13 +256,11 @@ export default function AdminBarcode() {
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()),
   );
 
-  const total = activeTab === "grup" && !highlightIds ? grupGroupList.length : filtered.length;
+  const total = filtered.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const paginatedGrupGroups = grupGroupList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
-  function switchTab(tab: TabKey) { setActiveTab(tab); setPage(1); setSearch(""); }
 
   function openEdit(pkg: any) {
     setEditPkg(pkg);
@@ -447,32 +334,8 @@ export default function AdminBarcode() {
     }
   }
 
-  async function confirmDeleteGrup() {
-    if (!deleteGrupName) return;
-    const ids = (grupGroups[deleteGrupName] || []).map((p: any) => p.id);
-    setIsDeletingGrup(true);
-    try {
-      const token = localStorage.getItem("jaj_token");
-      await Promise.all(ids.map((id: number) =>
-        fetch(`/api/packages/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
-      ));
-      await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({ title: "Berhasil", description: `Grup paket "${deleteGrupName}" (${ids.length} paket) berhasil dihapus.` });
-      setDeleteGrupName(null);
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal", description: err.message });
-    } finally {
-      setIsDeletingGrup(false);
-    }
-  }
-
   const editIsKargo = editForm.serviceType === "jastip kargo";
   const editRouteOpts = deliveryRouteOptions[editForm.serviceType] || [];
-
-  const tabs: { key: TabKey; label: string; icon: any; count: number }[] = [
-    { key: "single", label: "Barcode 1 Paket", icon: Package, count: allPackages.filter((p: any) => !p.packageMode || p.packageMode === "single").length },
-    { key: "grup", label: "Barcode Grup Paket", icon: Layers, count: allPackages.filter((p: any) => p.packageMode === "grup").length },
-  ];
 
   return (
     <div className="space-y-6">
@@ -506,27 +369,6 @@ export default function AdminBarcode() {
         </Card>
       )}
 
-      {!highlightIds && (
-        <div className="flex gap-2 border-b pb-0">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => switchTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                  isActive ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-                <Badge variant={isActive ? "default" : "secondary"} className="text-xs ml-1">{tab.count}</Badge>
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
@@ -554,25 +396,6 @@ export default function AdminBarcode() {
           <p className="text-sm mt-1">Tambah paket terlebih dahulu untuk membuat barcode</p>
           <Button className="mt-4" onClick={() => setLocation(`${base}/packages/type`)}>Input Paket Baru</Button>
         </div>
-      ) : activeTab === "grup" && !highlightIds ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {paginatedGrupGroups.map(({ name, pkgs }) => (
-              <GrupGroupCard
-                key={name}
-                customerName={name}
-                packages={pkgs}
-                onOpenDetail={() => setLocation(`${base}/barcode-group?name=${encodeURIComponent(name)}`)}
-                onDeleteAll={() => setDeleteGrupName(name)}
-              />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className="border rounded-lg">
-              <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            </div>
-          )}
-        </>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
@@ -701,28 +524,6 @@ export default function AdminBarcode() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Grup Confirmation */}
-      <AlertDialog open={!!deleteGrupName} onOpenChange={(o) => { if (!o) setDeleteGrupName(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Grup Paket?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Semua <strong>{deleteGrupName ? (grupGroups[deleteGrupName]?.length || 0) : 0} paket</strong> milik{" "}
-              <strong>{deleteGrupName}</strong> akan dihapus permanen dan tidak dapat dikembalikan.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmDeleteGrup}
-              disabled={isDeletingGrup}
-            >
-              {isDeletingGrup ? "Menghapus..." : "Ya, Hapus Semua"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
