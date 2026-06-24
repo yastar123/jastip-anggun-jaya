@@ -446,10 +446,9 @@ export default function AdminBarcode() {
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()),
   );
 
-  // When viewing from grup mode (highlightIds set), group packages by customerName
-  const isGrupView = !!highlightIds && highlightIds.length > 0;
+  // Always group packages by customerName
   const groupedByCustomer: { customerName: string; pkgs: any[] }[] = [];
-  if (isGrupView) {
+  {
     const map = new Map<string, any[]>();
     for (const p of filtered) {
       const key = (p.customerName || "").trim().toLowerCase();
@@ -461,12 +460,11 @@ export default function AdminBarcode() {
     }
   }
 
-  const total = isGrupView ? groupedByCustomer.length : filtered.length;
+  const total = groupedByCustomer.length;
+  const totalPackages = filtered.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginatedGroups = isGrupView
-    ? groupedByCustomer.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-    : [];
-  const paginated = isGrupView ? [] : filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedGroups = groupedByCustomer.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated: any[] = [];
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
 
@@ -560,13 +558,13 @@ export default function AdminBarcode() {
         </div>
       </div>
 
-      {isGrupView && (
+      {highlightIds && highlightIds.length > 0 && (
         <Card className="border-green-500 bg-green-50">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
               <div className="flex-1">
-                <p className="font-semibold text-green-800">Barcode siap — {highlightIds!.length} paket ({groupedByCustomer.length} konsumen) dalam sesi Grup ini</p>
+                <p className="font-semibold text-green-800">Barcode siap — {highlightIds.length} paket ({groupedByCustomer.length} konsumen) dalam sesi Grup ini</p>
                 <p className="text-sm text-green-700 mt-0.5">Paket dengan nama yang sama digabung menjadi 1 barcode. Silakan cetak atau unduh.</p>
               </div>
               <Button size="sm" variant="outline" className="border-green-400 text-green-700" onClick={() => setLocation(`${base}/barcode`)}>
@@ -589,7 +587,7 @@ export default function AdminBarcode() {
           />
         </div>
         <Badge variant="secondary">
-          {isGrupView ? `${groupedByCustomer.length} konsumen · ${filtered.length} paket` : `${total} paket`}
+          {`${total} konsumen · ${totalPackages} paket`}
         </Badge>
       </div>
 
@@ -609,19 +607,14 @@ export default function AdminBarcode() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {isGrupView
-              ? paginatedGroups.map((group) => (
-                  <GroupedBarcodeItem
-                    key={group.customerName}
-                    pkgs={group.pkgs}
-                    onEdit={openEdit}
-                    onDelete={setDeletePkg}
-                  />
-                ))
-              : paginated.map((pkg: any) => (
-                  <BarcodeItem key={pkg.id} pkg={pkg} onEdit={openEdit} onDelete={setDeletePkg} />
-                ))
-            }
+            {paginatedGroups.map((group) => (
+              <GroupedBarcodeItem
+                key={group.customerName}
+                pkgs={group.pkgs}
+                onEdit={openEdit}
+                onDelete={setDeletePkg}
+              />
+            ))}
           </div>
           {totalPages > 1 && (
             <div className="border rounded-lg">
