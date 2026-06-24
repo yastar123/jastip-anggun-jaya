@@ -7,7 +7,7 @@ if (!process.env.DATABASE_URL) {
 
 export default defineConfig({
   // use glob to match all TypeScript schema files
-  schema: path.join(__dirname, "./src/schema/**/*.ts"),
+  schema: "./src/schema",
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
