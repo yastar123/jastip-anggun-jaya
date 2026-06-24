@@ -3,9 +3,14 @@ import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Camera, Upload, ScanLine, X, AlertCircle, Hash, CheckCircle2, XCircle } from "lucide-react";
+import {
+  Camera, Upload, ScanLine, X, AlertCircle, Hash,
+  CheckCircle2, XCircle, Package,
+} from "lucide-react";
 import { useLocation } from "wouter";
+import QRCode from "qrcode";
 
 function formatRp(n: any) {
   if (n === null || n === undefined || n === "") return "-";
@@ -14,6 +19,27 @@ function formatRp(n: any) {
 function formatDate(d: string | null | undefined) {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+function formatDateLong(d: string | null | undefined) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const serviceLabel: Record<string, string> = {
+  "jastip pesawat": "Jastip Pesawat",
+  "jastip hemat+": "Jastip Hemat+",
+  "jastip kargo": "Jastip Kargo",
+  "jastip pelni": "Jastip Pelni",
+};
+
+function SmallQR({ value }: { value: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (canvasRef.current && value) {
+      QRCode.toCanvas(canvasRef.current, value, { width: 80, margin: 1 }).catch(() => {});
+    }
+  }, [value]);
+  return <canvas ref={canvasRef} className="rounded" />;
 }
 
 type ScanState = "idle" | "camera" | "result";
@@ -24,11 +50,12 @@ export default function AdminScan() {
 
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [foundPackage, setFoundPackage] = useState<any>(null);
+  const [groupPackages, setGroupPackages] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [notFoundMsg, setNotFoundMsg] = useState("");
   const [resiInput, setResiInput] = useState("");
   const [isLooking, setIsLooking] = useState(false);
-  const [isActioning, setIsActioning] = useState(false);
+  const [actioningIds, setActioningIds] = useState<Set<number>>(new Set());
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,36 +64,57 @@ export default function AdminScan() {
   async function lookupCode(code: string) {
     setIsLooking(true);
     setFoundPackage(null);
+    setGroupPackages([]);
     setNotFound(false);
     try {
       const token = localStorage.getItem("jaj_token");
+
+      // Try scan endpoint first
       const r = await fetch(`/api/packages/scan/${encodeURIComponent(code)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await r.json();
+
+      let pkg: any = null;
       if (data.package) {
-        setFoundPackage(data.package);
-        setNotFound(false);
-        setScanState("result");
-        return;
-      }
-      // Try searching packages by resi/packageNumber
-      const r2 = await fetch(`/api/packages?search=${encodeURIComponent(code)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const packages = await r2.json();
-      if (Array.isArray(packages) && packages.length > 0) {
-        setFoundPackage(packages[0]);
-        setNotFound(false);
-        setScanState("result");
+        pkg = data.package;
       } else {
+        // Try searching by resi/barcode
+        const r2 = await fetch(`/api/packages?search=${encodeURIComponent(code)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const packages = await r2.json();
+        if (Array.isArray(packages) && packages.length > 0) {
+          pkg = packages[0];
+        }
+      }
+
+      if (!pkg) {
         setFoundPackage(null);
+        setGroupPackages([]);
         setNotFound(true);
         setNotFoundMsg("Paket tidak ditemukan. Pastikan nomor resi atau barcode sudah benar.");
         setScanState("result");
+        return;
       }
+
+      // Fetch all packages to find sibling packages for same customer
+      const allR = await fetch(`/api/packages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const allPkgs = await allR.json();
+      const customerName = (pkg.customerName || "").trim().toLowerCase();
+      const siblings: any[] = Array.isArray(allPkgs)
+        ? allPkgs.filter((p: any) => (p.customerName || "").trim().toLowerCase() === customerName)
+        : [pkg];
+
+      setFoundPackage(pkg);
+      setGroupPackages(siblings.length > 0 ? siblings : [pkg]);
+      setNotFound(false);
+      setScanState("result");
     } catch {
       setFoundPackage(null);
+      setGroupPackages([]);
       setNotFound(true);
       setNotFoundMsg("Terjadi kesalahan saat mencari paket.");
       setScanState("result");
@@ -142,53 +190,67 @@ export default function AdminScan() {
   function reset() {
     setScanState("idle");
     setFoundPackage(null);
+    setGroupPackages([]);
     setNotFound(false);
     setNotFoundMsg("");
     setResiInput("");
   }
 
-  async function serahkanPaket() {
-    if (!foundPackage) return;
-    setIsActioning(true);
+  function updatePkgInGroup(updated: any) {
+    setGroupPackages(prev => prev.map(p => p.id === updated.id ? updated : p));
+    if (foundPackage?.id === updated.id) setFoundPackage(updated);
+  }
+
+  async function serahkanPaket(pkg: any) {
+    setActioningIds(prev => new Set(prev).add(pkg.id));
     try {
       const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${foundPackage.id}/serahkan`, {
+      const r = await fetch(`/api/packages/${pkg.id}/serahkan`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (!r.ok) throw new Error("Gagal menyerahkan paket");
       const updated = await r.json();
-      setFoundPackage(updated);
-      toast({ title: "Paket Diserahkan", description: `Paket ${foundPackage.resiNumber} berhasil diserahkan ke konsumen.` });
+      updatePkgInGroup(updated);
+      toast({ title: "Paket Diserahkan", description: `${pkg.resiNumber} berhasil diserahkan.` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal", description: err.message });
     } finally {
-      setIsActioning(false);
+      setActioningIds(prev => { const s = new Set(prev); s.delete(pkg.id); return s; });
     }
   }
 
-  async function tolakPaket() {
-    if (!foundPackage) return;
-    setIsActioning(true);
+  async function tolakPaket(pkg: any) {
+    setActioningIds(prev => new Set(prev).add(pkg.id));
     try {
       const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${foundPackage.id}/tolak`, {
+      const r = await fetch(`/api/packages/${pkg.id}/tolak`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (!r.ok) throw new Error("Gagal menolak paket");
       const updated = await r.json();
-      setFoundPackage(updated);
-      toast({ title: "Paket Ditolak", description: `Status paket ${foundPackage.resiNumber} dikembalikan ke Pending.` });
+      updatePkgInGroup(updated);
+      toast({ title: "Dikembalikan ke Pending", description: `${pkg.resiNumber} dikembalikan ke Pending.` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal", description: err.message });
     } finally {
-      setIsActioning(false);
+      setActioningIds(prev => { const s = new Set(prev); s.delete(pkg.id); return s; });
     }
   }
 
-  const pkg = foundPackage;
-  const isDiserahkan = pkg?.status === "diserahkan";
+  async function serahkanSemua() {
+    const pending = groupPackages.filter(p => p.status !== "diserahkan");
+    for (const p of pending) {
+      await serahkanPaket(p);
+    }
+  }
+
+  const isGroupView = groupPackages.length > 1;
+  const totalWeight = groupPackages.reduce((s, p) => s + Number(p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = groupPackages.reduce((s, p) => s + Number(p.totalShipping ?? 0), 0);
+  const pendingCount = groupPackages.filter(p => p.status !== "diserahkan").length;
+  const allDone = pendingCount === 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -255,14 +317,184 @@ export default function AdminScan() {
             <Card><CardContent className="flex items-center justify-center py-12 text-muted-foreground">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3" />Mencari paket...
             </CardContent></Card>
-          ) : notFound || !pkg ? (
+          ) : notFound || !foundPackage ? (
             <Card className="border-destructive/50">
               <CardContent className="flex items-center gap-3 py-8 text-destructive">
                 <AlertCircle className="w-6 h-6 shrink-0" />
                 <div><p className="font-semibold">Paket tidak ditemukan</p><p className="text-sm text-muted-foreground mt-1">{notFoundMsg || "Pastikan nomor resi atau barcode sudah benar."}</p></div>
               </CardContent>
             </Card>
+          ) : isGroupView ? (
+            /* ========== GRUP VIEW ========== */
+            <div className="space-y-4">
+              {/* Group header */}
+              <Card className={`border-2 ${allDone ? "border-green-400 bg-green-50" : "border-primary/40 bg-primary/5"}`}>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Package className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-lg">{foundPackage.customerName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {groupPackages.length} paket · Berat {totalWeight.toFixed(3)} Kg · Total Ongkir {formatRp(totalShipping)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-sm px-3 py-1 ${allDone ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
+                    >
+                      {allDone ? "✓ Semua Diserahkan" : `${pendingCount} Pending`}
+                    </Badge>
+                  </div>
+
+                  {!allDone && (
+                    <Button
+                      className="w-full mt-3 bg-green-600 hover:bg-green-700 gap-2"
+                      onClick={serahkanSemua}
+                      disabled={actioningIds.size > 0}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Serahkan Semua ({pendingCount} Paket)
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Individual packages */}
+              {groupPackages.map((pkg: any, idx: number) => {
+                const isDone = pkg.status === "diserahkan";
+                const isActioning = actioningIds.has(pkg.id);
+                return (
+                  <Card key={pkg.id} className={`hover:shadow-md transition-shadow ${isDone ? "border-green-200" : ""}`}>
+                    <CardContent className="pt-4 pb-3">
+                      {/* Header */}
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="shrink-0 text-center">
+                          <SmallQR value={pkg.barcode || pkg.resiNumber || String(pkg.id)} />
+                          <p className="text-xs text-muted-foreground mt-1 font-mono">#{idx + 1}</p>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <p className="font-mono font-bold text-sm">{pkg.barcode || "-"}</p>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${isDone ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
+                            >
+                              {isDone ? "✓ Diserahkan" : "● Pending"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-semibold text-primary">{pkg.customerName || "-"}</p>
+                        </div>
+                      </div>
+
+                      {/* All fields grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-xs border-t pt-3 mb-3">
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Resi</p>
+                          <p className="font-mono font-semibold">{pkg.resiNumber || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Paket</p>
+                          <p className="font-mono">{pkg.packageNumber || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Tanggal</p>
+                          <p>{formatDateLong(pkg.packageDate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Jastip</p>
+                          <p>{serviceLabel[pkg.serviceType] || pkg.serviceType || "-"}</p>
+                        </div>
+                        <div className="md:col-span-2">
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>
+                          <p>{pkg.deliveryRoute || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Paking</p>
+                          <p>{pkg.packagingType || "-"}</p>
+                        </div>
+                        {(pkg.serviceType === "jastip kargo" || pkg.serviceType === "jastip pelni") && (
+                          <div className="md:col-span-2">
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Nama Barang</p>
+                            <p>{pkg.itemName || "-"}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Real</p>
+                          <p className="font-semibold">{pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Volume</p>
+                          <p>{pkg.volumeWeight != null ? `${Number(pkg.volumeWeight).toFixed(3)} Kg` : "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Digunakan</p>
+                          <p className="font-semibold">{pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-"}</p>
+                        </div>
+                        {(pkg.length || pkg.width || pkg.height) && (
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Dimensi (cm)</p>
+                            <p className="font-mono">{pkg.length || "?"} × {pkg.width || "?"} × {pkg.height || "?"}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Total Ongkir</p>
+                          <p className="font-bold text-primary text-sm">{formatRp(pkg.totalShipping)}</p>
+                        </div>
+                        {pkg.pickedUpAt && (
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Diserahkan Pada</p>
+                            <p>{formatDate(pkg.pickedUpAt)}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons per package */}
+                      {!isDone ? (
+                        <div className="flex gap-2 pt-1 border-t">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700 gap-1"
+                            onClick={() => serahkanPaket(pkg)}
+                            disabled={isActioning}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {isActioning ? "Memproses..." : "Serahkan"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 border-red-300 text-red-600 hover:bg-red-50 gap-1"
+                            onClick={() => tolakPaket(pkg)}
+                            disabled={isActioning}
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Tolak
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 pt-2 border-t">
+                          <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                          <span className="text-sm font-medium text-green-700 flex-1">Sudah diserahkan</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                            onClick={() => tolakPaket(pkg)}
+                            disabled={isActioning}
+                          >
+                            {isActioning ? "..." : "Kembalikan ke Pending"}
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           ) : (
+            /* ========== SINGLE PACKAGE VIEW ========== */
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -270,65 +502,54 @@ export default function AdminScan() {
                     <ScanLine className="h-4 w-4 text-primary" />
                     Paket Ditemukan
                   </CardTitle>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${isDiserahkan ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                    {isDiserahkan ? "✓ Diserahkan" : "● Pending"}
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${foundPackage.status === "diserahkan" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                    {foundPackage.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}
                   </span>
                 </div>
                 <CardDescription>
-                  Konsumen: <span className="font-medium text-foreground">{pkg.customerName}</span>
+                  Konsumen: <span className="font-medium text-foreground">{foundPackage.customerName}</span>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Package info grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {[
-                    { label: "No. Barcode", value: pkg.barcode, mono: true },
-                    { label: "No. Resi", value: pkg.resiNumber, mono: true },
-                    { label: "No. Paket", value: pkg.packageNumber || "-", mono: true },
-                    { label: "Tanggal", value: pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID") : "-" },
-                    { label: "Mode Paket", value: pkg.packageMode === "grup" ? "Grup Paket" : pkg.packageMode === "single" ? "1 Paket" : "-" },
-                    { label: "Admin Input", value: pkg.adminName || "-" },
-                    { label: "Nama / Jenis Barang", value: pkg.itemName || "-" },
-                    { label: "Jenis Jastip", value: pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-" },
-                    { label: "Rute Pengiriman", value: pkg.deliveryRoute || "-" },
-                    { label: "Berat Real", value: pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-" },
-                    { label: "Berat Volume", value: pkg.volumeWeight != null ? `${pkg.volumeWeight} Kg` : "-" },
-                    { label: "Berat Digunakan", value: pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-" },
-                    { label: "Total Berat", value: pkg.totalWeight != null ? `${pkg.totalWeight} Kg` : "-" },
-                    { label: "Jenis Paking", value: pkg.packagingType || "-" },
-                    { label: "Tarif Ongkir/kg", value: formatRp(pkg.shippingRate) },
-                    { label: "Total Ongkir", value: formatRp(pkg.totalShipping) },
-                    { label: "Harga Barang", value: formatRp(pkg.price) },
+                    { label: "No. Barcode", value: foundPackage.barcode, mono: true },
+                    { label: "No. Resi", value: foundPackage.resiNumber, mono: true },
+                    { label: "No. Paket", value: foundPackage.packageNumber || "-", mono: true },
+                    { label: "Tanggal", value: foundPackage.packageDate ? new Date(foundPackage.packageDate).toLocaleDateString("id-ID") : "-" },
+                    { label: "Admin Input", value: foundPackage.adminName || "-" },
+                    { label: "Nama / Jenis Barang", value: foundPackage.itemName || "-" },
+                    { label: "Jenis Jastip", value: foundPackage.serviceType ? foundPackage.serviceType.replace("jastip ", "Jastip ") : "-" },
+                    { label: "Rute Pengiriman", value: foundPackage.deliveryRoute || "-" },
+                    { label: "Berat Real", value: foundPackage.realWeight != null ? `${foundPackage.realWeight} Kg` : "-" },
+                    { label: "Berat Volume", value: foundPackage.volumeWeight != null ? `${foundPackage.volumeWeight} Kg` : "-" },
+                    { label: "Berat Digunakan", value: foundPackage.usedWeight != null ? `${foundPackage.usedWeight} Kg` : "-" },
+                    { label: "Jenis Paking", value: foundPackage.packagingType || "-" },
+                    { label: "Tarif Ongkir/kg", value: formatRp(foundPackage.shippingRate) },
+                    { label: "Total Ongkir", value: formatRp(foundPackage.totalShipping) },
                   ].map((item) => (
                     <div key={item.label} className="bg-muted/40 rounded-lg p-3">
                       <p className="text-xs text-muted-foreground mb-0.5">{item.label}</p>
                       <p className={`text-sm font-medium ${(item as any).mono ? "font-mono" : ""}`}>{item.value}</p>
                     </div>
                   ))}
-                  {pkg.notes && (
-                    <div className="col-span-2 md:col-span-3 bg-muted/40 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground mb-0.5">Catatan</p>
-                      <p className="text-sm font-medium">{pkg.notes}</p>
-                    </div>
-                  )}
                 </div>
 
-                {/* Action buttons */}
-                {!isDiserahkan ? (
+                {foundPackage.status !== "diserahkan" ? (
                   <div className="flex gap-3 pt-2">
                     <Button
                       className="flex-1 bg-green-600 hover:bg-green-700 gap-2"
-                      onClick={serahkanPaket}
-                      disabled={isActioning}
+                      onClick={() => serahkanPaket(foundPackage)}
+                      disabled={actioningIds.has(foundPackage.id)}
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      {isActioning ? "Memproses..." : "Serahkan Paket"}
+                      {actioningIds.has(foundPackage.id) ? "Memproses..." : "Serahkan Paket"}
                     </Button>
                     <Button
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 gap-2"
-                      onClick={tolakPaket}
-                      disabled={isActioning}
+                      onClick={() => tolakPaket(foundPackage)}
+                      disabled={actioningIds.has(foundPackage.id)}
                     >
                       <XCircle className="w-4 h-4" />
                       Tolak
@@ -339,18 +560,16 @@ export default function AdminScan() {
                     <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-green-800">Paket sudah diserahkan</p>
-                      {pkg.pickedUpAt && (
-                        <p className="text-xs text-green-600">
-                          Diserahkan: {formatDate(pkg.pickedUpAt)}
-                        </p>
+                      {foundPackage.pickedUpAt && (
+                        <p className="text-xs text-green-600">Diserahkan: {formatDate(foundPackage.pickedUpAt)}</p>
                       )}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-50"
-                      onClick={tolakPaket}
-                      disabled={isActioning}
+                      onClick={() => tolakPaket(foundPackage)}
+                      disabled={actioningIds.has(foundPackage.id)}
                     >
                       Kembalikan ke Pending
                     </Button>
