@@ -308,13 +308,14 @@ function BarcodeItem({
 
 function GroupedBarcodeItem({
   pkgs,
-  onEdit,
-  onDelete,
 }: {
   pkgs: any[];
-  onEdit: (pkg: any) => void;
-  onDelete: (pkg: any) => void;
+  onEdit?: (pkg: any) => void;
+  onDelete?: (pkg: any) => void;
 }) {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const first = pkgs[0];
   const qrValue = first?.barcode || first?.resiNumber || first?.id?.toString() || "";
@@ -389,20 +390,14 @@ function GroupedBarcodeItem({
             <Download className="w-3 h-3 mr-1" /> Unduh
           </Button>
         </div>
-        <div className="flex gap-1.5">
-          {pkgs.map((p) => (
-            <Button key={p.id} size="sm" variant="outline" className="flex-1 text-xs border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEdit(p)}>
-              <Pencil className="w-3 h-3 mr-1" /> Edit #{p.id}
-            </Button>
-          ))}
-        </div>
-        {pkgs.length === 1 && (
-          <div className="flex gap-1.5 mt-1.5">
-            <Button size="sm" variant="outline" className="flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => onDelete(first)}>
-              <Trash2 className="w-3 h-3 mr-1" /> Hapus
-            </Button>
-          </div>
-        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+          onClick={() => setLocation(`${base}/barcode-group?name=${encodeURIComponent(first?.customerName || "")}`)}
+        >
+          <Pencil className="w-3 h-3 mr-1" /> Edit / Kelola Paket
+        </Button>
       </CardContent>
     </Card>
   );
@@ -609,10 +604,8 @@ export default function AdminBarcode() {
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
             {paginatedGroups.map((group) => (
               <GroupedBarcodeItem
-                key={group.customerName}
+                key={group.customerName || group.pkgs[0]?.id}
                 pkgs={group.pkgs}
-                onEdit={openEdit}
-                onDelete={setDeletePkg}
               />
             ))}
           </div>

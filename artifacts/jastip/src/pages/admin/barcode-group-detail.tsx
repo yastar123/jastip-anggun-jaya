@@ -72,7 +72,7 @@ export default function BarcodeGroupDetail() {
   const queryClient = useQueryClient();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
-  const q = new URLSearchParams(location.split("?")[1] || "");
+  const q = new URLSearchParams(window.location.search);
   const groupName = q.get("name") || "";
   const idsParam = q.get("ids") || "";
   const filterIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
