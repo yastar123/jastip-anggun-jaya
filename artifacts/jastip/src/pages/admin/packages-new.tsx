@@ -213,6 +213,7 @@ export default function AdminPackagesNew() {
   const [currentBatchIds, setCurrentBatchIds] = useState<number[]>([]);
   const [currentBatchCount, setCurrentBatchCount] = useState(0);
   const [currentBatchWeight, setCurrentBatchWeight] = useState(0);
+  const [currentBatchName, setCurrentBatchName] = useState("");
   const [pendingName, setPendingName] = useState("");
   const [isAssigningName, setIsAssigningName] = useState(false);
 
@@ -355,6 +356,7 @@ export default function AdminPackagesNew() {
         setCurrentBatchIds(newIds);
         setCurrentBatchCount(newCount);
         setCurrentBatchWeight(newWeight);
+        setCurrentBatchName(values.customerName?.trim() || "");
 
         form.reset({
           packageDate: values.packageDate || todayStr(),
@@ -368,8 +370,8 @@ export default function AdminPackagesNew() {
         });
 
         toast({
-          title: `Paket ke-${newCount} tersimpan`,
-          description: "Klik 'Masukkan Nama Penerima' jika sudah selesai untuk nama ini, atau lanjut input paket berikutnya.",
+          title: `Paket ke-${newCount} tersimpan — ${values.customerName?.trim() || ""}`,
+          description: "Lanjut input paket berikutnya, atau klik 'Selesaikan Batch, Ganti Nama' untuk pindah ke penerima lain.",
         });
       }
     } catch (error: any) {
@@ -430,7 +432,7 @@ export default function AdminPackagesNew() {
 
   function finalizeBatch() {
     if (currentBatchIds.length === 0) return;
-    const batchName = form.getValues("customerName")?.trim() || "(Tanpa Nama)";
+    const batchName = currentBatchName || form.getValues("customerName")?.trim() || "(Tanpa Nama)";
     const newBatch: CompletedBatch = {
       customerName: batchName,
       ids: currentBatchIds,
@@ -441,6 +443,7 @@ export default function AdminPackagesNew() {
     setCurrentBatchIds([]);
     setCurrentBatchCount(0);
     setCurrentBatchWeight(0);
+    setCurrentBatchName("");
     setGrupPhase("batch_done");
     form.reset({
       packageDate: form.getValues("packageDate") || todayStr(),
@@ -518,20 +521,27 @@ export default function AdminPackagesNew() {
                   <Layers className="h-5 w-5 text-blue-600 shrink-0" />
                   <div className="flex-1">
                     <p className="font-semibold text-blue-800">
-                      Total: {totalGrupPackages} paket · {completedBatches.length} nama selesai
+                      Total: {allGrupIds.length} paket tersimpan
                     </p>
                     {completedBatches.map((b, i) => (
                       <span key={i} className="inline-flex items-center gap-1 mr-2 mt-1">
-                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">{b.customerName} ({b.count} pkt)</Badge>
+                        <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                          ✓ {b.customerName} ({b.count} pkt)
+                        </Badge>
                       </span>
                     ))}
-                    {currentBatchCount > 0 && (
+                    {currentBatchCount > 0 && currentBatchName && (
+                      <Badge variant="outline" className="text-xs text-blue-700 border-blue-400 bg-blue-100 ml-1 mt-1">
+                        Sesi aktif: {currentBatchCount} pkt — {currentBatchName}
+                      </Badge>
+                    )}
+                    {currentBatchCount > 0 && !currentBatchName && (
                       <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 ml-1 mt-1">
-                        Sesi aktif: {currentBatchCount} pkt belum diberi nama
+                        Sesi aktif: {currentBatchCount} pkt (isi nama pemilik)
                       </Badge>
                     )}
                   </div>
-                  {completedBatches.length > 0 && (
+                  {allGrupIds.length > 0 && (
                     <Button
                       size="sm"
                       className="bg-blue-600 hover:bg-blue-700"
