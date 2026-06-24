@@ -305,6 +305,7 @@ router.post(
       }
       let success = 0, failed = 0;
       const errors: string[] = [];
+      const createdIds: number[] = [];
 
       for (const row of rows) {
         try {
@@ -312,7 +313,7 @@ router.post(
             resiNumber, packageNumber, customerName, itemName,
             realWeight, length, width, height, packagingType,
             shippingRate, totalWeight, price, notes, packageDate,
-            serviceType, deliveryRoute,
+            serviceType, deliveryRoute, packageMode,
           } = row;
 
           if (!resiNumber || !customerName) {
@@ -334,7 +335,7 @@ router.post(
           const totalShipping = getTotalShipping(serviceType, deliveryRoute, usedWeight);
 
           const barcode = generateBarcode();
-          await db.insert(packagesTable).values({
+          const inserted = await db.insert(packagesTable).values({
             barcode,
             resiNumber: String(resiNumber),
             packageNumber: packageNumber ? String(packageNumber) : null,
@@ -357,14 +358,16 @@ router.post(
             serviceType: serviceType ? String(serviceType) : null,
             deliveryRoute: deliveryRoute ? String(deliveryRoute) : null,
             packageDate: packageDate ? new Date(String(packageDate)) : new Date(),
-          });
+            packageMode: packageMode ? String(packageMode) : "grup",
+          }).returning({ id: packagesTable.id });
+          if (inserted[0]?.id) createdIds.push(inserted[0].id);
           success++;
         } catch (e) {
           failed++;
           errors.push(`Error processing row: ${String(e)}`);
         }
       }
-      res.json({ success, failed, total: rows.length, errors });
+      res.json({ success, failed, total: rows.length, errors, ids: createdIds });
     } catch (err) {
       req.log.error(err);
       res.status(500).json({ error: "Server error" });
