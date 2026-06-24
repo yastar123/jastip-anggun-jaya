@@ -289,9 +289,9 @@ export default function AdminPackagesNew() {
   }, [serviceType, deliveryRoute, realWeight, length, width, height]);
 
   async function onSubmit(values: PackageFormValues) {
-    // Single mode: require customerName
-    if (!isGrup && !values.customerName?.trim()) {
-      form.setError("customerName", { message: "Nama konsumen wajib diisi" });
+    // Require customerName for all modes
+    if (!values.customerName?.trim()) {
+      form.setError("customerName", { message: "Nama pemilik paket wajib diisi" });
       return;
     }
 
@@ -342,7 +342,7 @@ export default function AdminPackagesNew() {
         const result = await createPackage.mutateAsync({
           data: {
             ...values,
-            customerName: "",
+            customerName: values.customerName || "",
             totalWeight: newWeight,
           } as any,
         });
@@ -361,7 +361,7 @@ export default function AdminPackagesNew() {
           resiNumber: "",
           packageNumber: "",
           itemName: "",
-          customerName: "",
+          customerName: values.customerName || "",
           serviceType: values.serviceType,
           packageMode: "grup",
           deliveryRoute: values.deliveryRoute,
@@ -426,6 +426,33 @@ export default function AdminPackagesNew() {
       packageMode: "grup",
       deliveryRoute: form.getValues("deliveryRoute"),
     });
+  }
+
+  function finalizeBatch() {
+    if (currentBatchIds.length === 0) return;
+    const batchName = form.getValues("customerName")?.trim() || "(Tanpa Nama)";
+    const newBatch: CompletedBatch = {
+      customerName: batchName,
+      ids: currentBatchIds,
+      count: currentBatchCount,
+      weight: currentBatchWeight,
+    };
+    setCompletedBatches((prev) => [...prev, newBatch]);
+    setCurrentBatchIds([]);
+    setCurrentBatchCount(0);
+    setCurrentBatchWeight(0);
+    setGrupPhase("batch_done");
+    form.reset({
+      packageDate: form.getValues("packageDate") || todayStr(),
+      resiNumber: "",
+      packageNumber: "",
+      itemName: "",
+      customerName: "",
+      serviceType: form.getValues("serviceType"),
+      packageMode: "grup",
+      deliveryRoute: form.getValues("deliveryRoute"),
+    });
+    toast({ title: `Batch "${batchName}" selesai`, description: `${currentBatchCount} paket · Silakan input nama & paket berikutnya.` });
   }
 
   function goNextPackage() {
@@ -518,38 +545,6 @@ export default function AdminPackagesNew() {
             </Card>
           )}
 
-          {/* PHASE: naming — enter customer name */}
-          {grupPhase === "naming" && (
-            <Card className="border-amber-400 bg-amber-50">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-amber-800">
-                  <Users className="h-4 w-4" />
-                  Masukkan Nama Penerima — untuk {currentBatchCount} paket ini
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-amber-700">
-                  Semua <strong>{currentBatchCount} paket</strong> di sesi ini akan ditetapkan ke nama penerima ini.
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Contoh: Anton, Yanti, Maman..."
-                    value={pendingName}
-                    onChange={(e) => setPendingName(e.target.value)}
-                    className="flex-1"
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAssignName(); } }}
-                    autoFocus
-                  />
-                  <Button onClick={handleAssignName} disabled={isAssigningName || !pendingName.trim()}>
-                    {isAssigningName ? "Menyimpan..." : "Konfirmasi Nama"}
-                  </Button>
-                </div>
-                <Button variant="ghost" size="sm" onClick={() => setGrupPhase("inputting")}>
-                  ← Kembali input paket
-                </Button>
-              </CardContent>
-            </Card>
-          )}
 
           {/* PHASE: batch_done — name assigned */}
           {grupPhase === "batch_done" && completedBatches.length > 0 && (
@@ -584,7 +579,7 @@ export default function AdminPackagesNew() {
 
           {/* Counter badge during inputting */}
           {grupPhase === "inputting" && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Badge className="text-sm px-3 py-1 bg-primary text-primary-foreground">
                 Paket ke-{currentBatchCount + 1}
               </Badge>
@@ -592,10 +587,10 @@ export default function AdminPackagesNew() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1 border-amber-400 text-amber-700 hover:bg-amber-50"
-                  onClick={() => setGrupPhase("naming")}
+                  className="gap-1 border-green-500 text-green-700 hover:bg-green-50"
+                  onClick={finalizeBatch}
                 >
-                  <ArrowRight className="h-3.5 w-3.5" /> Selesai Input, Masukkan Nama
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Selesaikan Batch, Ganti Nama
                 </Button>
               )}
             </div>
@@ -680,27 +675,29 @@ export default function AdminPackagesNew() {
                       </FormItem>
                     )}
                   />
-                  {/* Nama Konsumen — hanya tampil untuk mode non-grup-multi */}
-                  {!isGrup && (
-                    <FormField
-                      control={form.control}
-                      name="customerName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nama Konsumen <span className="text-destructive">*</span></FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Masukkan nama konsumen"
-                              {...field}
-                              value={field.value || ""}
-                              readOnly={packageMode === "grup" && !!savedGrup}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                  {/* Nama Konsumen — tampil untuk semua mode */}
+                  <FormField
+                    control={form.control}
+                    name="customerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Nama Pemilik Paket <span className="text-destructive">*</span>
+                          {isGrup && (
+                            <span className="text-xs font-normal text-muted-foreground ml-1">(nama penerima paket ini)</span>
+                          )}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Masukkan nama pemilik paket"
+                            {...field}
+                            value={field.value || ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
