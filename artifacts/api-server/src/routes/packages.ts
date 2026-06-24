@@ -134,7 +134,6 @@ function formatPackage(
 // GET /api/packages
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const user = (req as any).user;
     const { status, customerId, adminId, dateFrom, dateTo, search } =
       req.query as any;
 
@@ -232,7 +231,6 @@ router.post(
         getShippingRate(serviceType, deliveryRoute, usedWeight) ??
         (shippingRate ? Number(shippingRate) : null);
 
-      // totalShipping: use provided value if given, otherwise auto-calculate
       let totalShipping: number | null = null;
       if (totalShippingInput !== undefined && totalShippingInput !== null && totalShippingInput !== "") {
         totalShipping = Number(totalShippingInput);
@@ -305,44 +303,28 @@ router.post(
         res.status(400).json({ error: "packages array required" });
         return;
       }
-      let success = 0,
-        failed = 0;
+      let success = 0, failed = 0;
       const errors: string[] = [];
 
       for (const row of rows) {
         try {
           const {
-            resiNumber,
-            packageNumber,
-            customerName,
-            itemName,
-            realWeight,
-            length,
-            width,
-            height,
-            packagingType,
-            shippingRate,
-            totalWeight,
-            price,
-            notes,
-            packageDate,
-            serviceType,
-            deliveryRoute,
+            resiNumber, packageNumber, customerName, itemName,
+            realWeight, length, width, height, packagingType,
+            shippingRate, totalWeight, price, notes, packageDate,
+            serviceType, deliveryRoute,
           } = row;
 
           if (!resiNumber || !customerName) {
             failed++;
-            errors.push(
-              `Row missing resiNumber or customerName: ${JSON.stringify(row)}`,
-            );
+            errors.push(`Row missing resiNumber or customerName: ${JSON.stringify(row)}`);
             continue;
           }
 
           const divisor = getVolumeDivisor(serviceType);
           let volumeWeight: number | null = null;
           if (length && width && height) {
-            volumeWeight =
-              (Number(length) * Number(width) * Number(height)) / divisor;
+            volumeWeight = (Number(length) * Number(width) * Number(height)) / divisor;
           }
           const effectiveRealWeight = realWeight ? Number(realWeight) : null;
           const usedWeight =
@@ -473,7 +455,7 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/packages/:id
+// PATCH /api/packages/:id — full update including recalculating weights
 router.patch(
   "/:id",
   requireAuth,
@@ -481,11 +463,64 @@ router.patch(
   async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const { status, notes } = req.body;
+      const {
+        status, notes,
+        resiNumber, packageNumber, customerName, itemName,
+        serviceType, deliveryRoute, packagingType, packageDate,
+        realWeight, length, width, height,
+      } = req.body;
+
       const updateData: any = { updatedAt: new Date() };
-      if (status) updateData.status = status;
+
+      if (status) {
+        updateData.status = status;
+        if (status === "diserahkan") updateData.pickedUpAt = new Date();
+      }
       if (notes !== undefined) updateData.notes = notes;
-      if (status === "diserahkan") updateData.pickedUpAt = new Date();
+      if (resiNumber !== undefined) updateData.resiNumber = resiNumber;
+      if (packageNumber !== undefined) updateData.packageNumber = packageNumber || null;
+      if (customerName !== undefined) updateData.customerName = customerName;
+      if (itemName !== undefined) updateData.itemName = itemName || null;
+      if (serviceType !== undefined) updateData.serviceType = serviceType || null;
+      if (deliveryRoute !== undefined) updateData.deliveryRoute = deliveryRoute || null;
+      if (packagingType !== undefined) updateData.packagingType = packagingType || null;
+      if (packageDate !== undefined) updateData.packageDate = packageDate ? new Date(packageDate) : null;
+
+      const hasPhysical = realWeight !== undefined || length !== undefined || width !== undefined || height !== undefined;
+      const hasService = serviceType !== undefined || deliveryRoute !== undefined;
+
+      if (hasPhysical || hasService) {
+        const existing = await db.select().from(packagesTable).where(eq(packagesTable.id, id)).limit(1);
+        if (!existing[0]) { res.status(404).json({ error: "Not found" }); return; }
+        const e = existing[0];
+
+        const effService = serviceType !== undefined ? (serviceType || null) : e.serviceType;
+        const effRoute = deliveryRoute !== undefined ? (deliveryRoute || null) : e.deliveryRoute;
+        const rw = realWeight !== undefined ? (realWeight ? Number(realWeight) : null) : toNum(e.realWeight);
+        const l = length !== undefined ? (length ? Number(length) : null) : toNum(e.length);
+        const w = width !== undefined ? (width ? Number(width) : null) : toNum(e.width);
+        const h = height !== undefined ? (height ? Number(height) : null) : toNum(e.height);
+
+        if (realWeight !== undefined) updateData.realWeight = rw != null ? String(rw) : null;
+        if (length !== undefined) updateData.length = l != null ? String(l) : null;
+        if (width !== undefined) updateData.width = w != null ? String(w) : null;
+        if (height !== undefined) updateData.height = h != null ? String(h) : null;
+
+        const divisor = getVolumeDivisor(effService);
+        const vw = (l && w && h) ? (l * w * h) / divisor : null;
+        updateData.volumeWeight = vw != null ? String(vw) : null;
+
+        const uw = rw != null && vw != null
+          ? Math.max(rw, vw)
+          : (rw ?? vw);
+        updateData.usedWeight = uw != null ? String(uw) : null;
+
+        const rate = getShippingRate(effService, effRoute, uw ?? undefined);
+        updateData.shippingRate = rate != null ? String(rate) : null;
+        const total = getTotalShipping(effService, effRoute, uw ?? undefined);
+        updateData.totalShipping = total != null ? String(total) : null;
+      }
+
       const updated = await db
         .update(packagesTable)
         .set(updateData)
@@ -496,8 +531,31 @@ router.patch(
         res.status(404).json({ error: "Not found" });
         return;
       }
-      const adminMap = new Map<number, any>();
-      res.json(formatPackage(pkg, new Map(), adminMap));
+      res.json(formatPackage(pkg, new Map(), new Map()));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "Server error" });
+    }
+  },
+);
+
+// DELETE /api/packages/:id
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole("admin", "owner"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const deleted = await db
+        .delete(packagesTable)
+        .where(eq(packagesTable.id, id))
+        .returning();
+      if (!deleted[0]) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json({ success: true, id });
     } catch (err) {
       req.log.error(err);
       res.status(500).json({ error: "Server error" });

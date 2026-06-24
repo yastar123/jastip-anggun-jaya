@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calculator, CalendarDays, CheckCircle2, Plus } from "lucide-react";
+import { ArrowLeft, Calculator, CalendarDays, CheckCircle2, Plus, Weight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const packageSchema = z.object({
@@ -49,7 +49,6 @@ const packageSchema = z.object({
   usedWeight: z.coerce.number().optional().nullable(),
   shippingRate: z.coerce.number().optional().nullable(),
   totalWeight: z.coerce.number().optional().nullable(),
-  price: z.coerce.number().optional().nullable(),
   totalShipping: z.coerce.number().optional().nullable(),
 });
 
@@ -172,16 +171,22 @@ function parseQueryParams() {
 
 export default function AdminPackagesNew() {
   const { toast } = useToast();
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [savedGrup, setSavedGrup] = useState<{ customerName: string; serviceType: string; packageDate: string; deliveryRoute: string } | null>(null);
+  const [savedGrup, setSavedGrup] = useState<{
+    customerName: string;
+    serviceType: string;
+    packageDate: string;
+    deliveryRoute: string;
+  } | null>(null);
   const [grupPackageIds, setGrupPackageIds] = useState<number[]>([]);
+  const [grupTotalWeight, setGrupTotalWeight] = useState(0);
+  const [grupCount, setGrupCount] = useState(0);
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
   const createPackage = useCreatePackage();
-
   const params = parseQueryParams();
 
   const defaultRoute = params.serviceType
@@ -209,9 +214,9 @@ export default function AdminPackagesNew() {
   const height = form.watch("height");
   const realWeight = form.watch("realWeight");
   const packageMode = form.watch("packageMode");
-  const packageDate = form.watch("packageDate");
 
-  // Auto-set delivery route when service type changes
+  const isKargo = serviceType === "jastip kargo";
+
   useEffect(() => {
     if (!serviceType) {
       form.setValue("deliveryRoute", "" as any, { shouldDirty: true });
@@ -229,11 +234,9 @@ export default function AdminPackagesNew() {
     }
   }, [serviceType]);
 
-  // Single consolidated effect: compute volumeWeight → usedWeight → shippingRate → totalShipping
   useEffect(() => {
     const currentRoute = form.getValues("deliveryRoute");
 
-    // Step 1: volume weight
     let vw: number | null = null;
     const divisor = serviceType ? volumeDivisor[serviceType] : undefined;
     if (divisor && length && width && height && length > 0 && width > 0 && height > 0) {
@@ -241,13 +244,11 @@ export default function AdminPackagesNew() {
     }
     form.setValue("volumeWeight", vw, { shouldDirty: true });
 
-    // Step 2: used weight — use freshly-computed vw, not stale watched value
     const real = realWeight ?? 0;
     const volume = vw ?? 0;
     const uw = Math.max(real, volume);
     form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
 
-    // Step 3: shipping rate + total shipping
     const effectiveRoute = currentRoute || deliveryRoute;
     const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
     const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
@@ -258,12 +259,22 @@ export default function AdminPackagesNew() {
   async function onSubmit(values: PackageFormValues) {
     try {
       setIsSubmitting(true);
-      const result = await createPackage.mutateAsync({ data: values as any });
+
+      const newTotalWeight = grupTotalWeight + (values.realWeight ?? 0);
+
+      const result = await createPackage.mutateAsync({
+        data: {
+          ...values,
+          totalWeight: values.packageMode === "grup" ? newTotalWeight : (values.realWeight ?? undefined),
+        } as any,
+      });
       queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
 
       if (values.packageMode === "grup") {
         const newId = (result as any)?.id;
         if (newId) setGrupPackageIds((prev) => [...prev, newId]);
+        setGrupTotalWeight(newTotalWeight);
+        setGrupCount((c) => c + 1);
         setSavedGrup({
           customerName: values.customerName,
           serviceType: values.serviceType || "",
@@ -315,6 +326,11 @@ export default function AdminPackagesNew() {
     "jastip pelni": "Jastip Pelni",
   };
 
+  const watchedUsedWeight = form.watch("usedWeight");
+  const watchedVolumeWeight = form.watch("volumeWeight");
+  const watchedShippingRate = form.watch("shippingRate");
+  const watchedTotalShipping = form.watch("totalShipping");
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
@@ -340,6 +356,30 @@ export default function AdminPackagesNew() {
         </div>
       </div>
 
+      {/* Grup session info */}
+      {packageMode === "grup" && grupCount > 0 && !savedGrup && (
+        <Card className="border-blue-300 bg-blue-50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-3">
+              <Weight className="h-5 w-5 text-blue-600 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-blue-800">Sesi Grup — {grupCount} paket tersimpan</p>
+                <p className="text-sm text-blue-700">
+                  Total berat sesi: <strong>{grupTotalWeight.toFixed(3)} Kg</strong>
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => setLocation(`${base}/barcode${grupPackageIds.length > 0 ? `?ids=${grupPackageIds.join(",")}` : ""}`)}
+              >
+                Selesai & Cetak Barcode
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Grup success banner */}
       {savedGrup && (
         <Card className="border-green-500 bg-green-50">
@@ -350,6 +390,9 @@ export default function AdminPackagesNew() {
                 <p className="font-semibold text-green-800">Paket berhasil disimpan!</p>
                 <p className="text-sm text-green-700 mt-0.5">
                   Konsumen: <strong>{savedGrup.customerName}</strong> · {serviceLabel[savedGrup.serviceType] || savedGrup.serviceType}
+                </p>
+                <p className="text-sm text-green-700">
+                  {grupCount} paket · Total berat: <strong>{grupTotalWeight.toFixed(3)} Kg</strong>
                 </p>
                 <div className="flex gap-2 mt-3">
                   <Button size="sm" variant="outline" className="gap-1 border-green-400" onClick={goNextPackage}>
@@ -443,19 +486,22 @@ export default function AdminPackagesNew() {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="itemName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nama / Jenis Barang</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Contoh: Sepatu, Baju, Elektronik..." {...field} value={field.value || ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Jenis Barang — hanya untuk Jastip Kargo */}
+              {isKargo && (
+                <FormField
+                  control={form.control}
+                  name="itemName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Jenis Barang <span className="text-xs text-muted-foreground">(Khusus Kargo)</span></FormLabel>
+                      <FormControl>
+                        <Input placeholder="Contoh: Elektronik, Mesin, Material..." {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -540,7 +586,7 @@ export default function AdminPackagesNew() {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Calculator className="h-4 w-4" />
-                Berat & Dimensi
+                Berat &amp; Dimensi
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -583,9 +629,9 @@ export default function AdminPackagesNew() {
 
               <div className="grid grid-cols-3 gap-4">
                 {[
-                  { name: "length" as const, label: "P — Panjang (cm)" },
-                  { name: "width" as const, label: "L — Lebar (cm)" },
-                  { name: "height" as const, label: "T — Tinggi (cm)" },
+                  { name: "length" as const, label: "Panjang (cm)" },
+                  { name: "width" as const, label: "Lebar (cm)" },
+                  { name: "height" as const, label: "Tinggi (cm)" },
                 ].map(({ name, label }) => (
                   <FormField
                     key={name}
@@ -608,164 +654,62 @@ export default function AdminPackagesNew() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="volumeWeight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Berat Volume (Kg)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" step="0.001" placeholder="Otomatis dihitung"
-                          {...field} value={field.value ?? ""} readOnly
-                          className="bg-muted/50"
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Volume = P × L × T ÷{" "}
-                        {serviceType ? volumeDivisor[serviceType]?.toLocaleString("id-ID") : "divisor"}
+              {/* Auto-calculated summary */}
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Kalkulasi Otomatis</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Berat Volume (Kg)</p>
+                    <p className="font-semibold">{watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(3) : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Berat Digunakan (Kg)</p>
+                    <p className="font-semibold text-primary">{watchedUsedWeight != null ? watchedUsedWeight.toFixed(3) : "-"}</p>
+                    {watchedUsedWeight != null && realWeight != null && watchedVolumeWeight != null && (
+                      <p className="text-xs text-muted-foreground">
+                        MAX({realWeight.toFixed(3)}, {watchedVolumeWeight.toFixed(3)})
                       </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="usedWeight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Berat Yang Digunakan (Kg)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" step="0.001" placeholder="0.000"
-                          {...field} value={field.value ?? ""} readOnly
-                          className="bg-muted/50"
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">MAX(Berat Real, Berat Volume)</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Tarif / Kg</p>
+                    <p className="font-semibold">{formatRp(watchedShippingRate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Ongkir</p>
+                    <p className="font-semibold text-primary">{formatRp(watchedTotalShipping)}</p>
+                  </div>
+                </div>
+                {packageMode === "grup" && (
+                  <div className="mt-2 pt-2 border-t">
+                    <p className="text-xs text-muted-foreground">Total Berat Sesi Grup (setelah paket ini)</p>
+                    <p className="font-semibold text-blue-700">
+                      {(grupTotalWeight + (realWeight ?? 0)).toFixed(3)} Kg
+                      {grupCount > 0 && <span className="text-xs font-normal text-muted-foreground ml-1">({grupCount} paket sebelumnya)</span>}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Section: Ongkir & Harga */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Ongkir & Harga</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="shippingRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tarif Ongkir (Rp/Kg)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" step="100" placeholder="Otomatis dihitung"
-                          {...field} value={field.value ?? ""} readOnly
-                          className="bg-muted/50"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="totalWeight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Berat (Kg)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" step="0.001" placeholder="0.000"
-                          {...field} value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Harga Barang (Rp)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">Rp</span>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            className="pl-9"
-                            value={field.value != null ? Number(field.value).toLocaleString("id-ID") : ""}
-                            onChange={(e) => {
-                              const raw = e.target.value.replace(/\./g, "").replace(/[^0-9]/g, "");
-                              field.onChange(raw ? Number(raw) : null);
-                            }}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="totalShipping"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Total Ongkir (Rp)
-                        {form.watch("totalShipping") != null && (
-                          <span className="ml-2 text-xs text-primary font-normal">
-                            = {formatRp(form.watch("totalShipping"))}
-                          </span>
-                        )}
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" step="100" placeholder="Otomatis dihitung, bisa diubah"
-                          {...field} value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground mt-1">Nilai otomatis berdasarkan tarif. Bisa diubah manual.</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end gap-3 pb-6">
+          <div className="flex gap-3">
             <Button
-              type="button"
-              variant="outline"
-              onClick={() => setLocation(`${base}/packages/type`)}
+              type="submit"
+              className="flex-1"
+              disabled={isSubmitting}
             >
-              Batal
+              {isSubmitting ? "Menyimpan..." : packageMode === "grup" ? "Simpan & Lanjut" : "Simpan Paket"}
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-36">
-              {isSubmitting
-                ? "Menyimpan..."
-                : packageMode === "grup"
-                ? "Simpan & Input Berikutnya"
-                : "Simpan & Cetak Barcode"}
-            </Button>
+            {packageMode === "grup" && grupPackageIds.length > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLocation(`${base}/barcode${grupPackageIds.length > 0 ? `?ids=${grupPackageIds.join(",")}` : ""}`)}
+              >
+                Selesai ({grupCount} paket)
+              </Button>
+            )}
           </div>
         </form>
       </Form>
