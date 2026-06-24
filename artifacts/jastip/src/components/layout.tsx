@@ -29,6 +29,7 @@ import {
   Crown,
   Wrench,
   UserCircle,
+  ShieldCheck,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: any; exact?: boolean };
@@ -49,6 +50,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet, exact: true },
     { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
     { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine, exact: true },
+    { name: "Verifikasi Paket", href: "/admin/verify", icon: ShieldCheck, exact: true },
     { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
   ];
 
@@ -72,6 +74,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet, exact: true },
         { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },
         { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine, exact: true },
+        { name: "Verifikasi Paket", href: "/owner/verify", icon: ShieldCheck, exact: true },
       ],
     },
   ];

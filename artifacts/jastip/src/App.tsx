@@ -16,7 +16,9 @@ import AdminPackagesType from "@/pages/admin/packages-type";
 import AdminPackagesImport from "@/pages/admin/packages-import";
 import AdminPackagesDetail from "@/pages/admin/packages-detail";
 import AdminBarcode from "@/pages/admin/barcode";
+import AdminBarcodeGroupDetail from "@/pages/admin/barcode-group-detail";
 import AdminScan from "@/pages/admin/scan";
+import AdminVerify from "@/pages/admin/verify";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
@@ -117,8 +119,14 @@ function Router() {
       <Route path="/admin/barcode">
         {(params) => <ProtectedRoute role="admin" component={AdminBarcode} params={params} />}
       </Route>
+      <Route path="/admin/barcode-group">
+        {(params) => <ProtectedRoute role="admin" component={AdminBarcodeGroupDetail} params={params} />}
+      </Route>
       <Route path="/admin/scan">
         {(params) => <ProtectedRoute role="admin" component={AdminScan} params={params} />}
+      </Route>
+      <Route path="/admin/verify">
+        {(params) => <ProtectedRoute role="admin" component={AdminVerify} params={params} />}
       </Route>
       <Route path="/admin/profile">
         {(params) => <ProtectedRoute role="admin" component={ProfilePage} params={params} />}
@@ -163,8 +171,14 @@ function Router() {
       <Route path="/owner/barcode">
         {(params) => <ProtectedRoute role="owner" component={AdminBarcode} params={params} />}
       </Route>
+      <Route path="/owner/barcode-group">
+        {(params) => <ProtectedRoute role="owner" component={AdminBarcodeGroupDetail} params={params} />}
+      </Route>
       <Route path="/owner/scan">
         {(params) => <ProtectedRoute role="owner" component={AdminScan} params={params} />}
+      </Route>
+      <Route path="/owner/verify">
+        {(params) => <ProtectedRoute role="owner" component={AdminVerify} params={params} />}
       </Route>
 
       <Route component={NotFound} />
