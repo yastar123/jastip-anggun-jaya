@@ -429,7 +429,7 @@ export default function AdminBarcode() {
   const [deletePkg, setDeletePkg] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const idsParam = new URLSearchParams(location.split("?")[1] || "").get("ids");
+  const idsParam = new URLSearchParams(window.location.search).get("ids");
   const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
   const allPackages = packages || [];
