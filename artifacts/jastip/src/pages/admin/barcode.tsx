@@ -59,43 +59,8 @@ interface EditForm {
   height: string;
 }
 
-function BarcodeItem({
-  pkg,
-  onEdit,
-  onDelete,
-}: {
-  pkg: any;
-  onEdit: (pkg: any) => void;
-  onDelete: (pkg: any) => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    if (canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
-        width: 160,
-        margin: 2,
-        color: { dark: "#000000", light: "#ffffff" },
-      }).catch(() => {});
-    }
-  }, [pkg]);
-
-  async function printBarcode() {
-    const qrValue = pkg.barcode || pkg.resiNumber || pkg.id.toString();
-    let qrDataUrl = "";
-    try {
-      qrDataUrl = await QRCode.toDataURL(qrValue, {
-        width: 400,
-        margin: 3,
-        color: { dark: "#000000", light: "#ffffff" },
-      });
-    } catch {
-      return;
-    }
-    const win = window.open("", "_blank");
-    if (!win) return;
-
-    win.document.write(`<!DOCTYPE html>
+function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string) {
+  return `<!DOCTYPE html>
 <html>
 <head>
   <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
@@ -156,7 +121,130 @@ function BarcodeItem({
   </div>
   <script>window.onload = () => { window.print(); window.close(); }</script>
 </body>
-</html>`);
+</html>`;
+}
+
+function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string) {
+  const first = pkgs[0];
+  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const pkgRows = pkgs.map((p, i) => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:5px 8px;font-size:11px;font-weight:700;">${i + 1}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.resiNumber || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.packageNumber || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;">${p.packagingType || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#c00;font-weight:700;">${p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-"}</td>
+    </tr>`).join("");
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Label Grup - ${first?.customerName}</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; background: #fff; }
+    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .header { background: #c00; color: #fff; padding: 14px 20px; }
+    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .top-wrap { display: flex; flex-direction: row; align-items: stretch; }
+    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; border-right: 2px dashed #ddd; min-width: 160px; }
+    .qr-wrap img { width: 130px; height: 130px; display: block; }
+    .qr-label { font-size: 7px; color: #999; margin-top: 5px; font-family: monospace; text-align:center; word-break:break-all; max-width:130px; }
+    .info-section { flex: 1; padding: 14px 18px; }
+    .customer { font-size: 22px; font-weight: 900; color: #111; margin-bottom: 6px; }
+    .meta { font-size: 11px; color: #666; margin-bottom: 4px; }
+    .totals { display: flex; gap: 24px; margin-top: 10px; }
+    .total-item { display: flex; flex-direction: column; }
+    .total-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; }
+    .total-value { font-size: 15px; font-weight: 900; color: #c00; }
+    .pkgs-section { padding: 0 0 0 0; border-top: 2px solid #eee; }
+    .pkgs-title { font-size: 9px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 18px 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; padding: 4px 8px; text-align: left; background: #f8f8f8; }
+    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 7px 20px; font-size: 9px; color: #aaa; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="label">
+    <div class="header">
+      <div class="brand-name">JASTIP ANGGUN JAYA</div>
+      <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+    </div>
+    <div class="top-wrap">
+      <div class="qr-wrap">
+        <img src="${qrDataUrl}" alt="QR Code" />
+        <div class="qr-label">${qrValue}</div>
+      </div>
+      <div class="info-section">
+        <div class="customer">${first?.customerName || "-"}</div>
+        <div class="meta">Jenis: ${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"} &nbsp;·&nbsp; Rute: ${first?.deliveryRoute || "-"}</div>
+        <div class="meta">Tanggal: ${first?.packageDate ? new Date(first.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div>
+        <div class="totals">
+          <div class="total-item">
+            <span class="total-label">Total Paket</span>
+            <span class="total-value" style="color:#111;">${pkgs.length} pkt</span>
+          </div>
+          <div class="total-item">
+            <span class="total-label">Total Berat</span>
+            <span class="total-value" style="color:#111;">${totalWeight.toFixed(3)} Kg</span>
+          </div>
+          <div class="total-item">
+            <span class="total-label">Total Ongkir</span>
+            <span class="total-value">Rp ${totalShipping.toLocaleString("id-ID")}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pkgs-section">
+      <div class="pkgs-title">Daftar Paket (${pkgs.length} item)</div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>No. Resi</th><th>No. Paket</th><th>Berat</th><th>Paking</th><th>Ongkir</th>
+        </tr></thead>
+        <tbody>${pkgRows}</tbody>
+      </table>
+    </div>
+    <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+  </div>
+  <script>window.onload = () => { window.print(); window.close(); }</script>
+</body>
+</html>`;
+}
+
+function BarcodeItem({
+  pkg,
+  onEdit,
+  onDelete,
+}: {
+  pkg: any;
+  onEdit: (pkg: any) => void;
+  onDelete: (pkg: any) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
+        width: 160,
+        margin: 2,
+        color: { dark: "#000000", light: "#ffffff" },
+      }).catch(() => {});
+    }
+  }, [pkg]);
+
+  async function printBarcode() {
+    const qrValue = pkg.barcode || pkg.resiNumber || pkg.id.toString();
+    let qrDataUrl = "";
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+    } catch { return; }
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(buildSinglePrintHtml(pkg, qrDataUrl, qrValue));
     win.document.close();
   }
 
@@ -218,6 +306,108 @@ function BarcodeItem({
   );
 }
 
+function GroupedBarcodeItem({
+  pkgs,
+  onEdit,
+  onDelete,
+}: {
+  pkgs: any[];
+  onEdit: (pkg: any) => void;
+  onDelete: (pkg: any) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const first = pkgs[0];
+  const qrValue = first?.barcode || first?.resiNumber || first?.id?.toString() || "";
+  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const allPending = pkgs.every((p) => p.status !== "diserahkan");
+  const allDone = pkgs.every((p) => p.status === "diserahkan");
+
+  useEffect(() => {
+    if (canvasRef.current && qrValue) {
+      QRCode.toCanvas(canvasRef.current, qrValue, {
+        width: 160, margin: 2, color: { dark: "#000000", light: "#ffffff" },
+      }).catch(() => {});
+    }
+  }, [qrValue]);
+
+  async function printBarcode() {
+    let qrDataUrl = "";
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+    } catch { return; }
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(buildGroupedPrintHtml(pkgs, qrDataUrl, qrValue));
+    win.document.close();
+  }
+
+  function downloadBarcode() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.download = `qr-grup-${first?.customerName || first?.id}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  }
+
+  return (
+    <Card className="hover:shadow-md transition-shadow border-blue-200">
+      <CardContent className="pt-4 pb-3">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm truncate">{first?.customerName || "-"}</p>
+            <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
+            {first?.serviceType && (
+              <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
+            )}
+          </div>
+          <Badge
+            variant="outline"
+            className={`text-xs ml-2 shrink-0 ${allDone ? "bg-green-100 text-green-800 border-green-300" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
+          >
+            {allDone ? "Diserahkan" : allPending ? "Pending" : "Sebagian"}
+          </Badge>
+        </div>
+        <div className="flex justify-center bg-white border rounded-lg p-2 mb-2">
+          <canvas ref={canvasRef} />
+        </div>
+        <div className="mb-2 space-y-0.5">
+          {pkgs.map((p, i) => (
+            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-mono truncate max-w-[120px]">#{i + 1} {p.resiNumber || "-"}</span>
+              <span>{p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-xs font-semibold text-primary mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
+        <div className="flex gap-1.5 mb-1.5">
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={printBarcode}>
+            <Printer className="w-3 h-3 mr-1" /> Cetak
+          </Button>
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={downloadBarcode}>
+            <Download className="w-3 h-3 mr-1" /> Unduh
+          </Button>
+        </div>
+        <div className="flex gap-1.5">
+          {pkgs.map((p) => (
+            <Button key={p.id} size="sm" variant="outline" className="flex-1 text-xs border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEdit(p)}>
+              <Pencil className="w-3 h-3 mr-1" /> Edit #{p.id}
+            </Button>
+          ))}
+        </div>
+        {pkgs.length === 1 && (
+          <div className="flex gap-1.5 mt-1.5">
+            <Button size="sm" variant="outline" className="flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => onDelete(first)}>
+              <Trash2 className="w-3 h-3 mr-1" /> Hapus
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminBarcode() {
   const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
@@ -256,9 +446,27 @@ export default function AdminBarcode() {
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()),
   );
 
-  const total = filtered.length;
+  // When viewing from grup mode (highlightIds set), group packages by customerName
+  const isGrupView = !!highlightIds && highlightIds.length > 0;
+  const groupedByCustomer: { customerName: string; pkgs: any[] }[] = [];
+  if (isGrupView) {
+    const map = new Map<string, any[]>();
+    for (const p of filtered) {
+      const key = (p.customerName || "").trim().toLowerCase();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    }
+    for (const [, pkgs] of map) {
+      groupedByCustomer.push({ customerName: pkgs[0]?.customerName || "", pkgs });
+    }
+  }
+
+  const total = isGrupView ? groupedByCustomer.length : filtered.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginatedGroups = isGrupView
+    ? groupedByCustomer.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : [];
+  const paginated = isGrupView ? [] : filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
 
@@ -352,14 +560,14 @@ export default function AdminBarcode() {
         </div>
       </div>
 
-      {highlightIds && highlightIds.length > 0 && (
+      {isGrupView && (
         <Card className="border-green-500 bg-green-50">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
               <div className="flex-1">
-                <p className="font-semibold text-green-800">Barcode siap — {highlightIds.length} paket dalam sesi Grup ini</p>
-                <p className="text-sm text-green-700 mt-0.5">Silakan cetak atau unduh barcode di bawah.</p>
+                <p className="font-semibold text-green-800">Barcode siap — {highlightIds!.length} paket ({groupedByCustomer.length} konsumen) dalam sesi Grup ini</p>
+                <p className="text-sm text-green-700 mt-0.5">Paket dengan nama yang sama digabung menjadi 1 barcode. Silakan cetak atau unduh.</p>
               </div>
               <Button size="sm" variant="outline" className="border-green-400 text-green-700" onClick={() => setLocation(`${base}/barcode`)}>
                 Lihat Semua
@@ -380,7 +588,9 @@ export default function AdminBarcode() {
             onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
-        <Badge variant="secondary">{total} paket</Badge>
+        <Badge variant="secondary">
+          {isGrupView ? `${groupedByCustomer.length} konsumen · ${filtered.length} paket` : `${total} paket`}
+        </Badge>
       </div>
 
       {isLoading ? (
@@ -399,9 +609,19 @@ export default function AdminBarcode() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {paginated.map((pkg: any) => (
-              <BarcodeItem key={pkg.id} pkg={pkg} onEdit={openEdit} onDelete={setDeletePkg} />
-            ))}
+            {isGrupView
+              ? paginatedGroups.map((group) => (
+                  <GroupedBarcodeItem
+                    key={group.customerName}
+                    pkgs={group.pkgs}
+                    onEdit={openEdit}
+                    onDelete={setDeletePkg}
+                  />
+                ))
+              : paginated.map((pkg: any) => (
+                  <BarcodeItem key={pkg.id} pkg={pkg} onEdit={openEdit} onDelete={setDeletePkg} />
+                ))
+            }
           </div>
           {totalPages > 1 && (
             <div className="border rounded-lg">

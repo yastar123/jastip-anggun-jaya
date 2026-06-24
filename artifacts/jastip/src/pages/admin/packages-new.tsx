@@ -902,6 +902,11 @@ export default function AdminPackagesNew() {
                     <div>
                       <p className="text-xs text-muted-foreground">Berat Volume (Kg)</p>
                       <p className="font-semibold">{watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(3) : "-"}</p>
+                      {serviceType && volumeDivisor[serviceType] && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          P × L × T ÷ {volumeDivisor[serviceType].toLocaleString("id-ID")}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Berat Digunakan (Kg)</p>
@@ -921,24 +926,6 @@ export default function AdminPackagesNew() {
                       <p className="font-semibold text-primary">{formatRp(watchedTotalShipping)}</p>
                     </div>
                   </div>
-                  {isGrup && (
-                    <div className="mt-2 pt-2 border-t">
-                      <p className="text-xs text-muted-foreground">Total Berat Sesi Ini (setelah paket ini)</p>
-                      <p className="font-semibold text-blue-700">
-                        {(currentBatchWeight + (realWeight ?? 0)).toFixed(3)} Kg
-                        {currentBatchCount > 0 && <span className="text-xs font-normal text-muted-foreground ml-1">({currentBatchCount} paket sebelumnya)</span>}
-                      </p>
-                    </div>
-                  )}
-                  {!isGrup && packageMode === "grup" && (
-                    <div className="mt-2 pt-2 border-t">
-                      <p className="text-xs text-muted-foreground">Total Berat Sesi Grup (setelah paket ini)</p>
-                      <p className="font-semibold text-blue-700">
-                        {(singleGrupTotalWeight + (realWeight ?? 0)).toFixed(3)} Kg
-                        {singleGrupCount > 0 && <span className="text-xs font-normal text-muted-foreground ml-1">({singleGrupCount} paket sebelumnya)</span>}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -953,16 +940,6 @@ export default function AdminPackagesNew() {
                   ? "Simpan & Lanjut"
                   : "Simpan Paket"}
               </Button>
-              {isGrup && currentBatchCount > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-amber-400 text-amber-700 hover:bg-amber-50"
-                  onClick={() => setGrupPhase("naming")}
-                >
-                  <ArrowRight className="h-4 w-4 mr-1" /> Masukkan Nama
-                </Button>
-              )}
               {!isGrup && packageMode === "grup" && singleGrupIds.length > 0 && (
                 <Button
                   type="button"
