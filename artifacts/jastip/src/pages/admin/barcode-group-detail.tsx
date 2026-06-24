@@ -48,6 +48,7 @@ interface EditForm {
   itemName: string;
   serviceType: string;
   deliveryRoute: string;
+  packagingType: string;
   packageDate: string;
   realWeight: string;
   length: string;
@@ -81,7 +82,7 @@ export default function BarcodeGroupDetail() {
 
   const groupPackages = (packages || []).filter((p: any) => {
     if (filterIds) return filterIds.includes(p.id);
-    return p.customerName === groupName && p.packageMode === "grup";
+    return (p.customerName || "").trim().toLowerCase() === groupName.trim().toLowerCase();
   });
 
   const totalWeight = groupPackages.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0);
@@ -90,7 +91,7 @@ export default function BarcodeGroupDetail() {
   const [editPkg, setEditPkg] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({
     resiNumber: "", packageNumber: "", customerName: "", itemName: "",
-    serviceType: "", deliveryRoute: "", packageDate: "",
+    serviceType: "", deliveryRoute: "", packagingType: "", packageDate: "",
     realWeight: "", length: "", width: "", height: "",
   });
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -106,6 +107,7 @@ export default function BarcodeGroupDetail() {
       itemName: pkg.itemName || "",
       serviceType: pkg.serviceType || "",
       deliveryRoute: pkg.deliveryRoute || "",
+      packagingType: pkg.packagingType || "",
       packageDate: pkg.packageDate ? pkg.packageDate.split("T")[0] : "",
       realWeight: pkg.realWeight != null ? String(pkg.realWeight) : "",
       length: pkg.length != null ? String(pkg.length) : "",
@@ -129,6 +131,7 @@ export default function BarcodeGroupDetail() {
           itemName: editForm.itemName || null,
           serviceType: editForm.serviceType || null,
           deliveryRoute: editForm.deliveryRoute || null,
+          packagingType: editForm.packagingType || null,
           packageDate: editForm.packageDate || null,
           realWeight: editForm.realWeight ? Number(editForm.realWeight) : null,
           length: editForm.length ? Number(editForm.length) : null,
@@ -269,29 +272,23 @@ export default function BarcodeGroupDetail() {
           {groupPackages.map((pkg: any, idx: number) => (
             <Card key={pkg.id} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-4">
+                {/* Header row */}
+                <div className="flex items-start gap-4 mb-3">
                   <div className="shrink-0 text-center">
                     <SmallQR value={pkg.barcode || pkg.resiNumber || String(pkg.id)} />
-                    <p className="text-xs text-muted-foreground mt-1">#{idx + 1}</p>
+                    <p className="text-xs text-muted-foreground mt-1 font-mono">#{idx + 1}</p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-mono font-semibold text-sm">{pkg.resiNumber || "-"}</p>
-                      {pkg.packageNumber && <span className="text-xs text-muted-foreground">({pkg.packageNumber})</span>}
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-mono font-bold text-sm">{pkg.barcode || "-"}</p>
                       <Badge
                         variant="outline"
                         className={`text-xs ${pkg.status === "diserahkan" ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
                       >
-                        {pkg.status === "diserahkan" ? "Diserahkan" : "Pending"}
+                        {pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}
                       </Badge>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                      <span>{serviceLabel[pkg.serviceType] || pkg.serviceType || "-"}</span>
-                      <span>{pkg.deliveryRoute || "-"}</span>
-                      <span>Berat: {pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span>
-                      <span>Ongkir: {formatRp(pkg.totalShipping)}</span>
-                      {pkg.itemName && <span className="col-span-2">Barang: {pkg.itemName}</span>}
-                    </div>
+                    <p className="text-sm font-semibold text-primary">{pkg.customerName || "-"}</p>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
                     <Button size="sm" variant="outline" className="text-xs border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => openEdit(pkg)}>
@@ -300,6 +297,62 @@ export default function BarcodeGroupDetail() {
                     <Button size="sm" variant="outline" className="text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => setDeletePkg(pkg)}>
                       <Trash2 className="w-3 h-3 mr-1" /> Hapus
                     </Button>
+                  </div>
+                </div>
+
+                {/* All fields grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-xs border-t pt-3">
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Resi</p>
+                    <p className="font-mono font-semibold">{pkg.resiNumber || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Paket</p>
+                    <p className="font-mono">{pkg.packageNumber || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Tanggal</p>
+                    <p>{pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Jastip</p>
+                    <p>{serviceLabel[pkg.serviceType] || pkg.serviceType || "-"}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>
+                    <p>{pkg.deliveryRoute || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Paking</p>
+                    <p>{pkg.packagingType || "-"}</p>
+                  </div>
+                  {(pkg.serviceType === "jastip kargo" || pkg.serviceType === "jastip pelni") && (
+                    <div className="md:col-span-2">
+                      <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Nama Barang</p>
+                      <p>{pkg.itemName || "-"}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Real</p>
+                    <p className="font-semibold">{pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Volume</p>
+                    <p>{pkg.volumeWeight != null ? `${Number(pkg.volumeWeight).toFixed(3)} Kg` : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Digunakan</p>
+                    <p className="font-semibold">{pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-"}</p>
+                  </div>
+                  {(pkg.length || pkg.width || pkg.height) && (
+                    <div>
+                      <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Dimensi (cm)</p>
+                      <p className="font-mono">{pkg.length || "?"} × {pkg.width || "?"} × {pkg.height || "?"}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Total Ongkir</p>
+                    <p className="font-bold text-primary text-sm">{formatRp(pkg.totalShipping)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -376,6 +429,10 @@ export default function BarcodeGroupDetail() {
                 <Input value={editForm.itemName} onChange={e => setEditForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Contoh: Pakaian, Elektronik..." />
               </div>
             )}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Jenis Paking</label>
+              <Input value={editForm.packagingType} onChange={e => setEditForm(f => ({ ...f, packagingType: e.target.value }))} placeholder="Karton, Plastik, Kayu..." />
+            </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Berat Real (Kg)</label>
               <Input type="number" step="0.001" value={editForm.realWeight} onChange={e => setEditForm(f => ({ ...f, realWeight: e.target.value }))} placeholder="0.000" />
