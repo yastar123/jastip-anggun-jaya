@@ -77,6 +77,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },
         { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine, exact: true },
         { name: "Verifikasi Paket", href: "/owner/verify", icon: ShieldCheck, exact: true },
+        { name: "Kalkulator Scan", href: "/owner/kalkulator-scan", icon: Calculator, exact: true },
       ],
     },
   ];

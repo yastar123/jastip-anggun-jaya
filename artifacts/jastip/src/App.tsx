@@ -184,6 +184,9 @@ function Router() {
       <Route path="/owner/verify">
         {(params) => <ProtectedRoute role="owner" component={AdminVerify} params={params} />}
       </Route>
+      <Route path="/owner/kalkulator-scan">
+        {(params) => <ProtectedRoute role="owner" component={AdminKalkulatorScan} params={params} />}
+      </Route>
 
       <Route component={NotFound} />
     </Switch>
