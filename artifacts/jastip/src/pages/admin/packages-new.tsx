@@ -124,23 +124,23 @@ function getTotalShipping(
     return Math.round(weight * 77000);
   }
   if (serviceType === "jastip hemat+" && deliveryRoute === "Surabaya → Manokwari") {
-    return Math.round(weight * 10000);
+    return Math.max(10000, Math.round(weight * 10000));
   }
   if (serviceType === "jastip kargo" && deliveryRoute === "Jakarta/Surabaya → Manokwari") {
-    return Math.round(weight * 7000);
+    return Math.max(70000, Math.round(weight * 7000));
   }
   if (serviceType === "jastip pelni") {
     if (deliveryRoute === "Jakarta → Manokwari") {
-      if (weight <= 10) return Math.round(weight * 20000);
-      if (weight <= 20) return Math.round(weight * 19000);
-      if (weight <= 40) return Math.round(weight * 18000);
-      return Math.round(weight * 17000);
+      if (weight <= 10) return Math.max(20000, Math.round(weight * 20000));
+      if (weight <= 20) return Math.max(20000, Math.round(weight * 19000));
+      if (weight <= 40) return Math.max(20000, Math.round(weight * 18000));
+      return Math.max(20000, Math.round(weight * 17000));
     }
     if (deliveryRoute === "Surabaya → Manokwari") {
-      if (weight <= 10) return Math.round(weight * 18000);
-      if (weight <= 20) return Math.round(weight * 17000);
-      if (weight <= 40) return Math.round(weight * 16000);
-      return Math.round(weight * 15500);
+      if (weight <= 10) return Math.max(18000, Math.round(weight * 18000));
+      if (weight <= 20) return Math.max(18000, Math.round(weight * 17000));
+      if (weight <= 40) return Math.max(18000, Math.round(weight * 16000));
+      return Math.max(18000, Math.round(weight * 15500));
     }
   }
   return null;
@@ -292,9 +292,10 @@ export default function AdminPackagesNew() {
     const effectiveRoute = currentRoute || deliveryRoute;
 
     if (serviceType === "jastip kargo") {
-      // Kargo: shippingRate diinput manual oleh admin; totalShipping = usedWeight × shippingRate
+      // Kargo: minimum usedWeight = 10 M³/Ton; totalShipping = max(10, uw) × shippingRate
       const currentRate = form.getValues("shippingRate") ?? 0;
-      const total = uw > 0 && currentRate > 0 ? Math.round(uw * currentRate) : null;
+      const billableWeight = uw > 0 ? Math.max(10, uw) : 0;
+      const total = billableWeight > 0 && currentRate > 0 ? Math.round(billableWeight * currentRate) : null;
       form.setValue("totalShipping", total ?? null, { shouldDirty: true });
     } else {
       const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
@@ -304,12 +305,13 @@ export default function AdminPackagesNew() {
     }
   }, [serviceType, deliveryRoute, realWeight, length, width, height]);
 
-  // Kargo: recalc ongkir saat Harga Kubikasi diubah
+  // Kargo: recalc ongkir saat Harga Kubikasi diubah; minimum 10 M³/Ton
   useEffect(() => {
     if (serviceType !== "jastip kargo") return;
     const uw = form.getValues("usedWeight") ?? 0;
     const rate = shippingRateWatch ?? 0;
-    const total = uw > 0 && rate > 0 ? Math.round(uw * rate) : null;
+    const billableWeight = uw > 0 ? Math.max(10, uw) : 0;
+    const total = billableWeight > 0 && rate > 0 ? Math.round(billableWeight * rate) : null;
     form.setValue("totalShipping", total ?? null, { shouldDirty: true });
   }, [shippingRateWatch, serviceType]);
 
