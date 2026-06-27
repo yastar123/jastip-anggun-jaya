@@ -252,6 +252,12 @@ export default function AdminPackagesNew() {
   const isKargo = serviceType === "jastip kargo";
   const isPelni = serviceType === "jastip pelni";
 
+  const watchedUsedWeight = form.watch("usedWeight");
+  const watchedVolumeWeight = form.watch("volumeWeight");
+  const watchedShippingRate = form.watch("shippingRate");
+  const watchedTotalShipping = form.watch("totalShipping");
+  const shippingRateWatch = watchedShippingRate;
+
   useEffect(() => {
     if (!serviceType) {
       form.setValue("deliveryRoute", "" as any, { shouldDirty: true });
@@ -497,12 +503,6 @@ export default function AdminPackagesNew() {
     "jastip kargo": "Jastip Kargo",
     "jastip pelni": "Jastip Pelni",
   };
-
-  const watchedUsedWeight = form.watch("usedWeight");
-  const watchedVolumeWeight = form.watch("volumeWeight");
-  const watchedShippingRate = form.watch("shippingRate");
-  const watchedTotalShipping = form.watch("totalShipping");
-  const shippingRateWatch = watchedShippingRate;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
