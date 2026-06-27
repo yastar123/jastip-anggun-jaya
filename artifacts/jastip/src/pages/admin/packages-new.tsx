@@ -283,11 +283,28 @@ export default function AdminPackagesNew() {
     form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
 
     const effectiveRoute = currentRoute || deliveryRoute;
-    const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
-    const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
-    form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
-    form.setValue("totalShipping", total ?? null, { shouldDirty: true });
+
+    if (serviceType === "jastip kargo") {
+      // Kargo: shippingRate diinput manual oleh admin; totalShipping = usedWeight × shippingRate
+      const currentRate = form.getValues("shippingRate") ?? 0;
+      const total = uw > 0 && currentRate > 0 ? Math.round(uw * currentRate) : null;
+      form.setValue("totalShipping", total ?? null, { shouldDirty: true });
+    } else {
+      const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
+      const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
+      form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
+      form.setValue("totalShipping", total ?? null, { shouldDirty: true });
+    }
   }, [serviceType, deliveryRoute, realWeight, length, width, height]);
+
+  // Kargo: recalc ongkir saat Harga Kubikasi diubah
+  useEffect(() => {
+    if (serviceType !== "jastip kargo") return;
+    const uw = form.getValues("usedWeight") ?? 0;
+    const rate = shippingRateWatch ?? 0;
+    const total = uw > 0 && rate > 0 ? Math.round(uw * rate) : null;
+    form.setValue("totalShipping", total ?? null, { shouldDirty: true });
+  }, [shippingRateWatch, serviceType]);
 
   async function onSubmit(values: PackageFormValues) {
     // Require customerName for all modes
@@ -484,6 +501,7 @@ export default function AdminPackagesNew() {
   const watchedVolumeWeight = form.watch("volumeWeight");
   const watchedShippingRate = form.watch("shippingRate");
   const watchedTotalShipping = form.watch("totalShipping");
+  const shippingRateWatch = watchedShippingRate;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -662,273 +680,533 @@ export default function AdminPackagesNew() {
       {(!isGrup || grupPhase === "inputting") && (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Section: Identitas Paket */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CalendarDays className="h-4 w-4" />
-                  Identitas Paket
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="packageDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tanggal <span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  {/* Nama Konsumen — tampil untuk semua mode */}
-                  <FormField
-                    control={form.control}
-                    name="customerName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Nama Pemilik Paket <span className="text-destructive">*</span>
-                          {isGrup && (
-                            <span className="text-xs font-normal text-muted-foreground ml-1">(nama penerima paket ini)</span>
-                          )}
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Masukkan nama pemilik paket"
-                            {...field}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="resiNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>No Resi <span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Contoh: JNE123456789" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="packageNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>No Paket</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Contoh: PKT-001" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Nama Barang — untuk Kargo dan Pelni */}
-                {(isKargo || isPelni) && (
-                  <FormField
-                    control={form.control}
-                    name="itemName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>
-                          Nama Barang{" "}
-                          <span className="text-xs text-muted-foreground">
-                            {isKargo ? "(Khusus Kargo)" : "(Khusus Pelni)"}
-                          </span>
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder={isKargo ? "Contoh: Elektronik, Mesin, Material..." : "Contoh: Pakaian, Makanan, Perabot..."}
-                            {...field}
-                            value={field.value || ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="serviceType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Jenis Jastip</FormLabel>
-                        {params.serviceType ? (
-                          <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
-                            {serviceLabel[field.value || ""] || field.value || params.serviceType}
-                            <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
-                          </div>
-                        ) : (
-                          <FormControl>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Pilih jenis jastip" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-                                <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
-                                <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
-                                <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </FormControl>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="deliveryRoute"
-                    render={({ field }) => {
-                      const routeOpts = deliveryRouteOptions[serviceType || ""] || [];
-                      const isSingleRoute = params.serviceType && routeOpts.length === 1;
-                      return (
-                        <FormItem>
-                          <FormLabel>Lokasi Pengiriman</FormLabel>
-                          {isSingleRoute ? (
-                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
-                              {field.value || routeOpts[0]?.label || "-"}
-                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
-                            </div>
-                          ) : (
+            {isKargo ? (
+              /* ====== FORM KHUSUS JASTIP KARGO ====== */
+              <>
+                {/* Card 1: Info Dasar Kargo */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      Data Kargo
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Row 1: Nama Konsumen | Tgl Masuk */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="customerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Nama Konsumen <span className="text-destructive">*</span>
+                            </FormLabel>
                             <FormControl>
-                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={!serviceType}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder={serviceType ? "Pilih lokasi pengiriman" : "Pilih jenis jastip dahulu"} />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {routeOpts.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <Input placeholder="Nama pemilik / penerima kargo" {...field} value={field.value || ""} />
                             </FormControl>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      );
-                    }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="packageDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tgl Masuk <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-            {/* Section: Berat & Dimensi */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calculator className="h-4 w-4" />
-                  Berat &amp; Dimensi
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="realWeight"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Berat Real (Kg)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number" step="0.001" placeholder="0.000"
-                            {...field} value={field.value ?? ""}
-                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                    {/* Row 2: Toko/Kurir | Total Koli */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="resiNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Toko / Kurir <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input placeholder="Nama toko atau kurir pengirim" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="packageNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Total Koli</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number" min="1" step="1" placeholder="Jumlah koli (kotak/karton)"
+                                {...field} value={field.value || ""}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { name: "length" as const, label: "Panjang (cm)" },
-                    { name: "width" as const, label: "Lebar (cm)" },
-                    { name: "height" as const, label: "Tinggi (cm)" },
-                  ].map(({ name, label }) => (
+                    {/* Row 3: Jenis Barang */}
                     <FormField
-                      key={name}
                       control={form.control}
-                      name={name}
+                      name="itemName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{label}</FormLabel>
+                          <FormLabel>Jenis Barang</FormLabel>
                           <FormControl>
                             <Input
-                              type="number" step="0.1" placeholder="0"
-                              {...field} value={field.value ?? ""}
-                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              placeholder="Contoh: Elektronik, Mesin, Material bangunan..."
+                              {...field}
+                              value={field.value || ""}
                             />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  ))}
-                </div>
 
-                {/* Auto-calculated summary */}
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Kalkulasi Otomatis</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Row 4: Jenis Jastip (auto) | Lokasi Pengiriman (auto) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="serviceType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Jenis Jastip</FormLabel>
+                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                              {serviceLabel[field.value || ""] || field.value || "Jastip Kargo"}
+                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="deliveryRoute"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lokasi Pengiriman</FormLabel>
+                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                              {field.value || "Jakarta/Surabaya → Manokwari"}
+                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Card 2: Ukuran & Kalkulasi Ongkir */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calculator className="h-4 w-4" />
+                      Ukuran &amp; Kalkulasi Ongkir
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Dimensi */}
                     <div>
-                      <p className="text-xs text-muted-foreground">Berat Volume (Kg)</p>
-                      <p className="font-semibold">{watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(3) : "-"}</p>
-                      {serviceType && volumeDivisor[serviceType] && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          P × L × T ÷ {volumeDivisor[serviceType].toLocaleString("id-ID")}
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Ukuran Koli (Panjang × Lebar × Tinggi ÷ 1.000.000 = M³)
+                      </p>
+                      <div className="grid grid-cols-3 gap-4">
+                        {[
+                          { name: "length" as const, label: "Panjang (cm)" },
+                          { name: "width" as const, label: "Lebar (cm)" },
+                          { name: "height" as const, label: "Tinggi (cm)" },
+                        ].map(({ name, label }) => (
+                          <FormField
+                            key={name}
+                            control={form.control}
+                            name={name}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{label}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number" step="0.1" placeholder="0"
+                                    {...field} value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* M3 / Ton */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* M3 — auto dari dimensi */}
+                      <div className="rounded-lg border bg-muted/30 p-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">M³ (Kubikasi)</p>
+                        <p className="text-xl font-black text-orange-600">
+                          {watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(4) : "—"}
                         </p>
+                        <p className="text-xs text-muted-foreground mt-1">P × L × T ÷ 1.000.000</p>
+                      </div>
+                      {/* Ton — input manual */}
+                      <FormField
+                        control={form.control}
+                        name="realWeight"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Ton (Berat Aktual)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number" step="0.001" placeholder="0.000"
+                                {...field} value={field.value ?? ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">Masukkan dalam satuan Ton</p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Digunakan = max(M3, Ton) */}
+                    {watchedUsedWeight != null && watchedUsedWeight > 0 && (
+                      <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">M³/Ton yang Digunakan</p>
+                          <p className="text-lg font-black text-orange-700">
+                            {watchedUsedWeight.toFixed(4)}
+                            <span className="text-xs font-normal ml-1">
+                              {watchedVolumeWeight != null && realWeight != null
+                                ? (watchedVolumeWeight >= (realWeight ?? 0) ? "(M³ lebih besar)" : "(Ton lebih besar)")
+                                : ""}
+                            </span>
+                          </p>
+                        </div>
+                        <p className="text-xs text-orange-600">MAX(M³, Ton)</p>
+                      </div>
+                    )}
+
+                    {/* Harga Kubikasi */}
+                    <FormField
+                      control={form.control}
+                      name="shippingRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Harga Kubikasi Barang (per M³/Ton) <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
+                              <Input
+                                type="number" step="1000" placeholder="0"
+                                className="pl-9"
+                                {...field} value={field.value ?? ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
+                    />
+
+                    {/* Ongkir Summary */}
+                    <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ongkir Jastip</p>
+                          <p className="text-2xl font-black text-primary mt-1">
+                            {watchedTotalShipping != null ? formatRp(watchedTotalShipping) : "—"}
+                          </p>
+                          {watchedUsedWeight != null && watchedShippingRate != null && watchedTotalShipping != null && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {watchedUsedWeight.toFixed(4)} × {formatRp(watchedShippingRate)} = {formatRp(watchedTotalShipping)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Berat Digunakan (Kg)</p>
-                      <p className="font-semibold text-primary">{watchedUsedWeight != null ? watchedUsedWeight.toFixed(3) : "-"}</p>
-                      {watchedUsedWeight != null && realWeight != null && watchedVolumeWeight != null && (
-                        <p className="text-xs text-muted-foreground">
-                          MAX({realWeight.toFixed(3)}, {watchedVolumeWeight.toFixed(3)})
-                        </p>
-                      )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              /* ====== FORM STANDAR (non-kargo) ====== */
+              <>
+                {/* Section: Identitas Paket */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CalendarDays className="h-4 w-4" />
+                      Identitas Paket
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="packageDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tanggal <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="customerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Nama Pemilik Paket <span className="text-destructive">*</span>
+                              {isGrup && (
+                                <span className="text-xs font-normal text-muted-foreground ml-1">(nama penerima paket ini)</span>
+                              )}
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder="Masukkan nama pemilik paket" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Tarif / Kg</p>
-                      <p className="font-semibold">{formatRp(watchedShippingRate)}</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="resiNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>No Resi <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <Input placeholder="Contoh: JNE123456789" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="packageNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>No Paket</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Contoh: PKT-001" {...field} value={field.value || ""} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Total Ongkir</p>
-                      <p className="font-semibold text-primary">{formatRp(watchedTotalShipping)}</p>
+
+                    {isPelni && (
+                      <FormField
+                        control={form.control}
+                        name="itemName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Nama Barang{" "}
+                              <span className="text-xs text-muted-foreground">(Khusus Pelni)</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Contoh: Pakaian, Makanan, Perabot..."
+                                {...field}
+                                value={field.value || ""}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="serviceType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Jenis Jastip</FormLabel>
+                            {params.serviceType ? (
+                              <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                                {serviceLabel[field.value || ""] || field.value || params.serviceType}
+                                <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                              </div>
+                            ) : (
+                              <FormControl>
+                                <Select onValueChange={field.onChange} value={field.value || ""}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Pilih jenis jastip" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
+                                    <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
+                                    <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
+                                    <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormControl>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="deliveryRoute"
+                        render={({ field }) => {
+                          const routeOpts = deliveryRouteOptions[serviceType || ""] || [];
+                          const isSingleRoute = params.serviceType && routeOpts.length === 1;
+                          return (
+                            <FormItem>
+                              <FormLabel>Lokasi Pengiriman</FormLabel>
+                              {isSingleRoute ? (
+                                <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                                  {field.value || routeOpts[0]?.label || "-"}
+                                  <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                                </div>
+                              ) : (
+                                <FormControl>
+                                  <Select onValueChange={field.onChange} value={field.value || ""} disabled={!serviceType}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder={serviceType ? "Pilih lokasi pengiriman" : "Pilih jenis jastip dahulu"} />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {routeOpts.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormControl>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+
+                {/* Section: Berat & Dimensi */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calculator className="h-4 w-4" />
+                      Berat &amp; Dimensi
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="realWeight"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Berat Real (Kg)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number" step="0.001" placeholder="0.000"
+                                {...field} value={field.value ?? ""}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { name: "length" as const, label: "Panjang (cm)" },
+                        { name: "width" as const, label: "Lebar (cm)" },
+                        { name: "height" as const, label: "Tinggi (cm)" },
+                      ].map(({ name, label }) => (
+                        <FormField
+                          key={name}
+                          control={form.control}
+                          name={name}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{label}</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number" step="0.1" placeholder="0"
+                                  {...field} value={field.value ?? ""}
+                                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Auto-calculated summary */}
+                    <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Kalkulasi Otomatis</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Berat Volume (Kg)</p>
+                          <p className="font-semibold">{watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(3) : "-"}</p>
+                          {serviceType && volumeDivisor[serviceType] && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              P × L × T ÷ {volumeDivisor[serviceType].toLocaleString("id-ID")}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Berat Digunakan (Kg)</p>
+                          <p className="font-semibold text-primary">{watchedUsedWeight != null ? watchedUsedWeight.toFixed(3) : "-"}</p>
+                          {watchedUsedWeight != null && realWeight != null && watchedVolumeWeight != null && (
+                            <p className="text-xs text-muted-foreground">
+                              MAX({realWeight.toFixed(3)}, {watchedVolumeWeight.toFixed(3)})
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Tarif / Kg</p>
+                          <p className="font-semibold">{formatRp(watchedShippingRate)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total Ongkir</p>
+                          <p className="font-semibold text-primary">{formatRp(watchedTotalShipping)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
 
             <div className="flex gap-3">
               <Button type="submit" className="flex-1" disabled={isSubmitting}>
