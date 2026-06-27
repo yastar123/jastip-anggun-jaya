@@ -1037,29 +1037,6 @@ export default function AdminPackagesNew() {
                       />
                     </div>
 
-                    {isPelni && (
-                      <FormField
-                        control={form.control}
-                        name="itemName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              Nama Barang{" "}
-                              <span className="text-xs text-muted-foreground">(Khusus Pelni)</span>
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Contoh: Pakaian, Makanan, Perabot..."
-                                {...field}
-                                value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
