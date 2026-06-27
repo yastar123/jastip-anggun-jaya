@@ -19,6 +19,7 @@ import AdminBarcode from "@/pages/admin/barcode";
 import AdminBarcodeGroupDetail from "@/pages/admin/barcode-group-detail";
 import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
+import AdminKalkulatorScan from "@/pages/admin/kalkulator-scan";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
@@ -127,6 +128,9 @@ function Router() {
       </Route>
       <Route path="/admin/verify">
         {(params) => <ProtectedRoute role="admin" component={AdminVerify} params={params} />}
+      </Route>
+      <Route path="/admin/kalkulator-scan">
+        {(params) => <ProtectedRoute role="admin" component={AdminKalkulatorScan} params={params} />}
       </Route>
       <Route path="/admin/profile">
         {(params) => <ProtectedRoute role="admin" component={ProfilePage} params={params} />}

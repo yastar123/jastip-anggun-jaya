@@ -30,6 +30,7 @@ import {
   Wrench,
   UserCircle,
   ShieldCheck,
+  Calculator,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: any; exact?: boolean };
@@ -51,6 +52,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
     { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine, exact: true },
     { name: "Verifikasi Paket", href: "/admin/verify", icon: ShieldCheck, exact: true },
+    { name: "Kalkulator Scan", href: "/admin/kalkulator-scan", icon: Calculator, exact: true },
     { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
   ];
 
