@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
 import {
   Camera, Upload, ScanLine, X, CheckCircle2, XCircle,
-  Users, Package, Hash, ShieldCheck, RotateCcw,
+  Users, Package, Hash, ShieldCheck, RotateCcw, Download,
 } from "lucide-react";
 
 interface PkgGroup {
@@ -171,15 +172,43 @@ export default function AdminVerify() {
   const matchCount = scanHistory.filter((h) => h.result === "match").length;
   const mismatchCount = scanHistory.filter((h) => h.result === "mismatch").length;
 
+  function exportExcel() {
+    const rows = (allPackages || []).map((p: any, i: number) => ({
+      No: i + 1,
+      "Nama Penerima": p.customerName || "",
+      "No Resi": p.resiNumber || "",
+      Barcode: p.barcode || "",
+      "Jenis Jastip": p.serviceType || "",
+      Status: p.status === "diserahkan" ? "Diserahkan" : "Pending",
+      "Berat (Kg)": p.realWeight ?? "",
+      "Ongkir (Rp)": p.ongkir ?? "",
+      Keterangan: p.description || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Verifikasi Paket");
+    XLSX.writeFile(wb, `verifikasi-paket-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ShieldCheck className="h-7 w-7 text-primary" /> Verifikasi Paket
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Pilih nama penerima, lalu scan barcode paket satu per satu untuk memverifikasi kepemilikan.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <ShieldCheck className="h-7 w-7 text-primary" /> Verifikasi Paket
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Pilih nama penerima, lalu scan barcode paket satu per satu untuk memverifikasi kepemilikan.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={exportExcel}
+          disabled={!allPackages || allPackages.length === 0}
+          className="shrink-0 flex items-center gap-2"
+        >
+          <Download className="h-4 w-4" /> Export Excel
+        </Button>
       </div>
 
       {!selectedGroup ? (
