@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Calculator, CalendarDays, CheckCircle2, Plus, Users, QrCode, ArrowRight, Layers } from "lucide-react";
+import { ArrowLeft, Calculator, CalendarDays, CheckCircle2, Plus, Users, QrCode, ArrowRight, Layers, Truck, Box } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 
@@ -50,6 +50,8 @@ const packageSchema = z.object({
   shippingRate: z.coerce.number().optional().nullable(),
   totalWeight: z.coerce.number().optional().nullable(),
   totalShipping: z.coerce.number().optional().nullable(),
+  price: z.coerce.number().optional().nullable(),
+  packagingType: z.string().optional().nullable(),
 });
 
 type PackageFormValues = z.infer<typeof packageSchema>;
@@ -270,24 +272,54 @@ export default function AdminPackagesNew() {
 
   useEffect(() => {
     const currentRoute = form.getValues("deliveryRoute");
-    let vw: number | null = null;
     const divisor = serviceType ? volumeDivisor[serviceType] : undefined;
-    if (divisor && length && width && height && length > 0 && width > 0 && height > 0) {
-      vw = Number(((length * width * height) / divisor).toFixed(3));
+    const isKargoMode = serviceType === "jastip kargo";
+
+    if (isKargoMode) {
+      // For kargo: only auto-set M3 when all 3 dimensions are provided
+      if (divisor && length && width && height && length > 0 && width > 0 && height > 0) {
+        const vw = Number(((length * width * height) / divisor).toFixed(3));
+        form.setValue("volumeWeight", vw, { shouldDirty: true });
+      }
+      // usedWeight = MAX(volumeWeight, realWeight) — recalculated in separate effect
+      // shippingRate and totalShipping = manually entered / separate effect
+    } else {
+      let vw: number | null = null;
+      if (divisor && length && width && height && length > 0 && width > 0 && height > 0) {
+        vw = Number(((length * width * height) / divisor).toFixed(3));
+      }
+      form.setValue("volumeWeight", vw, { shouldDirty: true });
+
+      const real = realWeight ?? 0;
+      const volume = vw ?? 0;
+      const uw = Math.max(real, volume);
+      form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
+
+      const effectiveRoute = currentRoute || deliveryRoute;
+      const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
+      const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
+      form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
+      form.setValue("totalShipping", total ?? null, { shouldDirty: true });
     }
-    form.setValue("volumeWeight", vw, { shouldDirty: true });
-
-    const real = realWeight ?? 0;
-    const volume = vw ?? 0;
-    const uw = Math.max(real, volume);
-    form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
-
-    const effectiveRoute = currentRoute || deliveryRoute;
-    const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
-    const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
-    form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
-    form.setValue("totalShipping", total ?? null, { shouldDirty: true });
   }, [serviceType, deliveryRoute, realWeight, length, width, height]);
+
+  // Kargo: recalculate usedWeight when volumeWeight or realWeight changes
+  useEffect(() => {
+    if (serviceType !== "jastip kargo") return;
+    const vw = watchedVolumeWeight ?? 0;
+    const real = realWeight ?? 0;
+    const uw = Math.max(vw, real);
+    form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
+  }, [serviceType, watchedVolumeWeight, realWeight]);
+
+  // Kargo: recalculate totalShipping when usedWeight or shippingRate changes
+  useEffect(() => {
+    if (serviceType !== "jastip kargo") return;
+    const uw = watchedUsedWeight ?? 0;
+    const rate = watchedShippingRateInput ?? 0;
+    const total = uw > 0 && rate > 0 ? Math.round(uw * rate) : null;
+    form.setValue("totalShipping", total ?? null, { shouldDirty: true });
+  }, [serviceType, watchedUsedWeight, watchedShippingRateInput]);
 
   async function onSubmit(values: PackageFormValues) {
     // Require customerName for all modes
@@ -484,6 +516,7 @@ export default function AdminPackagesNew() {
   const watchedVolumeWeight = form.watch("volumeWeight");
   const watchedShippingRate = form.watch("shippingRate");
   const watchedTotalShipping = form.watch("totalShipping");
+  const watchedShippingRateInput = watchedShippingRate;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
