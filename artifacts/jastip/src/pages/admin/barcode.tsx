@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 15;
 
 const SERVICE_TYPES = [
   { value: "jastip pesawat", label: "Jastip Pesawat" },
@@ -736,8 +736,8 @@ export default function AdminBarcode() {
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, i) => (
             <Card key={i} className="animate-pulse"><CardContent className="pt-4 h-48 bg-muted/20 rounded-xl" /></Card>
           ))}
         </div>
@@ -750,7 +750,7 @@ export default function AdminBarcode() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {paginatedGroups.map((group) => (
               <GroupedBarcodeItem
                 key={group.customerName || group.pkgs[0]?.id}

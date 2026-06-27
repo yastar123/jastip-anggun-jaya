@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/pagination";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import {
@@ -42,6 +43,9 @@ export default function AdminVerify() {
   const [isSearching, setIsSearching] = useState(false);
   const [scanHistory, setScanHistory] = useState<{ barcode: string; result: VerifyResult; pkg: any | null }[]>([]);
   const [searchGroup, setSearchGroup] = useState("");
+  const [groupPage, setGroupPage] = useState(1);
+
+  const GROUP_PAGE_SIZE = 15;
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,6 +56,8 @@ export default function AdminVerify() {
   const filteredGroups = allGroups.filter((g) =>
     !searchGroup || g.customerName.toLowerCase().includes(searchGroup.toLowerCase())
   );
+  const totalGroupPages = Math.ceil(filteredGroups.length / GROUP_PAGE_SIZE);
+  const paginatedGroupItems = filteredGroups.slice((groupPage - 1) * GROUP_PAGE_SIZE, groupPage * GROUP_PAGE_SIZE);
 
   async function lookupAndVerify(code: string) {
     if (!selectedGroup) return;
@@ -244,15 +250,15 @@ export default function AdminVerify() {
                 placeholder="Cari nama penerima..."
                 className="pl-9"
                 value={searchGroup}
-                onChange={(e) => setSearchGroup(e.target.value)}
+                onChange={(e) => { setSearchGroup(e.target.value); setGroupPage(1); }}
               />
             </div>
             <Badge variant="secondary">{allGroups.length} nama</Badge>
           </div>
 
           {isLoading ? (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {Array.from({ length: 10 }).map((_, i) => (
                 <Card key={i} className="animate-pulse"><CardContent className="h-20 pt-4 bg-muted/20" /></Card>
               ))}
             </div>
@@ -263,32 +269,43 @@ export default function AdminVerify() {
               <p className="text-sm mt-1">Input paket terlebih dahulu untuk mulai verifikasi</p>
             </div>
           ) : (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {filteredGroups.map((group) => {
-                const pending = group.packages.filter((p) => p.status !== "diserahkan").length;
-                const done = group.packages.filter((p) => p.status === "diserahkan").length;
-                return (
-                  <Card
-                    key={group.customerName}
-                    className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
-                    onClick={() => setSelectedGroup(group)}
-                  >
-                    <CardContent className="pt-4 pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-base">{group.customerName}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{group.packages.length} paket</p>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                {paginatedGroupItems.map((group) => {
+                  const pending = group.packages.filter((p) => p.status !== "diserahkan").length;
+                  const done = group.packages.filter((p) => p.status === "diserahkan").length;
+                  return (
+                    <Card
+                      key={group.customerName}
+                      className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
+                      onClick={() => setSelectedGroup(group)}
+                    >
+                      <CardContent className="pt-4 pb-3">
+                        <div className="flex flex-col gap-1.5">
+                          <p className="font-semibold text-sm leading-tight">{group.customerName}</p>
+                          <p className="text-xs text-muted-foreground">{group.packages.length} paket</p>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {pending > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{pending} pending</Badge>}
+                            {done > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{done} selesai</Badge>}
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          {pending > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300 block mb-1">{pending} pending</Badge>}
-                          {done > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 block">{done} serahkan</Badge>}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+              {totalGroupPages > 1 && (
+                <div className="border rounded-lg">
+                  <Pagination
+                    page={groupPage}
+                    totalPages={totalGroupPages}
+                    total={filteredGroups.length}
+                    pageSize={GROUP_PAGE_SIZE}
+                    onPageChange={setGroupPage}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (
