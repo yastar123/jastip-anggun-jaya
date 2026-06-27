@@ -9,9 +9,19 @@ import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import QRCode from "qrcode";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   Camera, Upload, ScanLine, X, CheckCircle2, XCircle,
   Users, Package, Hash, ShieldCheck, RotateCcw, Download, Printer,
 } from "lucide-react";
+
+const SERVICE_TYPES = [
+  { value: "jastip pesawat", label: "Jastip Pesawat" },
+  { value: "jastip hemat+", label: "Jastip Hemat+" },
+  { value: "jastip kargo", label: "Jastip Kargo" },
+  { value: "jastip pelni", label: "Jastip Pelni" },
+];
 
 interface PkgGroup {
   customerName: string;
@@ -42,6 +52,7 @@ export default function AdminVerify() {
   const [isSearching, setIsSearching] = useState(false);
   const [scanHistory, setScanHistory] = useState<{ barcode: string; result: VerifyResult; pkg: any | null }[]>([]);
   const [searchGroup, setSearchGroup] = useState("");
+  const [printServiceType, setPrintServiceType] = useState<string>("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -178,10 +189,20 @@ export default function AdminVerify() {
     try { return new Date(val).toLocaleDateString("id-ID"); } catch { return String(val); }
   }
 
-  async function printAllBarcodes() {
-    const pkgs = allPackages || [];
-    if (!pkgs.length) return;
+  async function printByServiceType() {
+    if (!printServiceType) return;
+    const pkgs = (allPackages || []).filter(
+      (p: any) => (p.serviceType || "").toLowerCase() === printServiceType.toLowerCase()
+    );
+    if (!pkgs.length) {
+      toast({ variant: "destructive", title: "Tidak ada paket", description: `Tidak ditemukan paket dengan jenis jastip: ${printServiceType}` });
+      return;
+    }
+    await doPrintBarcodes(pkgs);
+  }
 
+  async function doPrintBarcodes(pkgs: any[], title = "Print Barcode — Jastip Anggun Jaya") {
+    if (!pkgs.length) return;
     const pages: string[] = [];
     for (const pkg of pkgs) {
       const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
@@ -189,7 +210,6 @@ export default function AdminVerify() {
       try {
         qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
       } catch { continue; }
-
       pages.push(`
         <div class="page">
           <div class="label">
@@ -223,13 +243,11 @@ export default function AdminVerify() {
         </div>
       `);
     }
-
     if (!pages.length) return;
-
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Print Semua Barcode — Jastip Anggun Jaya</title>
+  <title>${title}</title>
   <style>
     @page { size: A4 portrait; margin: 12mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -261,11 +279,14 @@ export default function AdminVerify() {
   <script>window.onload = () => { window.print(); window.close(); }<\/script>
 </body>
 </html>`;
-
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);
     win.document.close();
+  }
+
+  async function printAllBarcodes() {
+    await doPrintBarcodes(allPackages || [], "Print Semua Barcode — Jastip Anggun Jaya");
   }
 
   function exportExcel() {
@@ -312,7 +333,7 @@ export default function AdminVerify() {
             Pilih nama penerima, lalu scan barcode paket satu per satu untuk memverifikasi kepemilikan.
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2 shrink-0 items-center">
           <Button
             variant="outline"
             onClick={exportExcel}
@@ -329,6 +350,34 @@ export default function AdminVerify() {
           >
             <Printer className="h-4 w-4" /> Print Semua Barcode
           </Button>
+          <div className="flex items-center gap-1 border rounded-md overflow-hidden">
+            <Select value={printServiceType} onValueChange={setPrintServiceType}>
+              <SelectTrigger className="border-0 rounded-none h-9 w-40 focus:ring-0 text-xs">
+                <SelectValue placeholder="Pilih jenis jastip..." />
+              </SelectTrigger>
+              <SelectContent>
+                {SERVICE_TYPES.map((s) => {
+                  const count = (allPackages || []).filter(
+                    (p: any) => (p.serviceType || "").toLowerCase() === s.value
+                  ).length;
+                  return (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label} {count > 0 && <span className="text-muted-foreground">({count})</span>}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={printByServiceType}
+              disabled={!printServiceType || !allPackages || allPackages.length === 0}
+              className="rounded-none border-l h-9 px-3 flex items-center gap-1.5 text-xs"
+            >
+              <Printer className="h-3.5 w-3.5" /> Print
+            </Button>
+          </div>
         </div>
       </div>
 
