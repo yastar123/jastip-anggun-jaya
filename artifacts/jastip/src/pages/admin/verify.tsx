@@ -172,17 +172,37 @@ export default function AdminVerify() {
   const matchCount = scanHistory.filter((h) => h.result === "match").length;
   const mismatchCount = scanHistory.filter((h) => h.result === "mismatch").length;
 
+  function formatTgl(val: any) {
+    if (!val) return "";
+    try { return new Date(val).toLocaleDateString("id-ID"); } catch { return String(val); }
+  }
+
   function exportExcel() {
     const rows = (allPackages || []).map((p: any, i: number) => ({
       No: i + 1,
+      "Tanggal Paket": formatTgl(p.packageDate),
       "Nama Penerima": p.customerName || "",
       "No Resi": p.resiNumber || "",
+      "No Paket": p.packageNumber || "",
       Barcode: p.barcode || "",
+      "Nama Barang": p.itemName || "",
+      "Mode Paket": p.packageMode || "",
       "Jenis Jastip": p.serviceType || "",
+      "Rute Pengiriman": p.deliveryRoute || "",
+      "Berat Real (Kg)": p.realWeight ?? "",
+      "Panjang (cm)": p.length ?? "",
+      "Lebar (cm)": p.width ?? "",
+      "Tinggi (cm)": p.height ?? "",
+      "Berat Volume (Kg)": p.volumeWeight ?? "",
+      "Berat Terpakai (Kg)": p.usedWeight ?? "",
+      "Total Berat (Kg)": p.totalWeight ?? "",
+      "Ongkir/Kg (Rp)": p.shippingRate ?? "",
+      "Total Ongkir (Rp)": p.totalShipping ?? "",
+      "Jenis Paking": p.packagingType || "",
+      "Harga Barang (Rp)": p.price ?? "",
       Status: p.status === "diserahkan" ? "Diserahkan" : "Pending",
-      "Berat (Kg)": p.realWeight ?? "",
-      "Ongkir (Rp)": p.ongkir ?? "",
-      Keterangan: p.description || "",
+      Catatan: p.notes || "",
+      "Tanggal Dibuat": formatTgl(p.createdAt),
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
