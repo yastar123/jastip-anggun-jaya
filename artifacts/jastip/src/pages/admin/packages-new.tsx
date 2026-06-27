@@ -38,6 +38,7 @@ const packageSchema = z.object({
   itemName: z.string().optional().nullable(),
   resiNumber: z.string().min(1, "No Resi wajib diisi"),
   packageNumber: z.string().optional().nullable(),
+  packagingType: z.string().optional().nullable(),
   serviceType: z.string().optional().nullable(),
   packageMode: z.string().optional().nullable(),
   deliveryRoute: z.string().optional().nullable(),
@@ -692,72 +693,90 @@ export default function AdminPackagesNew() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Row 1: Nama Konsumen | Tgl Masuk */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="customerName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              Nama Konsumen <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <FormControl>
-                              <Input placeholder="Nama pemilik / penerima kargo" {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="packageDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tgl Masuk <span className="text-destructive">*</span></FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    {/* Nama Konsumen */}
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Nama Konsumen <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nama pemilik / penerima kargo" {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                    {/* Row 2: Toko/Kurir | Total Koli */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="resiNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Toko / Kurir <span className="text-destructive">*</span></FormLabel>
-                            <FormControl>
-                              <Input placeholder="Nama toko atau kurir pengirim" {...field} value={field.value || ""} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="packageNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Total Koli</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number" min="1" step="1" placeholder="Jumlah koli (kotak/karton)"
-                                {...field} value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    {/* Tgl Masuk */}
+                    <FormField
+                      control={form.control}
+                      name="packageDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tgl Masuk <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                    {/* Row 3: Jenis Barang */}
+                    {/* Toko / Kurir */}
+                    <FormField
+                      control={form.control}
+                      name="resiNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Toko / Kurir <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nama toko atau kurir pengirim" {...field} value={field.value || ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Total Koli */}
+                    <FormField
+                      control={form.control}
+                      name="packageNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Total Koli</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number" min="1" step="1" placeholder="Jumlah koli (kotak/karton)"
+                              {...field} value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Koli (nomor/identitas koli) */}
+                    <FormField
+                      control={form.control}
+                      name="packagingType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Koli</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Contoh: Koli 1, Koli 2/3..."
+                              {...field} value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Jenis Barang */}
                     <FormField
                       control={form.control}
                       name="itemName"
@@ -775,38 +794,6 @@ export default function AdminPackagesNew() {
                         </FormItem>
                       )}
                     />
-
-                    {/* Row 4: Jenis Jastip (auto) | Lokasi Pengiriman (auto) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="serviceType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Jenis Jastip</FormLabel>
-                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
-                              {serviceLabel[field.value || ""] || field.value || "Jastip Kargo"}
-                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="deliveryRoute"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Lokasi Pengiriman</FormLabel>
-                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
-                              {field.value || "Jakarta/Surabaya → Manokwari"}
-                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
                   </CardContent>
                 </Card>
 
@@ -819,10 +806,10 @@ export default function AdminPackagesNew() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Dimensi */}
+                    {/* Ukuran: Panjang × Lebar × Tinggi ÷ 1.000.000 */}
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Ukuran Koli (Panjang × Lebar × Tinggi ÷ 1.000.000 = M³)
+                        Ukuran (Panjang × Lebar × Tinggi ÷ 1.000.000 Kubik)
                       </p>
                       <div className="grid grid-cols-3 gap-4">
                         {[
@@ -852,36 +839,34 @@ export default function AdminPackagesNew() {
                       </div>
                     </div>
 
-                    {/* M3 / Ton */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* M3 — auto dari dimensi */}
-                      <div className="rounded-lg border bg-muted/30 p-3">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">M³ (Kubikasi)</p>
-                        <p className="text-xl font-black text-orange-600">
-                          {watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(4) : "—"}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">P × L × T ÷ 1.000.000</p>
-                      </div>
-                      {/* Ton — input manual */}
-                      <FormField
-                        control={form.control}
-                        name="realWeight"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Ton (Berat Aktual)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number" step="0.001" placeholder="0.000"
-                                {...field} value={field.value ?? ""}
-                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                              />
-                            </FormControl>
-                            <p className="text-xs text-muted-foreground mt-1">Masukkan dalam satuan Ton</p>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    {/* M3 (auto dari dimensi) */}
+                    <div className="rounded-lg border bg-muted/30 p-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">M³ / Ton (Kubikasi)</p>
+                      <p className="text-xl font-black text-orange-600">
+                        {watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(4) : "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">P × L × T ÷ 1.000.000</p>
                     </div>
+
+                    {/* Ton (input manual) */}
+                    <FormField
+                      control={form.control}
+                      name="realWeight"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>M³ / Ton (Berat Aktual)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number" step="0.001" placeholder="0.000"
+                              {...field} value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">Masukkan dalam satuan Ton</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
                     {/* Digunakan = max(M3, Ton) */}
                     {watchedUsedWeight != null && watchedUsedWeight > 0 && (
@@ -901,7 +886,7 @@ export default function AdminPackagesNew() {
                       </div>
                     )}
 
-                    {/* Harga Kubikasi */}
+                    {/* Harga Kubikasi Barang */}
                     <FormField
                       control={form.control}
                       name="shippingRate"
@@ -924,7 +909,7 @@ export default function AdminPackagesNew() {
                       )}
                     />
 
-                    {/* Ongkir Summary */}
+                    {/* Ongkir Jastip */}
                     <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -939,6 +924,38 @@ export default function AdminPackagesNew() {
                           )}
                         </div>
                       </div>
+                    </div>
+
+                    {/* Jenis Jastip (otomatis) | Lokasi Pengiriman (otomatis) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="serviceType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Jenis Jastip</FormLabel>
+                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                              {serviceLabel[field.value || ""] || field.value || "Jastip Kargo"}
+                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="deliveryRoute"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lokasi Pengiriman</FormLabel>
+                            <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium">
+                              {field.value || "Jakarta/Surabaya → Manokwari"}
+                              <span className="ml-auto text-xs text-muted-foreground">Otomatis</span>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </CardContent>
                 </Card>
