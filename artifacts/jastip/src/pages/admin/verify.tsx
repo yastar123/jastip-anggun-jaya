@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import QRCode from "qrcode";
 import {
   Camera, Upload, ScanLine, X, CheckCircle2, XCircle,
-  Users, Package, Hash, ShieldCheck, RotateCcw, Download,
+  Users, Package, Hash, ShieldCheck, RotateCcw, Download, Printer,
 } from "lucide-react";
 
 interface PkgGroup {
@@ -177,6 +178,96 @@ export default function AdminVerify() {
     try { return new Date(val).toLocaleDateString("id-ID"); } catch { return String(val); }
   }
 
+  async function printAllBarcodes() {
+    const pkgs = allPackages || [];
+    if (!pkgs.length) return;
+
+    const pages: string[] = [];
+    for (const pkg of pkgs) {
+      const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
+      let qrDataUrl = "";
+      try {
+        qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+      } catch { continue; }
+
+      pages.push(`
+        <div class="page">
+          <div class="label">
+            <div class="header">
+              <div class="brand-name">JASTIP ANGGUN JAYA</div>
+              <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+            </div>
+            <div class="body-wrap">
+              <div class="qr-wrap">
+                <img src="${qrDataUrl}" alt="QR Code" />
+                <div class="qr-label">${qrValue}</div>
+              </div>
+              <div class="info-section">
+                <div class="customer">${pkg.customerName || "-"}</div>
+                <div class="info-grid">
+                  <div class="info-item"><span class="info-label">No. Resi</span><span class="info-value mono">${pkg.resiNumber || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">No. Paket</span><span class="info-value mono">${pkg.packageNumber || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Tanggal</span><span class="info-value">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Status</span><span class="info-value"><span class="status" style="background:${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"};color:${pkg.status === "diserahkan" ? "#166534" : "#713f12"}">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></span></div>
+                  <div class="info-item"><span class="info-label">Jenis Jastip</span><span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Rute</span><span class="info-value">${pkg.deliveryRoute || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Berat Real</span><span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Berat Digunakan</span><span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Jenis Paking</span><span class="info-value">${pkg.packagingType || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Total Ongkir</span><span class="info-value red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (!pages.length) return;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Print Semua Barcode — Jastip Anggun Jaya</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; background: #fff; }
+    .page { width: 100%; height: calc(297mm - 24mm); display: flex; align-items: stretch; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
+    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .header { background: #c00; color: #fff; padding: 14px 20px; }
+    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .body-wrap { flex: 1; display: flex; flex-direction: row; align-items: stretch; }
+    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; border-right: 2px dashed #ddd; min-width: 180px; }
+    .qr-wrap img { width: 150px; height: 150px; display: block; }
+    .qr-label { font-size: 8px; color: #999; margin-top: 6px; font-family: monospace; text-align: center; word-break: break-all; max-width: 150px; }
+    .info-section { flex: 1; padding: 16px 20px; }
+    .customer { font-size: 20px; font-weight: 900; color: #111; margin-bottom: 12px; border-bottom: 1.5px solid #eee; padding-bottom: 10px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+    .info-item { display: flex; flex-direction: column; gap: 2px; }
+    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info-value { font-size: 12px; font-weight: 700; color: #111; line-height: 1.3; }
+    .info-value.mono { font-family: monospace; font-size: 11px; }
+    .info-value.red { color: #c00; font-size: 14px; }
+    .status { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 8px 20px; font-size: 9px; color: #aaa; text-align: center; }
+  </style>
+</head>
+<body>
+  ${pages.join("")}
+  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  }
+
   function exportExcel() {
     const rows = (allPackages || []).map((p: any, i: number) => ({
       No: i + 1,
@@ -221,14 +312,24 @@ export default function AdminVerify() {
             Pilih nama penerima, lalu scan barcode paket satu per satu untuk memverifikasi kepemilikan.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={exportExcel}
-          disabled={!allPackages || allPackages.length === 0}
-          className="shrink-0 flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" /> Export Excel
-        </Button>
+        <div className="flex gap-2 shrink-0">
+          <Button
+            variant="outline"
+            onClick={exportExcel}
+            disabled={!allPackages || allPackages.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={printAllBarcodes}
+            disabled={!allPackages || allPackages.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Printer className="h-4 w-4" /> Print Semua Barcode
+          </Button>
+        </div>
       </div>
 
       {!selectedGroup ? (
