@@ -363,7 +363,8 @@ export default function AdminPackagesImport() {
     try {
       const payload = valid.map((r) => ({
         customerName:  r.customerName,
-        resiNumber:    r.resiNumber    || undefined,
+        customerPhone: "",
+        resiNumber:    r.resiNumber || "-",
         packageNumber: r.packageNumber || undefined,
         itemName:      r.itemName      || undefined,
         realWeight:    r.realWeight,
