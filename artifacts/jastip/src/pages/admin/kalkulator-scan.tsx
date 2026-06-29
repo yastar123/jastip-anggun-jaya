@@ -213,8 +213,8 @@ export default function KalkulatorScan() {
       const body = {
         paymentType,
         totalAmount: totalTagihan,
-        paidAmount: paymentType === "tunai" ? uangNum : null,
-        changeAmount: paymentType === "tunai" ? kembalian : null,
+        paidAmount: (paymentType === "tunai" || paymentType === "transfer") ? uangNum : null,
+        changeAmount: (paymentType === "tunai" || paymentType === "transfer") ? kembalian : null,
         packageIds: items.map((i) => i.id),
         packageSummary: items.map((i) => ({
           id: i.id,
@@ -245,7 +245,7 @@ export default function KalkulatorScan() {
       const typeLabel = PAYMENT_TYPES.find((t) => t.value === paymentType)?.label || paymentType;
       toast({
         title: "✓ Pembayaran Selesai",
-        description: `${typeLabel} — ${formatRp(totalTagihan)}${paymentType === "tunai" ? ` | Kembalian: ${formatRp(kembalian)}` : ""}`,
+        description: `${typeLabel} — ${formatRp(totalTagihan)}${(paymentType === "tunai" || paymentType === "transfer") ? ` | Kembalian: ${formatRp(kembalian)}` : ""}`,
       });
       setShowPayModal(false);
       resetAll();
@@ -262,8 +262,7 @@ export default function KalkulatorScan() {
 
   const canConfirm =
     paymentType === "piutang" ||
-    paymentType === "transfer" ||
-    (paymentType === "tunai" && uangNum >= totalTagihan);
+    ((paymentType === "tunai" || paymentType === "transfer") && uangNum >= totalTagihan);
 
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
@@ -506,8 +505,8 @@ export default function KalkulatorScan() {
               </div>
             </div>
 
-            {/* Uang diterima — hanya untuk tunai */}
-            {paymentType === "tunai" && (
+            {/* Uang diterima — untuk tunai dan transfer */}
+            {(paymentType === "tunai" || paymentType === "transfer") && (
               <>
                 <div>
                   <label className="text-sm font-semibold block mb-1.5">Uang Diterima dari Customer</label>
@@ -541,14 +540,6 @@ export default function KalkulatorScan() {
                   )}
                 </div>
               </>
-            )}
-
-            {paymentType === "transfer" && (
-              <div className="rounded-xl p-4 border-2 border-blue-200 bg-blue-50 text-blue-800 text-sm text-center">
-                <CreditCard className="w-6 h-6 mx-auto mb-1" />
-                <p className="font-semibold">Transfer / QRIS</p>
-                <p className="text-xs text-blue-600 mt-1">Pastikan pembayaran sudah diterima sebelum konfirmasi</p>
-              </div>
             )}
 
             {paymentType === "piutang" && (
