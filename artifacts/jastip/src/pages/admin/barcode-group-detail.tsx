@@ -176,57 +176,78 @@ export default function BarcodeGroupDetail() {
 
     const qrDataUrls: string[] = await Promise.all(
       pkgs.map((p: any) =>
-        QRCode.toDataURL(p.barcode || p.resiNumber || String(p.id), { width: 200, margin: 2 }).catch(() => "")
+        QRCode.toDataURL(p.barcode || p.resiNumber || String(p.id), { width: 300, margin: 2 }).catch(() => "")
       )
     );
 
     const win = window.open("", "_blank");
     if (!win) return;
 
-    const rows = pkgs.map((p: any, i: number) => `
-      <div class="pkg-row">
-        <div class="qr-cell"><img src="${qrDataUrls[i]}" width="80" height="80" /><div class="barcode-txt">${p.barcode || p.resiNumber}</div></div>
-        <div class="info-cell">
-          <div class="resi">${p.resiNumber || "-"}</div>
-          <div class="detail">No. Paket: ${p.packageNumber || "-"} · ${serviceLabel[p.serviceType] || p.serviceType || "-"}</div>
-          <div class="detail">Berat: ${p.realWeight != null ? p.realWeight + " Kg" : "-"} · Ongkir: ${formatRp(p.totalShipping)}</div>
-          <div class="detail">Rute: ${p.deliveryRoute || "-"}</div>
+    const pages = pkgs.map((p: any, i: number) => {
+      const qrValue = p.barcode || p.resiNumber || String(p.id);
+      const pkgDate = p.packageDate ? new Date(p.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-";
+      return `
+        <div class="label">
+          <div class="header">
+            <div class="brand-name">JASTIP ANGGUN JAYA</div>
+            <div class="brand-sub">Jakarta · Surabaya → Manokwari, Papua</div>
+          </div>
+          <div class="body-wrap">
+            <div class="qr-wrap">
+              <img src="${qrDataUrls[i]}" alt="QR" />
+              <div class="qr-label">${qrValue}</div>
+            </div>
+            <div class="info-section">
+              <div class="customer">${p.customerName || "-"}</div>
+              <div class="row">
+                <div class="item"><div class="lbl">No. Resi</div><div class="val mono">${p.resiNumber || "-"}</div></div>
+                <div class="item"><div class="lbl">No. Paket</div><div class="val mono">${p.packageNumber || "-"}</div></div>
+              </div>
+              <div class="row">
+                <div class="item"><div class="lbl">Jenis Jastip</div><div class="val">${p.serviceType ? p.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+                <div class="item"><div class="lbl">Tanggal</div><div class="val">${pkgDate}</div></div>
+              </div>
+              <div class="row">
+                <div class="item"><div class="lbl">Berat Pakai</div><div class="val">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</div></div>
+                <div class="item"><div class="lbl">Jenis Paking</div><div class="val">${p.packagingType || "-"}</div></div>
+              </div>
+              <div class="row">
+                <div class="item"><div class="lbl">Total Ongkir</div><div class="val red">${p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
         </div>
-        <div class="status-cell"><span class="status ${p.status === "diserahkan" ? "done" : "pending"}">${p.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
 
     win.document.write(`<!DOCTYPE html><html><head>
-      <title>Label Grup — ${groupName || "Grup Paket"}</title>
+      <title>Label — ${groupName || "Grup Paket"}</title>
       <style>
-        @page { size: A4; margin: 10mm; }
-        body { font-family: Arial, sans-serif; }
-        .header { background: #c00; color: #fff; padding: 10px 16px; border-radius: 6px; margin-bottom: 12px; }
-        .brand { font-size: 20px; font-weight: 900; }
-        .sub { font-size: 11px; opacity: 0.85; }
-        .customer-name { font-size: 22px; font-weight: 900; margin: 8px 0 12px; border-bottom: 2px solid #eee; padding-bottom: 8px; }
-        .pkg-row { display: flex; gap: 12px; align-items: center; border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 8px; }
-        .qr-cell { text-align: center; min-width: 90px; }
-        .barcode-txt { font-size: 7px; color: #999; font-family: monospace; margin-top: 2px; word-break: break-all; max-width: 85px; }
-        .info-cell { flex: 1; }
-        .resi { font-size: 13px; font-weight: 700; font-family: monospace; }
-        .detail { font-size: 10px; color: #555; margin-top: 2px; }
-        .status-cell { text-align: center; min-width: 80px; }
-        .status { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
-        .status.done { background: #dcfce7; color: #166534; }
-        .status.pending { background: #fef9c3; color: #713f12; }
-        .summary { margin-top: 12px; font-size: 11px; color: #777; border-top: 1px dashed #ddd; padding-top: 8px; }
+        @page { size: 100mm 100mm; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #fff; }
+        .label { width: 100mm; height: 100mm; display: flex; flex-direction: column; border: 1.5px solid #222; page-break-after: always; overflow: hidden; }
+        .label:last-child { page-break-after: auto; }
+        .header { background: #c00; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
+        .brand-name { font-size: 11pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
+        .brand-sub { font-size: 5pt; opacity: 0.85; margin-top: 1px; }
+        .body-wrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
+        .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3mm 2.5mm; border-right: 1px dashed #ccc; width: 32mm; flex-shrink: 0; }
+        .qr-wrap img { width: 26mm; height: 26mm; display: block; }
+        .qr-label { font-size: 4pt; color: #999; margin-top: 1.5mm; font-family: monospace; text-align: center; word-break: break-all; max-width: 26mm; line-height: 1.2; }
+        .info-section { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
+        .customer { font-size: 10pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+        .row { display: flex; gap: 1.5mm; margin-bottom: 1mm; }
+        .item { flex: 1; }
+        .lbl { font-size: 4.5pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
+        .val { font-size: 7pt; font-weight: 700; color: #111; line-height: 1.2; }
+        .val.mono { font-family: monospace; font-size: 6.5pt; }
+        .val.red { color: #c00; font-size: 8pt; }
+        .footer { background: #f8f8f8; border-top: 0.5px solid #eee; padding: 1.5mm 3mm; font-size: 4.5pt; color: #aaa; text-align: center; flex-shrink: 0; }
       </style>
     </head><body>
-      <div class="header">
-        <div class="brand">JASTIP ANGGUN JAYA</div>
-        <div class="sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
-      </div>
-      <div class="customer-name">📦 ${groupName || "Grup Paket"} — ${pkgs.length} Paket</div>
-      ${rows}
-      <div class="summary">
-        Total ${pkgs.length} paket · Berat: ${totalWeight.toFixed(3)} Kg · Total Ongkir: ${formatRp(totalShipping)}
-      </div>
+      ${pages}
       <script>window.onload = () => { window.print(); window.close(); }</script>
     </body></html>`);
     win.document.close();

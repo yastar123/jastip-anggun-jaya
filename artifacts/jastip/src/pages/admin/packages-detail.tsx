@@ -24,7 +24,7 @@ function packagingLabel(t: string | null | undefined) {
   return t ? (map[t] || t) : "-";
 }
 
-function BarcodeDisplay({ value }: { value: string }) {
+function BarcodeDisplay({ value, pkg }: { value: string; pkg?: any }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { toast } = useToast();
 
@@ -45,12 +45,63 @@ function BarcodeDisplay({ value }: { value: string }) {
     const svgData = new XMLSerializer().serializeToString(svg);
     const win = window.open("", "_blank");
     if (!win) { toast({ variant: "destructive", title: "Pop-up diblokir", description: "Izinkan pop-up untuk mencetak." }); return; }
-    win.document.write(`<!DOCTYPE html><html><head><title>Label Barcode</title>
-      <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;}
-      .label{text-align:center;padding:20px;border:2px solid #000;display:inline-block;border-radius:8px;}
-      h2{margin:0 0 8px;font-size:15px;}.meta{font-size:12px;color:#555;margin-top:8px;}</style></head>
-      <body><div class="label"><h2>${value}</h2>${svgData}</div>
-      <script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
+    const customerName = pkg?.customerName || "";
+    const resiNumber = pkg?.resiNumber || value;
+    const pkgNumber = pkg?.packageNumber || "-";
+    const serviceType = pkg?.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-";
+    const pkgDate = pkg?.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-";
+    const usedWeight = pkg?.usedWeight != null ? pkg.usedWeight + " Kg" : "-";
+    const packaging = pkg?.packagingType || "-";
+    const ongkir = pkg?.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-";
+    win.document.write(`<!DOCTYPE html><html><head><title>Label Barcode - ${resiNumber}</title>
+      <style>
+        @page { size: 100mm 100mm; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; }
+        .label { width: 100mm; height: 100mm; display: flex; flex-direction: column; border: 1.5px solid #222; }
+        .header { background: #c00; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
+        .brand-name { font-size: 11pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
+        .brand-sub { font-size: 5pt; opacity: 0.85; margin-top: 1px; }
+        .body { flex: 1; padding: 2.5mm 3.5mm; overflow: hidden; }
+        .customer { font-size: 11pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+        .row { display: flex; gap: 2mm; margin-bottom: 1mm; }
+        .item { flex: 1; }
+        .lbl { font-size: 4.5pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
+        .val { font-size: 7pt; font-weight: 700; color: #111; line-height: 1.2; }
+        .val.mono { font-family: monospace; font-size: 6.5pt; }
+        .val.red { color: #c00; font-size: 8.5pt; }
+        .barcode-wrap { margin-top: 2mm; display: flex; justify-content: center; }
+        .footer { background: #f8f8f8; border-top: 0.5px solid #eee; padding: 1.5mm 3mm; font-size: 4pt; color: #aaa; text-align: center; flex-shrink: 0; }
+      </style></head>
+      <body>
+        <div class="label">
+          <div class="header">
+            <div class="brand-name">JASTIP ANGGUN JAYA</div>
+            <div class="brand-sub">Jakarta · Surabaya → Manokwari, Papua</div>
+          </div>
+          <div class="body">
+            <div class="customer">${customerName || resiNumber}</div>
+            <div class="row">
+              <div class="item"><div class="lbl">No. Resi</div><div class="val mono">${resiNumber}</div></div>
+              <div class="item"><div class="lbl">No. Paket</div><div class="val mono">${pkgNumber}</div></div>
+            </div>
+            <div class="row">
+              <div class="item"><div class="lbl">Jenis Jastip</div><div class="val">${serviceType}</div></div>
+              <div class="item"><div class="lbl">Tanggal</div><div class="val">${pkgDate}</div></div>
+            </div>
+            <div class="row">
+              <div class="item"><div class="lbl">Berat Pakai</div><div class="val">${usedWeight}</div></div>
+              <div class="item"><div class="lbl">Paking</div><div class="val">${packaging}</div></div>
+            </div>
+            <div class="row">
+              <div class="item"><div class="lbl">Total Ongkir</div><div class="val red">${ongkir}</div></div>
+            </div>
+            <div class="barcode-wrap">${svgData.replace(/width="\d+"/, 'width="88mm"').replace(/height="\d+"/, 'height="14mm"')}</div>
+          </div>
+          <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+        </div>
+        <script>window.onload=()=>{window.print();window.close();}<\/script>
+      </body></html>`);
     win.document.close();
   }
 
@@ -225,7 +276,7 @@ export default function AdminPackagesDetail() {
               <CardTitle className="text-base">Label Barcode</CardTitle>
             </CardHeader>
             <CardContent>
-              <BarcodeDisplay value={pkg.barcode || pkg.resiNumber} />
+              <BarcodeDisplay value={pkg.barcode || pkg.resiNumber} pkg={pkg} />
               <div className="mt-4 text-center">
                 <div className="text-xs text-muted-foreground">Kode Barcode</div>
                 <div className="font-mono font-bold text-sm mt-1 break-all">{pkg.barcode}</div>

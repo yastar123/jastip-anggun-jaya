@@ -72,55 +72,55 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string) {
 <head>
   <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm; }
+    @page { size: 100mm 100mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Arial', sans-serif; background: #fff; height: calc(297mm - 24mm); display: flex; align-items: stretch; }
-    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
-    .header { background: #c00; color: #fff; padding: 14px 20px; }
-    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
-    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
-    .body-wrap { flex: 1; display: flex; flex-direction: row; align-items: stretch; }
-    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; border-right: 2px dashed #ddd; min-width: 180px; }
-    .qr-wrap img { width: 150px; height: 150px; display: block; }
-    .qr-label { font-size: 8px; color: #999; margin-top: 6px; font-family: monospace; text-align:center; word-break:break-all; max-width:150px; }
-    .info-section { flex: 1; padding: 16px 20px; }
-    .customer { font-size: 20px; font-weight: 900; color: #111; margin-bottom: 12px; border-bottom: 1.5px solid #eee; padding-bottom: 10px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
-    .info-item { display: flex; flex-direction: column; gap: 2px; }
-    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
-    .info-value { font-size: 12px; font-weight: 700; color: #111; line-height: 1.3; }
-    .info-value.mono { font-family: monospace; font-size: 11px; }
-    .info-value.red { color: #c00; font-size: 14px; }
-    .full { grid-column: 1 / -1; }
-    .status { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; background: ${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"}; color: ${pkg.status === "diserahkan" ? "#166534" : "#713f12"}; }
-    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 8px 20px; font-size: 9px; color: #aaa; text-align: center; }
+    body { font-family: Arial, sans-serif; background: #fff; width: 100mm; height: 100mm; overflow: hidden; }
+    .label { width: 100mm; height: 100mm; display: flex; flex-direction: column; border: 1.5px solid #222; }
+    .header { background: #c00; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
+    .brand-name { font-size: 11pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
+    .brand-sub { font-size: 5pt; opacity: 0.85; margin-top: 1px; }
+    .body-wrap { flex: 1; display: flex; flex-direction: row; min-height: 0; }
+    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3mm 2.5mm; border-right: 1px dashed #ccc; width: 32mm; flex-shrink: 0; }
+    .qr-wrap img { width: 26mm; height: 26mm; display: block; }
+    .qr-label { font-size: 4pt; color: #999; margin-top: 1.5mm; font-family: monospace; text-align: center; word-break: break-all; max-width: 26mm; line-height: 1.2; }
+    .info-section { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
+    .customer { font-size: 10pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+    .row { display: flex; gap: 1.5mm; margin-bottom: 1mm; }
+    .item { flex: 1; }
+    .lbl { font-size: 4.5pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
+    .val { font-size: 7pt; font-weight: 700; color: #111; line-height: 1.2; }
+    .val.mono { font-family: monospace; font-size: 6.5pt; }
+    .val.red { color: #c00; font-size: 8pt; }
+    .footer { background: #f8f8f8; border-top: 0.5px solid #eee; padding: 1.5mm 3mm; font-size: 4.5pt; color: #aaa; text-align: center; flex-shrink: 0; }
   </style>
 </head>
 <body>
   <div class="label">
     <div class="header">
       <div class="brand-name">JASTIP ANGGUN JAYA</div>
-      <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+      <div class="brand-sub">Jakarta · Surabaya → Manokwari, Papua</div>
     </div>
     <div class="body-wrap">
       <div class="qr-wrap">
-        <img src="${qrDataUrl}" alt="QR Code" />
+        <img src="${qrDataUrl}" alt="QR" />
         <div class="qr-label">${qrValue}</div>
       </div>
       <div class="info-section">
         <div class="customer">${pkg.customerName || "-"}</div>
-        <div class="info-grid">
-          <div class="info-item"><span class="info-label">No. Resi</span><span class="info-value mono">${pkg.resiNumber || "-"}</span></div>
-          <div class="info-item"><span class="info-label">No. Paket</span><span class="info-value mono">${pkg.packageNumber || "-"}</span></div>
-          <div class="info-item"><span class="info-label">Tanggal</span><span class="info-value">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</span></div>
-          <div class="info-item"><span class="info-label">Status</span><span class="info-value"><span class="status">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></span></div>
-          <div class="info-item"><span class="info-label">Jenis Jastip</span><span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span></div>
-          <div class="info-item"><span class="info-label">Rute</span><span class="info-value">${pkg.deliveryRoute || "-"}</span></div>
-          <div class="info-item"><span class="info-label">Berat Real</span><span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span></div>
-          <div class="info-item"><span class="info-label">Berat Digunakan</span><span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span></div>
-          <div class="info-item"><span class="info-label">Jenis Paking</span><span class="info-value">${pkg.packagingType || "-"}</span></div>
-          ${pkg.serviceType === "jastip kargo" ? `<div class="info-item"><span class="info-label">Jenis Barang</span><span class="info-value">${pkg.itemName || "-"}</span></div>` : ""}
-          <div class="info-item"><span class="info-label">Total Ongkir</span><span class="info-value red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span></div>
+        <div class="row">
+          <div class="item"><div class="lbl">No. Resi</div><div class="val mono">${pkg.resiNumber || "-"}</div></div>
+          <div class="item"><div class="lbl">No. Paket</div><div class="val mono">${pkg.packageNumber || "-"}</div></div>
+        </div>
+        <div class="row">
+          <div class="item"><div class="lbl">Jenis Jastip</div><div class="val">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+          <div class="item"><div class="lbl">Tanggal</div><div class="val">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"}</div></div>
+        </div>
+        <div class="row">
+          <div class="item"><div class="lbl">Berat Pakai</div><div class="val">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
+          <div class="item"><div class="lbl">Jenis Paking</div><div class="val">${pkg.packagingType || "-"}</div></div>
+        </div>
+        <div class="row">
+          <div class="item"><div class="lbl">Total Ongkir</div><div class="val red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
         </div>
       </div>
     </div>
