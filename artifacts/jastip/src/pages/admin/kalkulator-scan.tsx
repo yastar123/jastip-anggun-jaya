@@ -219,8 +219,15 @@ export default function KalkulatorScan() {
         packageSummary: items.map((i) => ({
           id: i.id,
           resiNumber: i.resiNumber,
+          packageNumber: i.packageNumber,
           customerName: i.customerName,
+          serviceType: i.serviceType,
+          deliveryRoute: i.deliveryRoute,
+          packagingType: i.packagingType,
+          realWeight: i.realWeight,
+          usedWeight: i.usedWeight,
           totalShipping: i.totalShipping,
+          packageDate: i.packageDate,
         })),
       };
 

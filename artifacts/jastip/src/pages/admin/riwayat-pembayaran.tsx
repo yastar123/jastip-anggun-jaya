@@ -184,26 +184,75 @@ export default function RiwayatPembayaran() {
                       </Button>
                     </div>
 
-                    {isExpanded && pkgSummary.length > 0 && (
-                      <div className="px-5 pb-4">
-                        <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Detail Paket</p>
-                          {pkgSummary.map((pkg: any, i: number) => (
-                            <div key={i} className="flex justify-between text-sm">
-                              <div>
-                                <span className="font-medium">{pkg.customerName}</span>
-                                <span className="text-xs text-muted-foreground ml-2 font-mono">{pkg.resiNumber}</span>
+                    {isExpanded && (
+                      <div className="px-5 pb-4 space-y-3">
+                        {pkgSummary.length > 0 ? (
+                          pkgSummary.map((pkg: any, i: number) => (
+                            <div key={i} className="bg-muted/30 rounded-lg p-3 border border-border/50">
+                              <div className="flex items-start justify-between mb-2.5">
+                                <div>
+                                  <p className="font-bold text-sm">{pkg.customerName || "-"}</p>
+                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{pkg.resiNumber || "-"}</p>
+                                </div>
+                                <span className="font-black text-base text-primary">{formatRp(pkg.totalShipping)}</span>
                               </div>
-                              <span className="font-semibold text-primary">{formatRp(pkg.totalShipping)}</span>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs border-t pt-2.5">
+                                {pkg.packageNumber && (
+                                  <div>
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">No. Paket</p>
+                                    <p className="font-mono font-semibold">{pkg.packageNumber}</p>
+                                  </div>
+                                )}
+                                {pkg.packageDate && (
+                                  <div>
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Tanggal</p>
+                                    <p>{new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                                  </div>
+                                )}
+                                {pkg.serviceType && (
+                                  <div>
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Jastip</p>
+                                    <p className="capitalize">{pkg.serviceType}</p>
+                                  </div>
+                                )}
+                                {pkg.deliveryRoute && (
+                                  <div className="col-span-2 md:col-span-1">
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Rute</p>
+                                    <p>{pkg.deliveryRoute}</p>
+                                  </div>
+                                )}
+                                {pkg.realWeight != null && (
+                                  <div>
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Real</p>
+                                    <p className="font-semibold">{pkg.realWeight} Kg</p>
+                                  </div>
+                                )}
+                                {pkg.usedWeight != null && (
+                                  <div>
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Digunakan</p>
+                                    <p className="font-semibold">{pkg.usedWeight} Kg</p>
+                                  </div>
+                                )}
+                                {pkg.packagingType && (
+                                  <div>
+                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Paking</p>
+                                    <p className="capitalize">{pkg.packagingType}</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          ))}
-                          {p.paymentType === "tunai" && p.paidAmount != null && (
-                            <div className="border-t pt-2 mt-2 flex justify-between text-xs text-muted-foreground">
-                              <span>Dibayar: {formatRp(p.paidAmount)}</span>
-                              <span>Kembalian: {formatRp(p.changeAmount)}</span>
-                            </div>
-                          )}
-                        </div>
+                          ))
+                        ) : (
+                          <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground text-center">
+                            Data paket tidak tersedia
+                          </div>
+                        )}
+                        {p.paymentType === "tunai" && p.paidAmount != null && (
+                          <div className="flex justify-between text-xs text-muted-foreground bg-muted/20 rounded-md px-3 py-2">
+                            <span>Dibayar: <span className="font-semibold text-foreground">{formatRp(p.paidAmount)}</span></span>
+                            <span>Kembalian: <span className="font-semibold text-foreground">{formatRp(p.changeAmount)}</span></span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
