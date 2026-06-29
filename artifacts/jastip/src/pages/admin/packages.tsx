@@ -5,14 +5,27 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { Pagination } from "@/components/pagination";
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { Plus, Search, FileSpreadsheet, Barcode, Download } from "lucide-react";
+import { useLocation } from "wouter";
+import { Search, FileDown, X } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import * as XLSX from "xlsx";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const PAGE_SIZE = 10;
+
+const JENIS_JASTIP = [
+  "Jastip Cargo",
+  "Jastip Hemat+",
+  "Jastip Pelni",
+  "Jastip Pesawat",
+  "Jasa Belanja",
+];
 
 function formatRp(n: any) {
   if (!n) return "-";
@@ -33,6 +46,11 @@ export default function AdminPackages() {
   const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
 
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfJenis, setPdfJenis] = useState<string>("all");
+  const [pdfDateFrom, setPdfDateFrom] = useState("");
+  const [pdfDateTo, setPdfDateTo] = useState("");
+
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
     status: status === "all" ? undefined : (status as PackageStatus),
@@ -45,33 +63,102 @@ export default function AdminPackages() {
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleStatus(v: string) { setStatus(v); setPage(1); }
 
-  function exportExcel() {
+  function exportPdf() {
     if (!packages || packages.length === 0) return;
-    const rows = packages.map((p: any) => ({
-      "Tanggal": formatDate(p.packageDate || p.createdAt),
-      "No Resi": p.resiNumber || "",
-      "No Paket": p.packageNumber || "",
-      "Nama Konsumen": p.customerName || "",
-      "Jenis Jastip": p.serviceType || "",
-      "Rute": p.deliveryRoute || "",
-      "Jenis Barang": p.itemName || "",
-      "Berat Real (Kg)": p.realWeight ?? "",
-      "P (cm)": p.length ?? "",
-      "L (cm)": p.width ?? "",
-      "T (cm)": p.height ?? "",
-      "Berat Volume (Kg)": p.volumeWeight ?? "",
-      "Jenis Paking": packagingLabel(p.packagingType),
-      "Berat Digunakan (Kg)": p.usedWeight ?? "",
-      "Ongkir/Kg": p.shippingRate ?? "",
-      "Total Berat (Kg)": p.totalWeight ?? "",
-      "Total Ongkir": p.totalShipping ?? "",
-      "Status": p.status === "diserahkan" ? "Diserahkan" : "Pending",
-      "Barcode": p.barcode || "",
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Paket");
-    XLSX.writeFile(wb, `data-paket-${new Date().toISOString().split("T")[0]}.xlsx`);
+
+    let filtered = [...packages] as any[];
+
+    if (pdfJenis !== "all") {
+      filtered = filtered.filter((p) =>
+        (p.serviceType || "").toLowerCase() === pdfJenis.toLowerCase()
+      );
+    }
+
+    if (pdfDateFrom) {
+      const from = new Date(pdfDateFrom);
+      from.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((p) => {
+        const d = new Date(p.packageDate || p.createdAt);
+        return d >= from;
+      });
+    }
+
+    if (pdfDateTo) {
+      const to = new Date(pdfDateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((p) => {
+        const d = new Date(p.packageDate || p.createdAt);
+        return d <= to;
+      });
+    }
+
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+    const judul = pdfJenis !== "all" ? pdfJenis : "Semua Jenis Jastip";
+    const periodeFrom = pdfDateFrom ? new Date(pdfDateFrom).toLocaleDateString("id-ID") : "-";
+    const periodeTo = pdfDateTo ? new Date(pdfDateTo).toLocaleDateString("id-ID") : "-";
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Jastip Anggun Jaya — Laporan Paket", 14, 14);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Jenis Jastip : ${judul}`, 14, 21);
+    doc.text(`Periode      : ${periodeFrom} s/d ${periodeTo}`, 14, 26);
+    doc.text(`Dicetak      : ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, 14, 31);
+    doc.text(`Total Paket  : ${filtered.length} paket`, 14, 36);
+
+    const rows = filtered.map((p: any, i: number) => [
+      i + 1,
+      formatDate(p.packageDate || p.createdAt),
+      p.resiNumber || "-",
+      p.packageNumber || "-",
+      p.customerName || "-",
+      p.serviceType || "-",
+      p.itemName || "-",
+      p.realWeight ?? "-",
+      p.usedWeight ?? "-",
+      packagingLabel(p.packagingType),
+      p.totalWeight ?? "-",
+      p.totalShipping ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
+      p.status === "diserahkan" ? "Diserahkan" : "Pending",
+    ]);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [[
+        "No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen",
+        "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan",
+        "Paking", "Total Berat", "Total Ongkir", "Status",
+      ]],
+      body: rows,
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [200, 30, 30], textColor: 255, fontStyle: "bold", fontSize: 7 },
+      alternateRowStyles: { fillColor: [250, 245, 245] },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 8 },
+        1: { cellWidth: 18 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 18 },
+        7: { halign: "right", cellWidth: 16 },
+        8: { halign: "right", cellWidth: 18 },
+        10: { halign: "right", cellWidth: 16 },
+        11: { halign: "right", cellWidth: 24 },
+        12: { halign: "center", cellWidth: 18 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    const namaFile = [
+      "laporan-paket",
+      pdfJenis !== "all" ? pdfJenis.replace(/\s+/g, "-").toLowerCase() : "semua",
+      pdfDateFrom || "awal",
+      pdfDateTo || "akhir",
+    ].join("_") + ".pdf";
+
+    doc.save(namaFile);
+    setPdfOpen(false);
   }
 
   return (
@@ -81,30 +168,15 @@ export default function AdminPackages() {
           <h1 className="text-3xl font-bold tracking-tight">Semua Paket</h1>
           <p className="text-muted-foreground mt-1">Kelola data paket pelanggan.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={exportExcel} disabled={!packages || packages.length === 0}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Excel
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/packages/import">
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Import Excel
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/barcode">
-              <Barcode className="w-4 h-4 mr-2" />
-              Label Barcode
-            </Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/admin/packages/type">
-              <Plus className="w-4 h-4 mr-2" />
-              Input Paket Baru
-            </Link>
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPdfOpen(true)}
+          disabled={!packages || packages.length === 0}
+        >
+          <FileDown className="w-4 h-4 mr-2" />
+          Export PDF
+        </Button>
       </div>
 
       <Card>
@@ -170,6 +242,67 @@ export default function AdminPackages() {
         </CardContent>
         <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
+
+      <Dialog open={pdfOpen} onOpenChange={setPdfOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="w-5 h-5 text-primary" />
+              Export Laporan PDF
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Jenis Jastip</Label>
+              <Select value={pdfJenis} onValueChange={setPdfJenis}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih jenis jastip" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Jenis</SelectItem>
+                  {JENIS_JASTIP.map((j) => (
+                    <SelectItem key={j} value={j}>{j}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Tanggal Dari</Label>
+                <Input
+                  type="date"
+                  value={pdfDateFrom}
+                  onChange={(e) => setPdfDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tanggal Sampai</Label>
+                <Input
+                  type="date"
+                  value={pdfDateTo}
+                  onChange={(e) => setPdfDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+            {(pdfJenis !== "all" || pdfDateFrom || pdfDateTo) && (
+              <button
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                onClick={() => { setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); }}
+              >
+                <X className="w-3 h-3 inline mr-1" />
+                Reset filter
+              </button>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setPdfOpen(false)}>Batal</Button>
+            <Button onClick={exportPdf} disabled={!packages || packages.length === 0}>
+              <FileDown className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
