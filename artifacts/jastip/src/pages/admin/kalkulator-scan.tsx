@@ -503,29 +503,6 @@ export default function KalkulatorScan() {
             {paymentType === "tunai" && (
               <>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2 font-medium">Nominal Cepat</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {quickAmounts.slice(0, 6).map((amt) => (
-                      <button
-                        key={amt}
-                        type="button"
-                        className="text-xs px-2.5 py-1 rounded-md border hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium"
-                        onClick={() => setUangDibayar(amt.toLocaleString("id-ID"))}
-                      >
-                        {formatRp(amt)}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      className="text-xs px-2.5 py-1 rounded-md border hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium"
-                      onClick={() => setUangDibayar(totalTagihan.toLocaleString("id-ID"))}
-                    >
-                      Pas
-                    </button>
-                  </div>
-                </div>
-
-                <div>
                   <label className="text-sm font-semibold block mb-1.5">Uang Diterima dari Customer</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
