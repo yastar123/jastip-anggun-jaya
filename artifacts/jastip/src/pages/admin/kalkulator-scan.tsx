@@ -9,8 +9,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Calculator, Camera, X, Hash, Trash2, ScanLine, CheckCircle2,
-  ShoppingCart, Upload, RotateCcw,
+  Calculator, Camera, X, Hash, Trash2, CheckCircle2,
+  ShoppingCart, Upload, RotateCcw, Banknote, CreditCard, Clock,
 } from "lucide-react";
 
 function formatRp(n: number | string | null | undefined) {
@@ -28,6 +28,14 @@ interface ScannedItem {
   packageNumber?: string;
 }
 
+type PaymentType = "tunai" | "transfer" | "piutang";
+
+const PAYMENT_TYPES: { value: PaymentType; label: string; icon: any; desc: string; color: string }[] = [
+  { value: "tunai", label: "Tunai", icon: Banknote, desc: "Bayar cash langsung", color: "green" },
+  { value: "transfer", label: "Transfer", icon: CreditCard, desc: "Transfer bank / QRIS", color: "blue" },
+  { value: "piutang", label: "Piutang", icon: Clock, desc: "Bayar nanti / hutang", color: "orange" },
+];
+
 export default function KalkulatorScan() {
   const { toast } = useToast();
 
@@ -38,6 +46,8 @@ export default function KalkulatorScan() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [uangDibayar, setUangDibayar] = useState("");
   const [lastScanCode, setLastScanCode] = useState("");
+  const [paymentType, setPaymentType] = useState<PaymentType>("tunai");
+  const [isSaving, setIsSaving] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -181,11 +191,13 @@ export default function KalkulatorScan() {
     setManualInput("");
     setUangDibayar("");
     setLastScanCode("");
+    setPaymentType("tunai");
     stopCamera();
   }
 
   function openPayModal() {
     setUangDibayar("");
+    setPaymentType("tunai");
     setShowPayModal(true);
   }
 
@@ -194,13 +206,60 @@ export default function KalkulatorScan() {
     setUangDibayar(digits ? Number(digits).toLocaleString("id-ID") : "");
   }
 
+  async function handleKonfirmasiBayar() {
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem("jaj_token");
+      const body = {
+        paymentType,
+        totalAmount: totalTagihan,
+        paidAmount: paymentType === "tunai" ? uangNum : null,
+        changeAmount: paymentType === "tunai" ? kembalian : null,
+        packageIds: items.map((i) => i.id),
+        packageSummary: items.map((i) => ({
+          id: i.id,
+          resiNumber: i.resiNumber,
+          customerName: i.customerName,
+          totalShipping: i.totalShipping,
+        })),
+      };
+
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) throw new Error("Gagal menyimpan");
+
+      const typeLabel = PAYMENT_TYPES.find((t) => t.value === paymentType)?.label || paymentType;
+      toast({
+        title: "✓ Pembayaran Selesai",
+        description: `${typeLabel} — ${formatRp(totalTagihan)}${paymentType === "tunai" ? ` | Kembalian: ${formatRp(kembalian)}` : ""}`,
+      });
+      setShowPayModal(false);
+      resetAll();
+    } catch {
+      toast({ variant: "destructive", title: "Gagal menyimpan pembayaran", description: "Coba lagi." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const quickAmounts = [
     50000, 100000, 150000, 200000, 300000, 500000, 1000000,
   ].filter((a) => a >= totalTagihan - 10000);
 
+  const canConfirm =
+    paymentType === "piutang" ||
+    paymentType === "transfer" ||
+    (paymentType === "tunai" && uangNum >= totalTagihan);
+
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
@@ -220,18 +279,13 @@ export default function KalkulatorScan() {
       <div className="grid lg:grid-cols-5 gap-5">
         {/* LEFT: Scan controls */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Camera scanner area */}
           <div
             id={SCANNER_ID}
             className={scanMode === "camera" ? "w-full rounded-xl overflow-hidden border shadow-sm" : "hidden"}
           />
 
-          {/* Camera toggle */}
           {scanMode === "idle" ? (
-            <Card
-              className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
-              onClick={startCamera}
-            >
+            <Card className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all" onClick={startCamera}>
               <CardContent className="flex items-center gap-3 py-4">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                   <Camera className="w-5 h-5 text-primary" />
@@ -260,7 +314,6 @@ export default function KalkulatorScan() {
             </Card>
           )}
 
-          {/* Upload image */}
           <Card>
             <CardContent className="flex items-center gap-3 py-4">
               <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
@@ -277,7 +330,6 @@ export default function KalkulatorScan() {
             </CardContent>
           </Card>
 
-          {/* Manual input */}
           <Card>
             <CardHeader className="pb-2 pt-4 px-4">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -309,16 +361,13 @@ export default function KalkulatorScan() {
 
         {/* RIGHT: Items list + total */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Running total bar */}
           <Card className={`border-2 ${items.length > 0 ? "border-primary/40 bg-primary/5" : "border-dashed"}`}>
             <CardContent className="py-4 px-5">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Total Tagihan</p>
                   <p className="text-3xl font-black text-primary mt-0.5">{formatRp(totalTagihan)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {items.length} paket discan
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{items.length} paket discan</p>
                 </div>
                 <div className="text-right">
                   {isLooking && (
@@ -341,7 +390,6 @@ export default function KalkulatorScan() {
             </CardContent>
           </Card>
 
-          {/* Scanned items list */}
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
               <ShoppingCart className="h-12 w-12 mb-3 opacity-20" />
@@ -386,8 +434,6 @@ export default function KalkulatorScan() {
                   </CardContent>
                 </Card>
               ))}
-
-              {/* Bottom total row */}
               <div className="flex items-center justify-between px-4 py-2 bg-muted/50 rounded-lg border">
                 <span className="text-sm font-semibold text-muted-foreground">{items.length} paket</span>
                 <span className="font-black text-primary">{formatRp(totalTagihan)}</span>
@@ -425,79 +471,124 @@ export default function KalkulatorScan() {
               </div>
             </div>
 
-            {/* Quick amounts */}
+            {/* Payment type */}
             <div>
-              <p className="text-xs text-muted-foreground mb-2 font-medium">Nominal Cepat</p>
-              <div className="flex flex-wrap gap-1.5">
-                {quickAmounts.slice(0, 6).map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    className="text-xs px-2.5 py-1 rounded-md border hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium"
-                    onClick={() => setUangDibayar(amt.toLocaleString("id-ID"))}
-                  >
-                    {formatRp(amt)}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="text-xs px-2.5 py-1 rounded-md border hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium"
-                  onClick={() => setUangDibayar(totalTagihan.toLocaleString("id-ID"))}
-                >
-                  Pas
-                </button>
+              <p className="text-sm font-semibold mb-2">Jenis Pembayaran</p>
+              <div className="grid grid-cols-3 gap-2">
+                {PAYMENT_TYPES.map((pt) => {
+                  const Icon = pt.icon;
+                  const isSelected = paymentType === pt.value;
+                  const colorMap: Record<string, string> = {
+                    green: isSelected ? "border-green-500 bg-green-50 text-green-700" : "hover:border-green-300",
+                    blue: isSelected ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:border-blue-300",
+                    orange: isSelected ? "border-orange-500 bg-orange-50 text-orange-700" : "hover:border-orange-300",
+                  };
+                  return (
+                    <button
+                      key={pt.value}
+                      type="button"
+                      onClick={() => setPaymentType(pt.value)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center ${colorMap[pt.color]} ${!isSelected ? "border-muted" : ""}`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs font-bold">{pt.label}</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">{pt.desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Uang diterima */}
-            <div>
-              <label className="text-sm font-semibold block mb-1.5">Uang Diterima dari Customer</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
-                <Input
-                  className="pl-9 text-lg font-bold"
-                  placeholder="0"
-                  value={uangDibayar}
-                  onChange={(e) => handleUangInput(e.target.value)}
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {/* Kembalian */}
-            <div className={`rounded-xl p-4 border-2 ${
-              uangNum === 0
-                ? "border-dashed bg-muted/30"
-                : kembalian >= 0
-                  ? "border-green-400 bg-green-50"
-                  : "border-red-400 bg-red-50"
-            }`}>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Kembalian</p>
-              {uangNum === 0 ? (
-                <p className="text-2xl font-black text-muted-foreground">—</p>
-              ) : kembalian >= 0 ? (
-                <p className="text-2xl font-black text-green-700">{formatRp(kembalian)}</p>
-              ) : (
+            {/* Uang diterima — hanya untuk tunai */}
+            {paymentType === "tunai" && (
+              <>
                 <div>
-                  <p className="text-2xl font-black text-red-600">{formatRp(kembalian)}</p>
-                  <p className="text-xs text-red-500 mt-1">Uang kurang {formatRp(Math.abs(kembalian))}</p>
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">Nominal Cepat</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickAmounts.slice(0, 6).map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        className="text-xs px-2.5 py-1 rounded-md border hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium"
+                        onClick={() => setUangDibayar(amt.toLocaleString("id-ID"))}
+                      >
+                        {formatRp(amt)}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="text-xs px-2.5 py-1 rounded-md border hover:bg-primary hover:text-white hover:border-primary transition-colors font-medium"
+                      onClick={() => setUangDibayar(totalTagihan.toLocaleString("id-ID"))}
+                    >
+                      Pas
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div>
+                  <label className="text-sm font-semibold block mb-1.5">Uang Diterima dari Customer</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
+                    <Input
+                      className="pl-9 text-lg font-bold"
+                      placeholder="0"
+                      value={uangDibayar}
+                      onChange={(e) => handleUangInput(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className={`rounded-xl p-4 border-2 ${
+                  uangNum === 0 ? "border-dashed bg-muted/30"
+                    : kembalian >= 0 ? "border-green-400 bg-green-50"
+                    : "border-red-400 bg-red-50"
+                }`}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Kembalian</p>
+                  {uangNum === 0 ? (
+                    <p className="text-2xl font-black text-muted-foreground">—</p>
+                  ) : kembalian >= 0 ? (
+                    <p className="text-2xl font-black text-green-700">{formatRp(kembalian)}</p>
+                  ) : (
+                    <div>
+                      <p className="text-2xl font-black text-red-600">{formatRp(kembalian)}</p>
+                      <p className="text-xs text-red-500 mt-1">Uang kurang {formatRp(Math.abs(kembalian))}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {paymentType === "transfer" && (
+              <div className="rounded-xl p-4 border-2 border-blue-200 bg-blue-50 text-blue-800 text-sm text-center">
+                <CreditCard className="w-6 h-6 mx-auto mb-1" />
+                <p className="font-semibold">Transfer / QRIS</p>
+                <p className="text-xs text-blue-600 mt-1">Pastikan pembayaran sudah diterima sebelum konfirmasi</p>
+              </div>
+            )}
+
+            {paymentType === "piutang" && (
+              <div className="rounded-xl p-4 border-2 border-orange-200 bg-orange-50 text-orange-800 text-sm text-center">
+                <Clock className="w-6 h-6 mx-auto mb-1" />
+                <p className="font-semibold">Piutang / Bayar Nanti</p>
+                <p className="text-xs text-orange-600 mt-1">Tercatat sebagai hutang customer</p>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowPayModal(false)}>Batal</Button>
+            <Button variant="outline" onClick={() => setShowPayModal(false)} disabled={isSaving}>Batal</Button>
             <Button
               className="bg-green-600 hover:bg-green-700 flex-1 gap-2"
-              disabled={uangNum < totalTagihan}
-              onClick={() => {
-                setShowPayModal(false);
-                toast({ title: "✓ Pembayaran Selesai", description: `Kembalian: ${formatRp(kembalian)}` });
-                resetAll();
-              }}
+              disabled={!canConfirm || isSaving}
+              onClick={handleKonfirmasiBayar}
             >
-              <CheckCircle2 className="h-4 w-4" /> Konfirmasi Bayar
+              {isSaving ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Konfirmasi Bayar
             </Button>
           </DialogFooter>
         </DialogContent>

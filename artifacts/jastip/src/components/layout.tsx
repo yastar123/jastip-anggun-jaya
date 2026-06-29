@@ -31,6 +31,7 @@ import {
   UserCircle,
   ShieldCheck,
   Calculator,
+  History,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: any; exact?: boolean };
@@ -53,6 +54,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine, exact: true },
     { name: "Verifikasi Paket", href: "/admin/verify", icon: ShieldCheck, exact: true },
     { name: "Kalkulator Scan", href: "/admin/kalkulator-scan", icon: Calculator, exact: true },
+    { name: "Riwayat Pembayaran", href: "/admin/riwayat-pembayaran", icon: History, exact: true },
     { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
   ];
 
