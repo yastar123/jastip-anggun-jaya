@@ -253,10 +253,6 @@ export default function RiwayatPembayaran() {
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Digunakan</p>
                                   <p className="font-semibold">{pkg2.usedWeight != null ? `${pkg2.usedWeight} Kg` : "-"}</p>
                                 </div>
-                                <div>
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Paking</p>
-                                  <p className="capitalize">{pkg2.packagingType || "-"}</p>
-                                </div>
                               </div>
                             </div>
                           ); })
