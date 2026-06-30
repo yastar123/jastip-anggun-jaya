@@ -9,6 +9,13 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Banknote, CreditCard, Clock, History, ChevronDown, ChevronUp } from "lucide-react";
 
+async function fetchAllPackages() {
+  const token = localStorage.getItem("jaj_token");
+  const res = await fetch("/api/packages", { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) return [];
+  return res.json();
+}
+
 const PAGE_SIZE = 10;
 
 function formatRp(n: any) {
@@ -66,6 +73,31 @@ export default function RiwayatPembayaran() {
     queryKey: ["payments", filterType],
     queryFn: () => fetchPayments(filterType),
   });
+
+  const { data: allPackages = [] } = useQuery({
+    queryKey: ["packages-all"],
+    queryFn: fetchAllPackages,
+  });
+
+  // Build a lookup map: packageId → package object
+  const pkgMap: Record<number, any> = {};
+  for (const p of allPackages) {
+    pkgMap[p.id] = p;
+  }
+
+  // Enrich packageSummary entry with live package data for missing fields
+  function enrichPkg(pkg: any) {
+    const live = pkgMap[pkg.id];
+    if (!live) return pkg;
+    return {
+      ...pkg,
+      packageDate:   pkg.packageDate   || live.packageDate,
+      deliveryRoute: pkg.deliveryRoute || live.deliveryRoute,
+      realWeight:    pkg.realWeight    != null ? pkg.realWeight    : live.realWeight,
+      usedWeight:    pkg.usedWeight    != null ? pkg.usedWeight    : live.usedWeight,
+      packagingType: pkg.packagingType || live.packagingType,
+    };
+  }
 
   const total = payments.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -187,47 +219,47 @@ export default function RiwayatPembayaran() {
                     {isExpanded && (
                       <div className="px-5 pb-4 space-y-3">
                         {pkgSummary.length > 0 ? (
-                          pkgSummary.map((pkg: any, i: number) => (
+                          pkgSummary.map((pkg: any, i: number) => { const pkg2 = enrichPkg(pkg); return (
                             <div key={i} className="bg-muted/30 rounded-lg p-3 border border-border/50">
                               <div className="flex items-start justify-between mb-2.5">
                                 <div>
-                                  <p className="font-bold text-sm">{pkg.customerName || "-"}</p>
-                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{pkg.resiNumber || "-"}</p>
+                                  <p className="font-bold text-sm">{pkg2.customerName || "-"}</p>
+                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{pkg2.resiNumber || "-"}</p>
                                 </div>
-                                <span className="font-black text-base text-primary">{formatRp(pkg.totalShipping)}</span>
+                                <span className="font-black text-base text-primary">{formatRp(pkg2.totalShipping)}</span>
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs border-t pt-2.5">
                                 <div>
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">No. Paket</p>
-                                  <p className="font-mono font-semibold">{pkg.packageNumber || "-"}</p>
+                                  <p className="font-mono font-semibold">{pkg2.packageNumber || "-"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Tanggal</p>
-                                  <p>{pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</p>
+                                  <p>{pkg2.packageDate ? new Date(pkg2.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Jastip</p>
-                                  <p className="capitalize">{pkg.serviceType || "-"}</p>
+                                  <p className="capitalize">{pkg2.serviceType || "-"}</p>
                                 </div>
                                 <div className="col-span-2 md:col-span-1">
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Rute</p>
-                                  <p>{pkg.deliveryRoute || "-"}</p>
+                                  <p>{pkg2.deliveryRoute || "-"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Real</p>
-                                  <p className="font-semibold">{pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-"}</p>
+                                  <p className="font-semibold">{pkg2.realWeight != null ? `${pkg2.realWeight} Kg` : "-"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Digunakan</p>
-                                  <p className="font-semibold">{pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-"}</p>
+                                  <p className="font-semibold">{pkg2.usedWeight != null ? `${pkg2.usedWeight} Kg` : "-"}</p>
                                 </div>
                                 <div>
                                   <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Paking</p>
-                                  <p className="capitalize">{pkg.packagingType || "-"}</p>
+                                  <p className="capitalize">{pkg2.packagingType || "-"}</p>
                                 </div>
                               </div>
                             </div>
-                          ))
+                          ); })
                         ) : (
                           <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground text-center">
                             Data paket tidak tersedia

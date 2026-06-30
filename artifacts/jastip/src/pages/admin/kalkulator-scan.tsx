@@ -26,6 +26,11 @@ interface ScannedItem {
   serviceType: string;
   totalShipping: number;
   packageNumber?: string;
+  deliveryRoute?: string;
+  realWeight?: number | null;
+  usedWeight?: number | null;
+  packagingType?: string;
+  packageDate?: string;
 }
 
 type PaymentType = "tunai" | "transfer" | "piutang";
@@ -100,6 +105,11 @@ export default function KalkulatorScan() {
         serviceType: pkg.serviceType || "",
         totalShipping: Number(pkg.totalShipping ?? 0),
         packageNumber: pkg.packageNumber || "",
+        deliveryRoute: pkg.deliveryRoute || "",
+        realWeight: pkg.realWeight != null ? Number(pkg.realWeight) : null,
+        usedWeight: pkg.usedWeight != null ? Number(pkg.usedWeight) : null,
+        packagingType: pkg.packagingType || "",
+        packageDate: pkg.packageDate || "",
       };
       setItems((prev) => [...prev, newItem]);
       toast({
