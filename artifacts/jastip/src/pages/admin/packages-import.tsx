@@ -99,12 +99,10 @@ const TEMPLATE_STANDARD = [
   { header: "Nama Konsumen",    key: "customerName",  example: "BUDI",      required: true },
   { header: "No Resi",          key: "resiNumber",    example: "JNE-001",   required: true },
   { header: "No Paket",         key: "packageNumber", example: "PKT-001",   required: false },
-  { header: "Jenis Barang",     key: "itemName",      example: "Sepatu",    required: false },
   { header: "Berat Real (Kg)",  key: "realWeight",    example: "1.5",       required: true },
   { header: "Panjang (cm)",     key: "length",        example: "30",        required: false },
   { header: "Lebar (cm)",       key: "width",         example: "20",        required: false },
   { header: "Tinggi (cm)",      key: "height",        example: "15",        required: false },
-  { header: "Jenis Paking",     key: "packagingType", example: "karton",    required: false },
 ];
 
 const TEMPLATE_KARGO = [
