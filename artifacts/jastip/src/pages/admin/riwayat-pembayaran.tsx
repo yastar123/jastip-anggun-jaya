@@ -9,7 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Banknote, CreditCard, Clock, History, ChevronDown, ChevronUp } from "lucide-react";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 function formatRp(n: any) {
   if (!n) return "Rp 0";
@@ -197,48 +197,34 @@ export default function RiwayatPembayaran() {
                                 <span className="font-black text-base text-primary">{formatRp(pkg.totalShipping)}</span>
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs border-t pt-2.5">
-                                {pkg.packageNumber && (
-                                  <div>
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">No. Paket</p>
-                                    <p className="font-mono font-semibold">{pkg.packageNumber}</p>
-                                  </div>
-                                )}
-                                {pkg.packageDate && (
-                                  <div>
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Tanggal</p>
-                                    <p>{new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</p>
-                                  </div>
-                                )}
-                                {pkg.serviceType && (
-                                  <div>
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Jastip</p>
-                                    <p className="capitalize">{pkg.serviceType}</p>
-                                  </div>
-                                )}
-                                {pkg.deliveryRoute && (
-                                  <div className="col-span-2 md:col-span-1">
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Rute</p>
-                                    <p>{pkg.deliveryRoute}</p>
-                                  </div>
-                                )}
-                                {pkg.realWeight != null && (
-                                  <div>
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Real</p>
-                                    <p className="font-semibold">{pkg.realWeight} Kg</p>
-                                  </div>
-                                )}
-                                {pkg.usedWeight != null && (
-                                  <div>
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Digunakan</p>
-                                    <p className="font-semibold">{pkg.usedWeight} Kg</p>
-                                  </div>
-                                )}
-                                {pkg.packagingType && (
-                                  <div>
-                                    <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Paking</p>
-                                    <p className="capitalize">{pkg.packagingType}</p>
-                                  </div>
-                                )}
+                                <div>
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">No. Paket</p>
+                                  <p className="font-mono font-semibold">{pkg.packageNumber || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Tanggal</p>
+                                  <p>{pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Jastip</p>
+                                  <p className="capitalize">{pkg.serviceType || "-"}</p>
+                                </div>
+                                <div className="col-span-2 md:col-span-1">
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Rute</p>
+                                  <p>{pkg.deliveryRoute || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Real</p>
+                                  <p className="font-semibold">{pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Digunakan</p>
+                                  <p className="font-semibold">{pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Paking</p>
+                                  <p className="capitalize">{pkg.packagingType || "-"}</p>
+                                </div>
                               </div>
                             </div>
                           ))
