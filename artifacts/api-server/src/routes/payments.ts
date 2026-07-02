@@ -74,4 +74,49 @@ router.post(
   },
 );
 
+router.patch(
+  "/:id/bayar",
+  requireAuth,
+  requireRole("admin", "owner"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { paymentType, paidAmount, changeAmount } = req.body;
+
+      if (!paymentType || !["tunai", "transfer"].includes(paymentType)) {
+        return res.status(400).json({ error: "Jenis pembayaran tidak valid" });
+      }
+
+      const existing = await db
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.id, id))
+        .limit(1);
+
+      if (!existing[0]) {
+        return res.status(404).json({ error: "Data pembayaran tidak ditemukan" });
+      }
+
+      if (existing[0].paymentType !== "piutang") {
+        return res.status(400).json({ error: "Hanya pembayaran piutang yang dapat diubah" });
+      }
+
+      const [updated] = await db
+        .update(paymentsTable)
+        .set({
+          paymentType,
+          paidAmount: paidAmount != null ? String(paidAmount) : String(existing[0].totalAmount),
+          changeAmount: changeAmount != null ? String(changeAmount) : "0",
+        })
+        .where(eq(paymentsTable.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (err) {
+      (req as any).log?.error?.(err);
+      res.status(500).json({ error: "Gagal memperbarui pembayaran" });
+    }
+  },
+);
+
 export default router;

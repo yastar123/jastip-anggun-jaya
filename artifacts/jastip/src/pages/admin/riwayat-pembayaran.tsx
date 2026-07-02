@@ -6,8 +6,12 @@ import { Pagination } from "@/components/pagination";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import { Banknote, CreditCard, Clock, History, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Banknote, CreditCard, Clock, History, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 async function fetchAllPackages() {
   const token = localStorage.getItem("jaj_token");
@@ -64,10 +68,30 @@ async function fetchPayments(paymentType: string) {
   return res.json();
 }
 
+async function bayarPiutang(id: number, paymentType: "tunai" | "transfer") {
+  const token = localStorage.getItem("jaj_token");
+  const res = await fetch(`/api/payments/${id}/bayar`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ paymentType }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Gagal memperbarui pembayaran");
+  }
+  return res.json();
+}
+
 export default function RiwayatPembayaran() {
   const [filterType, setFilterType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [dialogPayment, setDialogPayment] = useState<any | null>(null);
+
+  const queryClient = useQueryClient();
 
   const { data: payments = [], isLoading, error } = useQuery({
     queryKey: ["payments", filterType],
@@ -79,13 +103,24 @@ export default function RiwayatPembayaran() {
     queryFn: fetchAllPackages,
   });
 
-  // Build a lookup map: packageId → package object
+  const mutation = useMutation({
+    mutationFn: ({ id, type }: { id: number; type: "tunai" | "transfer" }) =>
+      bayarPiutang(id, type),
+    onSuccess: (_, vars) => {
+      toast.success(`Piutang berhasil diubah ke ${vars.type === "tunai" ? "Tunai" : "Transfer"}`);
+      queryClient.invalidateQueries({ queryKey: ["payments"] });
+      setDialogPayment(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Gagal memperbarui pembayaran");
+    },
+  });
+
   const pkgMap: Record<number, any> = {};
   for (const p of allPackages) {
     pkgMap[p.id] = p;
   }
 
-  // Enrich packageSummary entry with live package data for missing fields
   function enrichPkg(pkg: any) {
     const live = pkgMap[pkg.id];
     if (!live) return pkg;
@@ -174,6 +209,7 @@ export default function RiwayatPembayaran() {
                 const isExpanded = expandedId === p.id;
                 const pkgSummary: any[] = p.packageSummary || [];
                 const pkgCount = Array.isArray(p.packageIds) ? p.packageIds.length : pkgSummary.length;
+                const isPiutang = p.paymentType === "piutang";
 
                 return (
                   <div key={p.id} className={`${meta.rowClass} transition-colors hover:bg-muted/20`}>
@@ -210,6 +246,21 @@ export default function RiwayatPembayaran() {
                           </p>
                         )}
                       </div>
+
+                      {isPiutang && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 text-orange-600 border-orange-300 hover:bg-orange-50 hover:text-orange-700 gap-1.5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDialogPayment(p);
+                          }}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Sudah Dibayar
+                        </Button>
+                      )}
 
                       <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7 text-muted-foreground">
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -279,6 +330,58 @@ export default function RiwayatPembayaran() {
           <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
         )}
       </Card>
+
+      {/* Dialog konfirmasi pembayaran piutang */}
+      <Dialog open={!!dialogPayment} onOpenChange={(open) => { if (!open) setDialogPayment(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-orange-500" />
+              Konfirmasi Pelunasan Piutang
+            </DialogTitle>
+            <DialogDescription>
+              Tagihan sebesar{" "}
+              <span className="font-bold text-foreground">
+                {formatRp(dialogPayment?.totalAmount)}
+              </span>{" "}
+              akan ditandai sudah dibayar. Pilih metode pembayaran:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <button
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ id: dialogPayment.id, type: "tunai" })}
+            >
+              <Banknote className="w-7 h-7 text-green-600" />
+              <span className="font-bold text-green-700 text-sm">Tunai</span>
+              <span className="text-xs text-green-600/80">Bayar cash</span>
+            </button>
+
+            <button
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={mutation.isPending}
+              onClick={() => mutation.mutate({ id: dialogPayment.id, type: "transfer" })}
+            >
+              <CreditCard className="w-7 h-7 text-blue-600" />
+              <span className="font-bold text-blue-700 text-sm">Transfer</span>
+              <span className="text-xs text-blue-600/80">Bayar transfer</span>
+            </button>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={mutation.isPending}
+              onClick={() => setDialogPayment(null)}
+            >
+              Batal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
