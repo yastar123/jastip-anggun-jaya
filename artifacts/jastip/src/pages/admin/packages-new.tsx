@@ -941,7 +941,32 @@ export default function AdminPackagesNew() {
                       name="shippingRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Harga Kubikasi Barang (per M³/Ton) <span className="text-destructive">*</span></FormLabel>
+                          <div className="flex items-center justify-between">
+                            <FormLabel>Harga Kubikasi Barang (per M³/Ton) <span className="text-destructive">*</span></FormLabel>
+                            {field.value && Number(field.value) > 0 && (
+                              <button
+                                type="button"
+                                className="text-xs text-primary underline underline-offset-2 hover:text-primary/80 flex items-center gap-1"
+                                onClick={async () => {
+                                  const rate = Number(field.value);
+                                  if (!rate || rate <= 0) return;
+                                  try {
+                                    const token = localStorage.getItem("jaj_token");
+                                    await fetch("/api/settings", {
+                                      method: "PATCH",
+                                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                                      body: JSON.stringify({ kargoRate: rate }),
+                                    });
+                                    toast({ title: "Tarif disimpan", description: `Rp ${rate.toLocaleString("id-ID")} / M³/Ton akan menjadi tarif default.` });
+                                  } catch {
+                                    toast({ variant: "destructive", title: "Gagal menyimpan tarif" });
+                                  }
+                                }}
+                              >
+                                Simpan sebagai tarif default
+                              </button>
+                            )}
+                          </div>
                           <FormControl>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
@@ -953,6 +978,11 @@ export default function AdminPackagesNew() {
                               />
                             </div>
                           </FormControl>
+                          {savedKargoRate != null && (
+                            <p className="text-xs text-muted-foreground">
+                              Tarif default tersimpan: <strong>Rp {savedKargoRate.toLocaleString("id-ID")}</strong> / M³/Ton
+                            </p>
+                          )}
                           <FormMessage />
                         </FormItem>
                       )}
