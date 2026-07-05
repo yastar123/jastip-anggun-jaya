@@ -6,7 +6,7 @@ import {
   useCreatePackage,
   getListPackagesQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +51,18 @@ const packageSchema = z.object({
   shippingRate: z.coerce.number().optional().nullable(),
   totalWeight: z.coerce.number().optional().nullable(),
   totalShipping: z.coerce.number().optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.serviceType === "jastip kargo") {
+    if (!data.length || Number(data.length) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Panjang wajib diisi untuk kargo", path: ["length"] });
+    }
+    if (!data.width || Number(data.width) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Lebar wajib diisi untuk kargo", path: ["width"] });
+    }
+    if (!data.height || Number(data.height) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tinggi wajib diisi untuk kargo", path: ["height"] });
+    }
+  }
 });
 
 type PackageFormValues = z.infer<typeof packageSchema>;
@@ -184,6 +196,22 @@ async function patchPackageCustomerName(id: number, customerName: string) {
   if (!r.ok) throw new Error("Gagal memperbarui nama konsumen");
 }
 
+function useKargoRate() {
+  return useQuery<number | null>({
+    queryKey: ["settings", "kargoRate"],
+    queryFn: async () => {
+      const token = localStorage.getItem("jaj_token");
+      const res = await fetch("/api/settings", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const d = await res.json();
+      return d.kargoRate != null ? Number(d.kargoRate) : null;
+    },
+    staleTime: 60_000,
+  });
+}
+
 export default function AdminPackagesNew() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -191,6 +219,7 @@ export default function AdminPackagesNew() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
+  const { data: savedKargoRate } = useKargoRate();
 
   const createPackage = useCreatePackage();
   const params = parseQueryParams();
@@ -314,6 +343,16 @@ export default function AdminPackagesNew() {
     const total = billableWeight > 0 && rate > 0 ? Math.round(billableWeight * rate) : null;
     form.setValue("totalShipping", total ?? null, { shouldDirty: true });
   }, [shippingRateWatch, serviceType]);
+
+  // Kargo: auto-fill tarif dari pengaturan saat pertama kali masuk form kargo
+  useEffect(() => {
+    if (serviceType !== "jastip kargo") return;
+    if (savedKargoRate == null) return;
+    const current = form.getValues("shippingRate");
+    if (!current || current === 0) {
+      form.setValue("shippingRate", savedKargoRate, { shouldDirty: false });
+    }
+  }, [serviceType, savedKargoRate]);
 
   async function onSubmit(values: PackageFormValues) {
     // Require customerName for all modes
@@ -833,7 +872,7 @@ export default function AdminPackagesNew() {
                             name={name}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>{label} <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></FormLabel>
+                                <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number" step="0.1" placeholder="0"
