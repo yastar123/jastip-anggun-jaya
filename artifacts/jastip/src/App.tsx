@@ -19,7 +19,6 @@ import AdminBarcode from "@/pages/admin/barcode";
 import AdminBarcodeGroupDetail from "@/pages/admin/barcode-group-detail";
 import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
-import AdminKalkulatorScan from "@/pages/admin/kalkulator-scan";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
@@ -130,9 +129,6 @@ function Router() {
       <Route path="/admin/verify">
         {(params) => <ProtectedRoute role="admin" component={AdminVerify} params={params} />}
       </Route>
-      <Route path="/admin/kalkulator-scan">
-        {(params) => <ProtectedRoute role="admin" component={AdminKalkulatorScan} params={params} />}
-      </Route>
       <Route path="/admin/riwayat-pembayaran">
         {(params) => <ProtectedRoute role="admin" component={AdminRiwayatPembayaran} params={params} />}
       </Route>
@@ -187,9 +183,6 @@ function Router() {
       </Route>
       <Route path="/owner/verify">
         {(params) => <ProtectedRoute role="owner" component={AdminVerify} params={params} />}
-      </Route>
-      <Route path="/owner/kalkulator-scan">
-        {(params) => <ProtectedRoute role="owner" component={AdminKalkulatorScan} params={params} />}
       </Route>
 
       <Route component={NotFound} />

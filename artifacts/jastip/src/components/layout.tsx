@@ -30,7 +30,6 @@ import {
   Wrench,
   UserCircle,
   ShieldCheck,
-  Calculator,
   History,
 } from "lucide-react";
 
@@ -51,9 +50,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Input Paket", href: "/admin/packages/type", icon: FileInput, exact: true },
     { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet, exact: true },
     { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
-    { name: "Scan Barcode", href: "/admin/scan", icon: ScanLine, exact: true },
+    { name: "Scan Barcode dan Pembayaran", href: "/admin/scan", icon: ScanLine, exact: true },
     { name: "Verifikasi Paket", href: "/admin/verify", icon: ShieldCheck, exact: true },
-    { name: "Kalkulator Scan", href: "/admin/kalkulator-scan", icon: Calculator, exact: true },
     { name: "Riwayat Pembayaran", href: "/admin/riwayat-pembayaran", icon: History, exact: true },
     { name: "Profil", href: "/admin/profile", icon: UserCircle, exact: true },
   ];
@@ -77,9 +75,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { name: "Input Paket", href: "/owner/packages/type", icon: FileInput, exact: true },
         { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet, exact: true },
         { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },
-        { name: "Scan Barcode", href: "/owner/scan", icon: ScanLine, exact: true },
+        { name: "Scan Barcode dan Pembayaran", href: "/owner/scan", icon: ScanLine, exact: true },
         { name: "Verifikasi Paket", href: "/owner/verify", icon: ShieldCheck, exact: true },
-        { name: "Kalkulator Scan", href: "/owner/kalkulator-scan", icon: Calculator, exact: true },
       ],
     },
   ];

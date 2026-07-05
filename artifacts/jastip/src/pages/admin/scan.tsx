@@ -1,28 +1,26 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Camera, Upload, ScanLine, X, AlertCircle, Hash,
-  CheckCircle2, XCircle, Package,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Camera, Upload, ScanLine, X, Hash, Trash2, CheckCircle2, XCircle,
+  ShoppingCart, RotateCcw, Banknote, CreditCard, Clock, ChevronDown, ChevronUp,
+  AlertTriangle, Users,
 } from "lucide-react";
-import { useLocation } from "wouter";
-import QRCode from "qrcode";
 
-function formatRp(n: any) {
-  if (n === null || n === undefined || n === "") return "-";
+function formatRp(n: number | string | null | undefined) {
+  if (n == null || n === "") return "Rp 0";
   return `Rp ${Number(n).toLocaleString("id-ID")}`;
 }
 function formatDate(d: string | null | undefined) {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-function formatDateLong(d: string | null | undefined) {
-  if (!d) return "-";
-  return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const serviceLabel: Record<string, string> = {
@@ -32,120 +30,174 @@ const serviceLabel: Record<string, string> = {
   "jastip pelni": "Jastip Pelni",
 };
 
-function SmallQR({ value }: { value: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (canvasRef.current && value) {
-      QRCode.toCanvas(canvasRef.current, value, { width: 80, margin: 1 }).catch(() => {});
-    }
-  }, [value]);
-  return <canvas ref={canvasRef} className="rounded" />;
+interface ScannedItem {
+  id: number;
+  barcode: string;
+  resiNumber: string;
+  packageNumber?: string;
+  customerName: string;
+  serviceType: string;
+  deliveryRoute?: string;
+  packagingType?: string;
+  itemName?: string;
+  adminName?: string;
+  packageDate?: string;
+  realWeight?: number | null;
+  volumeWeight?: number | null;
+  usedWeight?: number | null;
+  shippingRate?: number | null;
+  totalShipping: number;
+  length?: number | null;
+  width?: number | null;
+  height?: number | null;
 }
 
-type ScanState = "idle" | "camera" | "result";
+type PaymentType = "tunai" | "transfer" | "piutang";
+
+const PAYMENT_TYPES: { value: PaymentType; label: string; icon: any; desc: string; color: string }[] = [
+  { value: "tunai", label: "Tunai", icon: Banknote, desc: "Bayar cash langsung", color: "green" },
+  { value: "transfer", label: "Transfer", icon: CreditCard, desc: "Transfer bank / QRIS", color: "blue" },
+  { value: "piutang", label: "Piutang", icon: Clock, desc: "Bayar nanti / hutang", color: "orange" },
+];
+
+function toItem(pkg: any): ScannedItem {
+  return {
+    id: pkg.id,
+    barcode: pkg.barcode || "",
+    resiNumber: pkg.resiNumber || "",
+    packageNumber: pkg.packageNumber || "",
+    customerName: pkg.customerName || "-",
+    serviceType: pkg.serviceType || "",
+    deliveryRoute: pkg.deliveryRoute || "",
+    packagingType: pkg.packagingType || "",
+    itemName: pkg.itemName || "",
+    adminName: pkg.adminName || "",
+    packageDate: pkg.packageDate || "",
+    realWeight: pkg.realWeight != null ? Number(pkg.realWeight) : null,
+    volumeWeight: pkg.volumeWeight != null ? Number(pkg.volumeWeight) : null,
+    usedWeight: pkg.usedWeight != null ? Number(pkg.usedWeight) : null,
+    shippingRate: pkg.shippingRate != null ? Number(pkg.shippingRate) : null,
+    totalShipping: Number(pkg.totalShipping ?? 0),
+    length: pkg.length != null ? Number(pkg.length) : null,
+    width: pkg.width != null ? Number(pkg.width) : null,
+    height: pkg.height != null ? Number(pkg.height) : null,
+  };
+}
 
 export default function AdminScan() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
 
-  const [scanState, setScanState] = useState<ScanState>("idle");
-  const [foundPackage, setFoundPackage] = useState<any>(null);
-  const [groupPackages, setGroupPackages] = useState<any[]>([]);
-  const [notFound, setNotFound] = useState(false);
-  const [notFoundMsg, setNotFoundMsg] = useState("");
-  const [resiInput, setResiInput] = useState("");
+  const [scanMode, setScanMode] = useState<"idle" | "camera">("idle");
+  const [manualInput, setManualInput] = useState("");
   const [isLooking, setIsLooking] = useState(false);
-  const [actioningIds, setActioningIds] = useState<Set<number>>(new Set());
+  const [items, setItems] = useState<ScannedItem[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [alreadyDelivered, setAlreadyDelivered] = useState<any>(null);
+  const [revertingId, setRevertingId] = useState<number | null>(null);
+
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [uangDibayar, setUangDibayar] = useState("");
+  const [paymentType, setPaymentType] = useState<PaymentType>("tunai");
+  const [isSaving, setIsSaving] = useState(false);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const SCANNER_ID = "admin-qr-scanner";
+  const manualRef = useRef<HTMLInputElement>(null);
+  const SCANNER_ID = "admin-scan-pos-scanner";
 
-  async function lookupCode(code: string) {
+  const totalTagihan = items.reduce((s, i) => s + i.totalShipping, 0);
+  const uangNum = Number(uangDibayar.replace(/\D/g, "")) || 0;
+  const kembalian = uangNum - totalTagihan;
+
+  async function fetchJson(url: string) {
+    const token = localStorage.getItem("jaj_token");
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    return r.json();
+  }
+
+  async function lookupAndAdd(code: string) {
+    const trimmed = code.trim();
+    if (!trimmed) return;
     setIsLooking(true);
-    setFoundPackage(null);
-    setGroupPackages([]);
-    setNotFound(false);
+    setAlreadyDelivered(null);
     try {
-      const token = localStorage.getItem("jaj_token");
-
-      // Try scan endpoint first
-      const r = await fetch(`/api/packages/scan/${encodeURIComponent(code)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await r.json();
-
       let pkg: any = null;
+      const data = await fetchJson(`/api/packages/scan/${encodeURIComponent(trimmed)}`);
       if (data.package) {
         pkg = data.package;
       } else {
-        // Try searching by resi/barcode
-        const r2 = await fetch(`/api/packages?search=${encodeURIComponent(code)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const packages = await r2.json();
-        if (Array.isArray(packages) && packages.length > 0) {
-          pkg = packages[0];
-        }
+        const list = await fetchJson(`/api/packages?search=${encodeURIComponent(trimmed)}`);
+        if (Array.isArray(list) && list.length > 0) pkg = list[0];
       }
 
       if (!pkg) {
-        setFoundPackage(null);
-        setGroupPackages([]);
-        setNotFound(true);
-        setNotFoundMsg("Paket tidak ditemukan. Pastikan nomor resi atau barcode sudah benar.");
-        setScanState("result");
+        toast({ variant: "destructive", title: "Paket tidak ditemukan", description: `Barcode: ${trimmed}` });
         return;
       }
 
-      // Fetch all packages to find sibling packages for same customer
-      const allR = await fetch(`/api/packages`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const allPkgs = await allR.json();
-      const customerName = (pkg.customerName || "").trim().toLowerCase();
-      const siblings: any[] = Array.isArray(allPkgs)
-        ? allPkgs.filter((p: any) => (p.customerName || "").trim().toLowerCase() === customerName)
-        : [pkg];
+      if (pkg.status === "diserahkan") {
+        setAlreadyDelivered(pkg);
+        toast({ title: "Sudah diserahkan sebelumnya", description: `${pkg.customerName} — ${pkg.resiNumber || pkg.barcode}` });
+        return;
+      }
 
-      setFoundPackage(pkg);
-      setGroupPackages(siblings.length > 0 ? siblings : [pkg]);
-      setNotFound(false);
-      setScanState("result");
+      const alreadyAdded = items.some((i) => i.id === pkg.id);
+      if (alreadyAdded) {
+        toast({ title: "Sudah ditambahkan", description: `${pkg.resiNumber || pkg.barcode} sudah ada dalam daftar.` });
+        return;
+      }
+
+      const newItems: ScannedItem[] = [toItem(pkg)];
+
+      // Auto-tambahkan paket lain dalam grup yang sama (nama customer sama, masih pending)
+      const allPkgs = await fetchJson(`/api/packages`);
+      if (Array.isArray(allPkgs)) {
+        const customerName = (pkg.customerName || "").trim().toLowerCase();
+        const siblings = allPkgs.filter((p: any) =>
+          p.id !== pkg.id &&
+          p.status !== "diserahkan" &&
+          (p.customerName || "").trim().toLowerCase() === customerName &&
+          !items.some((i) => i.id === p.id),
+        );
+        siblings.forEach((s: any) => newItems.push(toItem(s)));
+      }
+
+      setItems((prev) => [...prev, ...newItems]);
+      toast({
+        title: newItems.length > 1 ? `✓ ${newItems.length} paket grup ditambahkan` : "✓ Paket ditambahkan",
+        description: `${pkg.customerName} — ${formatRp(newItems.reduce((s, i) => s + i.totalShipping, 0))}`,
+      });
     } catch {
-      setFoundPackage(null);
-      setGroupPackages([]);
-      setNotFound(true);
-      setNotFoundMsg("Terjadi kesalahan saat mencari paket.");
-      setScanState("result");
+      toast({ variant: "destructive", title: "Gagal mencari paket" });
     } finally {
       setIsLooking(false);
     }
   }
 
   const handleScanSuccess = useCallback(async (code: string) => {
-    await stopCamera();
-    await lookupCode(code);
-  }, []);
+    await lookupAndAdd(code);
+  }, [items]);
 
   async function startCamera() {
-    setScanState("camera");
+    setScanMode("camera");
     try {
       const devices = await Html5Qrcode.getCameras();
       if (!devices.length) {
         toast({ variant: "destructive", title: "Kamera tidak tersedia" });
-        setScanState("idle"); return;
+        setScanMode("idle");
+        return;
       }
       const scanner = new Html5Qrcode(SCANNER_ID);
       scannerRef.current = scanner;
       await scanner.start(
         devices[devices.length - 1].id,
-        { fps: 10, qrbox: { width: 250, height: 120 } },
-        handleScanSuccess, undefined
+        { fps: 10, qrbox: { width: 260, height: 120 } },
+        handleScanSuccess,
+        undefined,
       );
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal akses kamera", description: err?.message });
-      setScanState("idle");
+      setScanMode("idle");
     }
   }
 
@@ -154,6 +206,7 @@ export default function AdminScan() {
       try { await scannerRef.current.stop(); } catch {}
       scannerRef.current = null;
     }
+    setScanMode("idle");
   }
 
   useEffect(() => () => { stopCamera(); }, []);
@@ -162,7 +215,7 @@ export default function AdminScan() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    const tempId = "admin-qr-temp-" + Date.now();
+    const tempId = "admin-scan-qr-temp-" + Date.now();
     const tempDiv = document.createElement("div");
     tempDiv.id = tempId;
     tempDiv.style.display = "none";
@@ -170,424 +223,531 @@ export default function AdminScan() {
     const scanner = new Html5Qrcode(tempId);
     scanner.scanFile(file, false)
       .then(async (code) => {
-        scanner.clear(); document.body.removeChild(tempDiv);
-        await lookupCode(code);
+        scanner.clear();
+        document.body.removeChild(tempDiv);
+        await lookupAndAdd(code);
       })
       .catch(() => {
-        scanner.clear(); document.body.removeChild(tempDiv);
+        scanner.clear();
+        document.body.removeChild(tempDiv);
         toast({ variant: "destructive", title: "Gagal membaca barcode", description: "Pastikan gambar berisi barcode yang jelas." });
       });
   }
 
-  async function handleResiSearch(e: React.FormEvent) {
+  async function handleManualSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!resiInput.trim()) return;
-    setScanState("result");
-    await lookupCode(resiInput.trim());
-    setResiInput("");
+    if (!manualInput.trim()) return;
+    const val = manualInput.trim();
+    setManualInput("");
+    await lookupAndAdd(val);
+    manualRef.current?.focus();
   }
 
-  function reset() {
-    setScanState("idle");
-    setFoundPackage(null);
-    setGroupPackages([]);
-    setNotFound(false);
-    setNotFoundMsg("");
-    setResiInput("");
+  function removeItem(id: number) {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    setExpandedIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
   }
 
-  function updatePkgInGroup(updated: any) {
-    setGroupPackages(prev => prev.map(p => p.id === updated.id ? updated : p));
-    if (foundPackage?.id === updated.id) setFoundPackage(updated);
+  function toggleExpand(id: number) {
+    setExpandedIds((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
   }
 
-  async function serahkanPaket(pkg: any) {
-    setActioningIds(prev => new Set(prev).add(pkg.id));
+  function resetAll() {
+    setItems([]);
+    setExpandedIds(new Set());
+    setManualInput("");
+    setUangDibayar("");
+    setPaymentType("tunai");
+    setAlreadyDelivered(null);
+    stopCamera();
+  }
+
+  function openPayModal() {
+    setUangDibayar("");
+    setPaymentType("tunai");
+    setShowPayModal(true);
+  }
+
+  function handleUangInput(val: string) {
+    const digits = val.replace(/\D/g, "");
+    setUangDibayar(digits ? Number(digits).toLocaleString("id-ID") : "");
+  }
+
+  async function tolakDelivered() {
+    if (!alreadyDelivered) return;
+    setRevertingId(alreadyDelivered.id);
     try {
       const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${pkg.id}/serahkan`, {
+      const r = await fetch(`/api/packages/${alreadyDelivered.id}/tolak`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
-      if (!r.ok) throw new Error("Gagal menyerahkan paket");
-      const updated = await r.json();
-      updatePkgInGroup(updated);
-      toast({ title: "Paket Diserahkan", description: `${pkg.resiNumber} berhasil diserahkan.` });
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal", description: err.message });
+      if (!r.ok) throw new Error("Gagal");
+      toast({ title: "Dikembalikan ke Pending", description: `${alreadyDelivered.resiNumber} dikembalikan ke Pending.` });
+      setAlreadyDelivered(null);
+    } catch {
+      toast({ variant: "destructive", title: "Gagal mengembalikan paket" });
     } finally {
-      setActioningIds(prev => { const s = new Set(prev); s.delete(pkg.id); return s; });
+      setRevertingId(null);
     }
   }
 
-  async function tolakPaket(pkg: any) {
-    setActioningIds(prev => new Set(prev).add(pkg.id));
+  async function handleKonfirmasiBayar() {
+    setIsSaving(true);
     try {
       const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${pkg.id}/tolak`, {
+      const body = {
+        paymentType,
+        totalAmount: totalTagihan,
+        paidAmount: (paymentType === "tunai" || paymentType === "transfer") ? uangNum : null,
+        changeAmount: (paymentType === "tunai" || paymentType === "transfer") ? kembalian : null,
+        packageIds: items.map((i) => i.id),
+        packageSummary: items.map((i) => ({
+          id: i.id,
+          resiNumber: i.resiNumber,
+          packageNumber: i.packageNumber,
+          customerName: i.customerName,
+          serviceType: i.serviceType,
+          deliveryRoute: i.deliveryRoute,
+          packagingType: i.packagingType,
+          realWeight: i.realWeight,
+          usedWeight: i.usedWeight,
+          totalShipping: i.totalShipping,
+          packageDate: i.packageDate,
+        })),
+      };
+
+      const res = await fetch("/api/payments", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
       });
-      if (!r.ok) throw new Error("Gagal menolak paket");
-      const updated = await r.json();
-      updatePkgInGroup(updated);
-      toast({ title: "Dikembalikan ke Pending", description: `${pkg.resiNumber} dikembalikan ke Pending.` });
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal", description: err.message });
+      if (!res.ok) throw new Error("Gagal menyimpan pembayaran");
+
+      // Tandai semua paket sebagai diserahkan setelah pembayaran tercatat
+      const results = await Promise.allSettled(
+        items.map((i) =>
+          fetch(`/api/packages/${i.id}/serahkan`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          }),
+        ),
+      );
+      const failedCount = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
+
+      const typeLabel = PAYMENT_TYPES.find((t) => t.value === paymentType)?.label || paymentType;
+      toast({
+        title: "✓ Pembayaran & Serah Terima Selesai",
+        description: `${typeLabel} — ${formatRp(totalTagihan)}${(paymentType === "tunai" || paymentType === "transfer") ? ` | Kembalian: ${formatRp(kembalian)}` : ""}${failedCount > 0 ? ` (${failedCount} paket gagal diupdate statusnya)` : ""}`,
+      });
+      setShowPayModal(false);
+      resetAll();
+    } catch {
+      toast({ variant: "destructive", title: "Gagal menyimpan pembayaran", description: "Coba lagi." });
     } finally {
-      setActioningIds(prev => { const s = new Set(prev); s.delete(pkg.id); return s; });
+      setIsSaving(false);
     }
   }
 
-  async function serahkanSemua() {
-    const pending = groupPackages.filter(p => p.status !== "diserahkan");
-    for (const p of pending) {
-      await serahkanPaket(p);
-    }
-  }
-
-  const isGroupView = groupPackages.length > 1;
-  const totalWeight = groupPackages.reduce((s, p) => s + Number(p.usedWeight ?? p.realWeight ?? 0), 0);
-  const totalShipping = groupPackages.reduce((s, p) => s + Number(p.totalShipping ?? 0), 0);
-  const pendingCount = groupPackages.filter(p => p.status !== "diserahkan").length;
-  const allDone = pendingCount === 0;
+  const canConfirm =
+    paymentType === "piutang" ||
+    ((paymentType === "tunai" || paymentType === "transfer") && uangNum >= totalTagihan);
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ScanLine className="h-7 w-7 text-primary" />Scan Barcode Paket
-        </h1>
-        <p className="text-muted-foreground mt-1">Scan, upload gambar, atau ketik nomor resi untuk menyerahkan paket.</p>
+    <div className="space-y-5 max-w-5xl mx-auto">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <ScanLine className="h-7 w-7 text-primary" /> Scan Barcode dan Pembayaran
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Scan barcode paket satu per satu (seperti kasir minimarket), lalu selesaikan pembayaran &amp; serah terima sekaligus.
+          </p>
+        </div>
+        {items.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={resetAll} className="text-muted-foreground shrink-0">
+            <RotateCcw className="h-4 w-4 mr-1" /> Reset
+          </Button>
+        )}
       </div>
 
-      <div id={SCANNER_ID} className={scanState === "camera" ? "w-full rounded-xl overflow-hidden border" : "hidden"} />
+      {alreadyDelivered && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-amber-900">
+                Paket sudah diserahkan sebelumnya
+              </p>
+              <p className="text-xs text-amber-700 truncate">
+                {alreadyDelivered.customerName} — {alreadyDelivered.resiNumber || alreadyDelivered.barcode}
+                {alreadyDelivered.pickedUpAt ? ` · Diserahkan: ${formatDate(alreadyDelivered.pickedUpAt)}` : ""}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-400 text-amber-800 hover:bg-amber-100 shrink-0"
+              onClick={tolakDelivered}
+              disabled={revertingId === alreadyDelivered.id}
+            >
+              {revertingId === alreadyDelivered.id ? "..." : "Kembalikan ke Pending"}
+            </Button>
+            <Button size="icon" variant="ghost" className="shrink-0" onClick={() => setAlreadyDelivered(null)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
-      {scanState === "idle" && (
-        <div className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Card className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group" onClick={startCamera}>
-              <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-                <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Camera className="w-7 h-7 text-primary" />
+      <div className="grid lg:grid-cols-5 gap-5">
+        {/* LEFT: Scan controls */}
+        <div className="lg:col-span-2 space-y-4">
+          <div
+            id={SCANNER_ID}
+            className={scanMode === "camera" ? "w-full rounded-xl overflow-hidden border shadow-sm" : "hidden"}
+          />
+
+          {scanMode === "idle" ? (
+            <Card className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all" onClick={startCamera}>
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Camera className="w-5 h-5 text-primary" />
                 </div>
-                <div><p className="font-semibold">Scan Kamera</p><p className="text-sm text-muted-foreground mt-1">Arahkan kamera ke barcode</p></div>
-                <Button className="mt-1">Buka Kamera</Button>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">Scan Kamera</p>
+                  <p className="text-xs text-muted-foreground">Terus scan tanpa berhenti</p>
+                </div>
+                <Button size="sm">Buka</Button>
               </CardContent>
             </Card>
-            <Card className="hover:shadow-lg hover:border-primary/50 transition-all group">
-              <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-                <div className="w-14 h-14 rounded-full bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
-                  <Upload className="w-7 h-7 text-secondary" />
+          ) : (
+            <Card className="border-primary/50">
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <Camera className="w-5 h-5 text-primary animate-pulse" />
                 </div>
-                <div><p className="font-semibold">Upload Gambar</p><p className="text-sm text-muted-foreground mt-1">Upload foto barcode dari galeri</p></div>
-                <Button className="mt-1 bg-secondary hover:bg-secondary/90" onClick={() => fileInputRef.current?.click()}>Pilih Gambar</Button>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                <div className="flex-1">
+                  <p className="font-semibold text-sm text-primary">Kamera Aktif</p>
+                  <p className="text-xs text-muted-foreground">Arahkan ke barcode...</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={stopCamera}>
+                  <X className="w-3 h-3 mr-1" /> Tutup
+                </Button>
               </CardContent>
             </Card>
-          </div>
+          )}
+
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><Hash className="h-4 w-4" />Input Nomor Resi / Barcode</CardTitle>
-              <CardDescription>Ketik nomor resi, barcode, atau nomor paket secara manual</CardDescription>
+            <CardContent className="flex items-center gap-3 py-4">
+              <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+                <Upload className="w-5 h-5 text-secondary" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm">Upload Gambar</p>
+                <p className="text-xs text-muted-foreground">Foto barcode dari galeri</p>
+              </div>
+              <Button size="sm" className="bg-secondary hover:bg-secondary/90" onClick={() => fileInputRef.current?.click()}>
+                Pilih
+              </Button>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Hash className="h-4 w-4" /> Input Manual
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleResiSearch} className="flex gap-2">
-                <Input value={resiInput} onChange={e => setResiInput(e.target.value)} placeholder="Contoh: JAJ-ABC123 atau JNE123456789" className="font-mono" />
-                <Button type="submit" disabled={!resiInput.trim() || isLooking}>{isLooking ? "Mencari..." : "Cari"}</Button>
+            <CardContent className="px-4 pb-4">
+              <form onSubmit={handleManualSubmit} className="flex gap-2">
+                <Input
+                  ref={manualRef}
+                  value={manualInput}
+                  onChange={(e) => setManualInput(e.target.value)}
+                  placeholder="No resi / barcode..."
+                  className="font-mono text-sm"
+                  disabled={isLooking}
+                />
+                <Button type="submit" size="sm" disabled={!manualInput.trim() || isLooking}>
+                  {isLooking ? "..." : "Tambah"}
+                </Button>
               </form>
             </CardContent>
           </Card>
         </div>
-      )}
 
-      {scanState === "camera" && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Camera className="h-4 w-4" />Kamera Aktif</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => { stopCamera(); setScanState("idle"); }}><X className="w-4 h-4 mr-1" />Tutup</Button>
-          </CardHeader>
-          <CardContent><p className="text-sm text-muted-foreground text-center">Arahkan kamera ke barcode paket...</p></CardContent>
-        </Card>
-      )}
-
-      {scanState === "result" && (
-        <div className="space-y-4">
-          {isLooking ? (
-            <Card><CardContent className="flex items-center justify-center py-12 text-muted-foreground">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-3" />Mencari paket...
-            </CardContent></Card>
-          ) : notFound || !foundPackage ? (
-            <Card className="border-destructive/50">
-              <CardContent className="flex items-center gap-3 py-8 text-destructive">
-                <AlertCircle className="w-6 h-6 shrink-0" />
-                <div><p className="font-semibold">Paket tidak ditemukan</p><p className="text-sm text-muted-foreground mt-1">{notFoundMsg || "Pastikan nomor resi atau barcode sudah benar."}</p></div>
-              </CardContent>
-            </Card>
-          ) : isGroupView ? (
-            /* ========== GRUP VIEW ========== */
-            <div className="space-y-4">
-              {/* Group header */}
-              <Card className={`border-2 ${allDone ? "border-green-400 bg-green-50" : "border-primary/40 bg-primary/5"}`}>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Package className="w-5 h-5 text-primary" />
+        {/* RIGHT: Items list + total */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card className={`border-2 ${items.length > 0 ? "border-primary/40 bg-primary/5" : "border-dashed"}`}>
+            <CardContent className="py-4 px-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Total Tagihan</p>
+                  <p className="text-3xl font-black text-primary mt-0.5">{formatRp(totalTagihan)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{items.length} paket discan</p>
+                </div>
+                <div className="text-right">
+                  {isLooking && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                      Mencari...
                     </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-lg">{foundPackage.customerName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {groupPackages.length} paket · Berat {totalWeight.toFixed(3)} Kg · Total Ongkir {formatRp(totalShipping)}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-sm px-3 py-1 ${allDone ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
-                    >
-                      {allDone ? "✓ Semua Diserahkan" : `${pendingCount} Pending`}
-                    </Badge>
-                  </div>
-
-                  {!allDone && (
-                    <Button
-                      className="w-full mt-3 bg-green-600 hover:bg-green-700 gap-2"
-                      onClick={serahkanSemua}
-                      disabled={actioningIds.size > 0}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Serahkan Semua ({pendingCount} Paket)
-                    </Button>
                   )}
-                </CardContent>
-              </Card>
+                  <Button
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700 gap-2 text-base font-bold"
+                    disabled={items.length === 0}
+                    onClick={openPayModal}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    Bayar &amp; Serahkan
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Individual packages */}
-              {groupPackages.map((pkg: any, idx: number) => {
-                const isDone = pkg.status === "diserahkan";
-                const isActioning = actioningIds.has(pkg.id);
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border-2 border-dashed rounded-xl">
+              <ShoppingCart className="h-12 w-12 mb-3 opacity-20" />
+              <p className="font-medium">Belum ada paket discan</p>
+              <p className="text-sm mt-1">Scan barcode untuk menambahkan paket</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item, idx) => {
+                const isExpanded = expandedIds.has(item.id);
                 return (
-                  <Card key={pkg.id} className={`hover:shadow-md transition-shadow ${isDone ? "border-green-200" : ""}`}>
-                    <CardContent className="pt-4 pb-3">
-                      {/* Header */}
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="shrink-0 text-center">
-                          <SmallQR value={pkg.barcode || pkg.resiNumber || String(pkg.id)} />
-                          <p className="text-xs text-muted-foreground mt-1 font-mono">#{idx + 1}</p>
+                  <Card key={item.id} className="hover:shadow-sm transition-shadow">
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">
+                          {idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <p className="font-mono font-bold text-sm">{pkg.barcode || "-"}</p>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${isDone ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
-                            >
-                              {isDone ? "✓ Diserahkan" : "● Pending"}
-                            </Badge>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-sm truncate">{item.customerName}</p>
+                            {item.serviceType && (
+                              <Badge variant="outline" className="text-xs capitalize shrink-0">
+                                {serviceLabel[item.serviceType]?.replace("Jastip ", "") || item.serviceType.replace("jastip ", "")}
+                              </Badge>
+                            )}
                           </div>
-                          <p className="text-sm font-semibold text-primary">{pkg.customerName || "-"}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">
+                            {item.resiNumber || item.barcode}
+                            {item.packageNumber ? ` · #${item.packageNumber}` : ""}
+                          </p>
                         </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-primary text-sm">{formatRp(item.totalShipping)}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-muted-foreground h-7 w-7"
+                          onClick={() => toggleExpand(item.id)}
+                          title="Lihat detail"
+                        >
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 text-muted-foreground hover:text-destructive h-7 w-7"
+                          onClick={() => removeItem(item.id)}
+                          title="Hapus dari daftar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
 
-                      {/* All fields grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-xs border-t pt-3 mb-3">
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Resi</p>
-                          <p className="font-mono font-semibold">{pkg.resiNumber || "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Paket</p>
-                          <p className="font-mono">{pkg.packageNumber || "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Tanggal</p>
-                          <p>{formatDateLong(pkg.packageDate)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Jastip</p>
-                          <p>{serviceLabel[pkg.serviceType] || pkg.serviceType || "-"}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>
-                          <p>{pkg.deliveryRoute || "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Paking</p>
-                          <p>{pkg.packagingType || "-"}</p>
-                        </div>
-                        {(pkg.serviceType === "jastip kargo" || pkg.serviceType === "jastip pelni") && (
+                      {isExpanded && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs border-t mt-3 pt-3">
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Tanggal</p>
+                            <p>{item.packageDate ? new Date(item.packageDate).toLocaleDateString("id-ID") : "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Admin Input</p>
+                            <p>{item.adminName || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Paking</p>
+                            <p>{item.packagingType || "-"}</p>
+                          </div>
                           <div className="md:col-span-2">
-                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Nama Barang</p>
-                            <p>{pkg.itemName || "-"}</p>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>
+                            <p>{item.deliveryRoute || "-"}</p>
                           </div>
-                        )}
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Real</p>
-                          <p className="font-semibold">{pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Volume</p>
-                          <p>{pkg.volumeWeight != null ? `${Number(pkg.volumeWeight).toFixed(3)} Kg` : "-"}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Digunakan</p>
-                          <p className="font-semibold">{pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-"}</p>
-                        </div>
-                        {(pkg.length || pkg.width || pkg.height) && (
+                          {item.itemName && (
+                            <div>
+                              <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Nama Barang</p>
+                              <p>{item.itemName}</p>
+                            </div>
+                          )}
                           <div>
-                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Dimensi (cm)</p>
-                            <p className="font-mono">{pkg.length || "?"} × {pkg.width || "?"} × {pkg.height || "?"}</p>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Real</p>
+                            <p className="font-semibold">{item.realWeight != null ? `${item.realWeight} Kg` : "-"}</p>
                           </div>
-                        )}
-                        <div>
-                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Total Ongkir</p>
-                          <p className="font-bold text-primary text-sm">{formatRp(pkg.totalShipping)}</p>
-                        </div>
-                        {pkg.pickedUpAt && (
                           <div>
-                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Diserahkan Pada</p>
-                            <p>{formatDate(pkg.pickedUpAt)}</p>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Volume</p>
+                            <p>{item.volumeWeight != null ? `${item.volumeWeight} Kg` : "-"}</p>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Action buttons per package */}
-                      {!isDone ? (
-                        <div className="flex gap-2 pt-1 border-t">
-                          <Button
-                            size="sm"
-                            className="flex-1 bg-green-600 hover:bg-green-700 gap-1"
-                            onClick={() => serahkanPaket(pkg)}
-                            disabled={isActioning}
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {isActioning ? "Memproses..." : "Serahkan"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 border-red-300 text-red-600 hover:bg-red-50 gap-1"
-                            onClick={() => tolakPaket(pkg)}
-                            disabled={isActioning}
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            Tolak
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 pt-2 border-t">
-                          <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                          <span className="text-sm font-medium text-green-700 flex-1">Sudah diserahkan</span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-amber-300 text-amber-700 hover:bg-amber-50"
-                            onClick={() => tolakPaket(pkg)}
-                            disabled={isActioning}
-                          >
-                            {isActioning ? "..." : "Kembalikan ke Pending"}
-                          </Button>
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Digunakan</p>
+                            <p className="font-semibold">{item.usedWeight != null ? `${item.usedWeight} Kg` : "-"}</p>
+                          </div>
+                          {(item.length || item.width || item.height) && (
+                            <div>
+                              <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Dimensi (cm)</p>
+                              <p className="font-mono">{item.length || "?"} × {item.width || "?"} × {item.height || "?"}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Tarif Ongkir/kg</p>
+                            <p>{formatRp(item.shippingRate)}</p>
+                          </div>
                         </div>
                       )}
                     </CardContent>
                   </Card>
                 );
               })}
+              <div className="flex items-center justify-between px-4 py-2 bg-muted/50 rounded-lg border">
+                <span className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> {items.length} paket
+                </span>
+                <span className="font-black text-primary">{formatRp(totalTagihan)}</span>
+              </div>
             </div>
-          ) : (
-            /* ========== SINGLE PACKAGE VIEW ========== */
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <ScanLine className="h-4 w-4 text-primary" />
-                    Paket Ditemukan
-                  </CardTitle>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${foundPackage.status === "diserahkan" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                    {foundPackage.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}
-                  </span>
-                </div>
-                <CardDescription>
-                  Konsumen: <span className="font-medium text-foreground">{foundPackage.customerName}</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    { label: "No. Barcode", value: foundPackage.barcode, mono: true },
-                    { label: "No. Resi", value: foundPackage.resiNumber, mono: true },
-                    { label: "No. Paket", value: foundPackage.packageNumber || "-", mono: true },
-                    { label: "Tanggal", value: foundPackage.packageDate ? new Date(foundPackage.packageDate).toLocaleDateString("id-ID") : "-" },
-                    { label: "Admin Input", value: foundPackage.adminName || "-" },
-                    { label: "Nama / Jenis Barang", value: foundPackage.itemName || "-" },
-                    { label: "Jenis Jastip", value: foundPackage.serviceType ? foundPackage.serviceType.replace("jastip ", "Jastip ") : "-" },
-                    { label: "Rute Pengiriman", value: foundPackage.deliveryRoute || "-" },
-                    { label: "Berat Real", value: foundPackage.realWeight != null ? `${foundPackage.realWeight} Kg` : "-" },
-                    { label: "Berat Volume", value: foundPackage.volumeWeight != null ? `${foundPackage.volumeWeight} Kg` : "-" },
-                    { label: "Berat Digunakan", value: foundPackage.usedWeight != null ? `${foundPackage.usedWeight} Kg` : "-" },
-                    { label: "Jenis Paking", value: foundPackage.packagingType || "-" },
-                    { label: "Tarif Ongkir/kg", value: formatRp(foundPackage.shippingRate) },
-                    { label: "Total Ongkir", value: formatRp(foundPackage.totalShipping) },
-                  ].map((item) => (
-                    <div key={item.label} className="bg-muted/40 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground mb-0.5">{item.label}</p>
-                      <p className={`text-sm font-medium ${(item as any).mono ? "font-mono" : ""}`}>{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {foundPackage.status !== "diserahkan" ? (
-                  <div className="flex gap-3 pt-2">
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700 gap-2"
-                      onClick={() => serahkanPaket(foundPackage)}
-                      disabled={actioningIds.has(foundPackage.id)}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      {actioningIds.has(foundPackage.id) ? "Memproses..." : "Serahkan Paket"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50 gap-2"
-                      onClick={() => tolakPaket(foundPackage)}
-                      disabled={actioningIds.has(foundPackage.id)}
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Tolak
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 pt-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-green-800">Paket sudah diserahkan</p>
-                      {foundPackage.pickedUpAt && (
-                        <p className="text-xs text-green-600">Diserahkan: {formatDate(foundPackage.pickedUpAt)}</p>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-50"
-                      onClick={() => tolakPaket(foundPackage)}
-                      disabled={actioningIds.has(foundPackage.id)}
-                    >
-                      Kembalikan ke Pending
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           )}
-
-          <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={reset}>Scan Lagi</Button>
-            <Button variant="outline" className="flex-1" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="w-4 h-4 mr-2" />Upload Gambar
-            </Button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-          </div>
         </div>
-      )}
+      </div>
+
+      {/* Payment Modal */}
+      <Dialog open={showPayModal} onOpenChange={setShowPayModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <ScanLine className="h-5 w-5 text-primary" /> Pembayaran &amp; Serah Terima
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Bill summary */}
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Jumlah Paket</span>
+                <span className="font-semibold text-foreground">{items.length} paket</span>
+              </div>
+              {items.map((item) => (
+                <div key={item.id} className="flex justify-between text-xs text-muted-foreground">
+                  <span className="truncate max-w-[180px]">{item.customerName} ({item.resiNumber || item.barcode})</span>
+                  <span className="shrink-0 ml-2">{formatRp(item.totalShipping)}</span>
+                </div>
+              ))}
+              <div className="border-t pt-2 flex justify-between items-center">
+                <span className="font-bold text-base">Total Tagihan</span>
+                <span className="font-black text-xl text-primary">{formatRp(totalTagihan)}</span>
+              </div>
+            </div>
+
+            {/* Payment type */}
+            <div>
+              <p className="text-sm font-semibold mb-2">Jenis Pembayaran</p>
+              <div className="grid grid-cols-3 gap-2">
+                {PAYMENT_TYPES.map((pt) => {
+                  const Icon = pt.icon;
+                  const isSelected = paymentType === pt.value;
+                  const colorMap: Record<string, string> = {
+                    green: isSelected ? "border-green-500 bg-green-50 text-green-700" : "hover:border-green-300",
+                    blue: isSelected ? "border-blue-500 bg-blue-50 text-blue-700" : "hover:border-blue-300",
+                    orange: isSelected ? "border-orange-500 bg-orange-50 text-orange-700" : "hover:border-orange-300",
+                  };
+                  return (
+                    <button
+                      key={pt.value}
+                      type="button"
+                      onClick={() => setPaymentType(pt.value)}
+                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center ${colorMap[pt.color]} ${!isSelected ? "border-muted" : ""}`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span className="text-xs font-bold">{pt.label}</span>
+                      <span className="text-[10px] text-muted-foreground leading-tight">{pt.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(paymentType === "tunai" || paymentType === "transfer") && (
+              <>
+                <div>
+                  <label className="text-sm font-semibold block mb-1.5">Uang Diterima dari Customer</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
+                    <Input
+                      className="pl-9 text-lg font-bold"
+                      placeholder="0"
+                      value={uangDibayar}
+                      onChange={(e) => handleUangInput(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className={`rounded-xl p-4 border-2 ${
+                  uangNum === 0 ? "border-dashed bg-muted/30"
+                    : kembalian >= 0 ? "border-green-400 bg-green-50"
+                    : "border-red-400 bg-red-50"
+                }`}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Kembalian</p>
+                  {uangNum === 0 ? (
+                    <p className="text-2xl font-black text-muted-foreground">—</p>
+                  ) : kembalian >= 0 ? (
+                    <p className="text-2xl font-black text-green-700">{formatRp(kembalian)}</p>
+                  ) : (
+                    <div>
+                      <p className="text-2xl font-black text-red-600">{formatRp(kembalian)}</p>
+                      <p className="text-xs text-red-500 mt-1">Uang kurang {formatRp(Math.abs(kembalian))}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {paymentType === "piutang" && (
+              <div className="rounded-xl p-4 border-2 border-orange-200 bg-orange-50 text-orange-800 text-sm text-center">
+                <Clock className="w-6 h-6 mx-auto mb-1" />
+                <p className="font-semibold">Piutang / Bayar Nanti</p>
+                <p className="text-xs text-orange-600 mt-1">Tercatat sebagai hutang customer. Paket tetap diserahkan sekarang.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowPayModal(false)} disabled={isSaving}>Batal</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 flex-1 gap-2"
+              disabled={!canConfirm || isSaving}
+              onClick={handleKonfirmasiBayar}
+            >
+              {isSaving ? (
+                <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Konfirmasi Bayar &amp; Serahkan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
