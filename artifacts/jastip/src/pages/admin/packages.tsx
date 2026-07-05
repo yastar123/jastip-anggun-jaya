@@ -27,8 +27,14 @@ const JENIS_JASTIP = [
   "Jasa Belanja",
 ];
 
+const GROUPED_JENIS = ["jastip hemat+", "jastip pelni", "jastip pesawat"];
+
 function formatRp(n: any) {
-  if (!n) return "-";
+  if (n == null || n === "" || n === 0) return "-";
+  return `Rp ${Number(n).toLocaleString("id-ID")}`;
+}
+function formatRpForce(n: any) {
+  if (n == null || n === "") return "-";
   return `Rp ${Number(n).toLocaleString("id-ID")}`;
 }
 function formatDate(d: string | null | undefined) {
@@ -38,6 +44,11 @@ function formatDate(d: string | null | undefined) {
 function packagingLabel(t: string | null | undefined) {
   const map: Record<string, string> = { karton: "Karton", plastik: "Plastik", kayu: "Kayu", bubble_wrap: "Bubble Wrap", sack: "Karung", lainnya: "Lainnya" };
   return t ? map[t] || t : "-";
+}
+function fNum(n: any, decimals = 1) {
+  if (n == null || n === "") return "";
+  const v = Number(n);
+  return isNaN(v) ? "" : v.toFixed(decimals);
 }
 
 export default function AdminPackages() {
@@ -50,6 +61,8 @@ export default function AdminPackages() {
   const [pdfJenis, setPdfJenis] = useState<string>("all");
   const [pdfDateFrom, setPdfDateFrom] = useState("");
   const [pdfDateTo, setPdfDateTo] = useState("");
+  const [pdfNamaKapal, setPdfNamaKapal] = useState("");
+  const [pdfJadwalClosing, setPdfJadwalClosing] = useState("");
 
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
@@ -63,37 +76,211 @@ export default function AdminPackages() {
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleStatus(v: string) { setStatus(v); setPage(1); }
 
-  function exportPdf() {
-    if (!packages || packages.length === 0) return;
-
+  function getFilteredPackages() {
+    if (!packages) return [];
     let filtered = [...packages] as any[];
-
     if (pdfJenis !== "all") {
       filtered = filtered.filter((p) =>
         (p.serviceType || "").toLowerCase() === pdfJenis.toLowerCase()
       );
     }
-
     if (pdfDateFrom) {
       const from = new Date(pdfDateFrom);
       from.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((p) => {
-        const d = new Date(p.packageDate || p.createdAt);
-        return d >= from;
-      });
+      filtered = filtered.filter((p) => new Date(p.packageDate || p.createdAt) >= from);
     }
-
     if (pdfDateTo) {
       const to = new Date(pdfDateTo);
       to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((p) => {
-        const d = new Date(p.packageDate || p.createdAt);
-        return d <= to;
-      });
+      filtered = filtered.filter((p) => new Date(p.packageDate || p.createdAt) <= to);
+    }
+    return filtered;
+  }
+
+  function isGroupedExport() {
+    return GROUPED_JENIS.includes(pdfJenis.toLowerCase());
+  }
+
+  function exportPdf() {
+    if (!packages || packages.length === 0) return;
+    if (isGroupedExport()) {
+      exportPdfGrouped();
+    } else {
+      exportPdfFlat();
+    }
+  }
+
+  function exportPdfGrouped() {
+    const filtered = getFilteredPackages();
+    if (filtered.length === 0) return;
+
+    filtered.sort((a: any, b: any) =>
+      (a.customerName || "").localeCompare(b.customerName || "", "id")
+    );
+
+    const groups = new Map<string, any[]>();
+    for (const pkg of filtered) {
+      const name = (pkg.customerName || "(Tanpa Nama)").trim();
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name)!.push(pkg);
     }
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageW = 297;
+    const margin = 10;
 
+    const totalPaket = filtered.length;
+    const totalBeratAll = filtered.reduce((s: number, p: any) => s + (Number(p.usedWeight) || 0), 0);
+
+    const serviceUpper: Record<string, string> = {
+      "jastip pelni": "JASTIP PELNI",
+      "jastip hemat+": "JASTIP HEMAT+",
+      "jastip pesawat": "JASTIP PESAWAT",
+    };
+    const ruteDefault: Record<string, string> = {
+      "jastip pesawat": "JAKARTA - MANOKWARI",
+      "jastip hemat+": "SURABAYA - MANOKWARI",
+      "jastip pelni": "JAKARTA - MANOKWARI",
+    };
+
+    const jenisKey = pdfJenis.toLowerCase();
+    const titleText = (serviceUpper[jenisKey] || pdfJenis.toUpperCase()) +
+      (pdfNamaKapal ? " " + pdfNamaKapal.toUpperCase() : "");
+    const rute = ruteDefault[jenisKey] || "-";
+    const closingStr = pdfJadwalClosing
+      ? new Date(pdfJadwalClosing).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" })
+      : "-";
+
+    // ── Header halaman ──────────────────────────────────────────────────────
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(titleText, pageW / 2, 11, { align: "center" });
+
+    const infoRows: [string, string][] = [
+      ["Nama Kapal", pdfNamaKapal || "-"],
+      ["Rute", rute],
+      ["Jadwal Closing", closingStr],
+      ["Berat", ""],
+      ["Jumlah Paket", `${totalPaket} Item`],
+    ];
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const labelX = 45;
+    const sepX = 90;
+    const valX = 95;
+    let y = 17;
+    for (const [lbl, val] of infoRows) {
+      doc.text(lbl, labelX, y);
+      doc.text(val, valX, y);
+      y += 4.2;
+    }
+
+    const desc =
+      `Jastip ${serviceUpper[jenisKey] || pdfJenis} terdapat sistem perhitungan berat Real & Volume , ` +
+      `Berat Real di gunakan jika Berat Real lebih besar dari Berat Volume . ` +
+      `Sedangkan Berat Volume di gunakan ketika Nilai dari Berat Volume lebih besar dari Berat Real`;
+    doc.setFontSize(6.5);
+    const lines = doc.splitTextToSize(desc, pageW - margin * 2 - 4);
+    doc.text(lines, pageW / 2, y + 1, { align: "center" });
+    y += lines.length * 3.2 + 3;
+
+    // ── Header tabel (reusable) ─────────────────────────────────────────────
+    const tableHead = [[
+      "TANGGAL", "NO RESI", "SCAN PAKET",
+      "STATUS NO\nSCAN PAKET",
+      "NAMA\nKONSUMEN",
+      "BERAT\nREAL", "P", "L", "T",
+      "BERAT\nVOLUME",
+      "JENIS\nPAKING",
+      "BERAT YANG\nDI GUNAKAN",
+      "ONGKIR PER\nPAKET",
+      "TOTAL\nBERAT",
+      "HARGA",
+      "TOTAL ONGKIR\nJASTIP",
+    ]];
+
+    const colStyles: Record<number, object> = {
+      0:  { cellWidth: 17 },
+      1:  { cellWidth: 27 },
+      2:  { cellWidth: 27 },
+      3:  { cellWidth: 14, halign: "center" },
+      4:  { cellWidth: 19 },
+      5:  { cellWidth: 10, halign: "right" },
+      6:  { cellWidth: 7,  halign: "right" },
+      7:  { cellWidth: 7,  halign: "right" },
+      8:  { cellWidth: 7,  halign: "right" },
+      9:  { cellWidth: 11, halign: "right" },
+      10: { cellWidth: 11 },
+      11: { cellWidth: 15, halign: "right" },
+      12: { cellWidth: 20, halign: "right" },
+      13: { cellWidth: 14, halign: "right" },
+      14: { cellWidth: 17, halign: "right" },
+      15: { cellWidth: 22, halign: "right" },
+    };
+
+    // ── Loop per grup konsumen ──────────────────────────────────────────────
+    for (const [customerName, pkgs] of groups) {
+      const totalBeratGrup = pkgs.reduce((s: number, p: any) => s + (Number(p.usedWeight) || 0), 0);
+      const totalOngkirGrup = pkgs.reduce((s: number, p: any) => s + (Number(p.totalShipping) || 0), 0);
+      const hargaPerKg = pkgs.find((p: any) => p.shippingRate != null)?.shippingRate ?? null;
+
+      if (210 - y < 22) { doc.addPage(); y = 10; }
+
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      doc.text(`NAMA KONSUMEN       ${customerName}`, margin, y + 3);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(`  Jumlah Paket:     ${pkgs.length}.0`, margin, y + 7.5);
+      y += 12;
+
+      const rows = pkgs.map((p: any, i: number) => [
+        formatDate(p.packageDate || p.createdAt),
+        p.resiNumber || "-",
+        p.barcode || p.resiNumber || "-",
+        p.status === "diserahkan" ? "SUDAH\nSCAN" : "BELUM\nSCAN",
+        p.customerName || "-",
+        fNum(p.realWeight, 1),
+        fNum(p.length, 0),
+        fNum(p.width, 0),
+        fNum(p.height, 0),
+        p.volumeWeight != null ? fNum(p.volumeWeight, 1) : "0.0",
+        p.packagingType || "-",
+        fNum(p.usedWeight, 1),
+        p.totalShipping != null ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
+        i === 0 ? totalBeratGrup.toFixed(1) : "",
+        i === 0 && hargaPerKg != null ? `Rp ${Number(hargaPerKg).toLocaleString("id-ID")}` : (i === 0 ? "-" : ""),
+        i === 0 ? `Rp ${totalOngkirGrup.toLocaleString("id-ID")}` : "",
+      ]);
+
+      autoTable(doc, {
+        startY: y,
+        head: tableHead,
+        body: rows,
+        styles: { fontSize: 5.8, cellPadding: 1.1, overflow: "ellipsize", lineColor: [200, 200, 200], lineWidth: 0.1 },
+        headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: "bold", fontSize: 5.8, halign: "center", valign: "middle" },
+        alternateRowStyles: { fillColor: [253, 248, 248] },
+        columnStyles: colStyles,
+        margin: { left: margin, right: margin },
+        tableLineColor: [200, 200, 200],
+        tableLineWidth: 0.1,
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    const safeJenis = pdfJenis.replace(/\+/g, "plus").replace(/\s+/g, "-").toLowerCase();
+    const safeKapal = pdfNamaKapal ? `-${pdfNamaKapal.replace(/\s+/g, "-")}` : "";
+    doc.save(`laporan-${safeJenis}${safeKapal}-${pdfDateFrom || "awal"}-${pdfDateTo || "akhir"}.pdf`);
+    setPdfOpen(false);
+  }
+
+  function exportPdfFlat() {
+    const filtered = getFilteredPackages();
+    if (filtered.length === 0) return;
+
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const judul = pdfJenis !== "all" ? pdfJenis : "Semua Jenis Jastip";
     const periodeFrom = pdfDateFrom ? new Date(pdfDateFrom).toLocaleDateString("id-ID") : "-";
     const periodeTo = pdfDateTo ? new Date(pdfDateTo).toLocaleDateString("id-ID") : "-";
@@ -101,7 +288,6 @@ export default function AdminPackages() {
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Jastip Anggun Jaya — Laporan Paket", 14, 14);
-
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(`Jenis Jastip : ${judul}`, 14, 21);
@@ -127,11 +313,7 @@ export default function AdminPackages() {
 
     autoTable(doc, {
       startY: 40,
-      head: [[
-        "No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen",
-        "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan",
-        "Paking", "Total Berat", "Total Ongkir", "Status",
-      ]],
+      head: [["No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen", "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan", "Paking", "Total Berat", "Total Ongkir", "Status"]],
       body: rows,
       styles: { fontSize: 7, cellPadding: 1.5 },
       headStyles: { fillColor: [200, 30, 30], textColor: 255, fontStyle: "bold", fontSize: 7 },
@@ -150,16 +332,13 @@ export default function AdminPackages() {
       margin: { left: 14, right: 14 },
     });
 
-    const namaFile = [
-      "laporan-paket",
-      pdfJenis !== "all" ? pdfJenis.replace(/\s+/g, "-").toLowerCase() : "semua",
-      pdfDateFrom || "awal",
-      pdfDateTo || "akhir",
-    ].join("_") + ".pdf";
-
+    const namaFile = ["laporan-paket", pdfJenis !== "all" ? pdfJenis.replace(/\s+/g, "-").toLowerCase() : "semua", pdfDateFrom || "awal", pdfDateTo || "akhir"].join("_") + ".pdf";
     doc.save(namaFile);
     setPdfOpen(false);
   }
+
+  const showGroupedFields = isGroupedExport();
+  const showNamaKapal = pdfJenis.toLowerCase() === "jastip pelni";
 
   return (
     <div className="space-y-6">
@@ -266,28 +445,48 @@ export default function AdminPackages() {
                 </SelectContent>
               </Select>
             </div>
+
+            {showGroupedFields && (
+              <>
+                {showNamaKapal && (
+                  <div className="space-y-1.5">
+                    <Label>Nama Kapal <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></Label>
+                    <Input
+                      placeholder="Contoh: KM DEMPO"
+                      value={pdfNamaKapal}
+                      onChange={(e) => setPdfNamaKapal(e.target.value)}
+                    />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label>Jadwal Closing <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></Label>
+                  <Input
+                    type="date"
+                    value={pdfJadwalClosing}
+                    onChange={(e) => setPdfJadwalClosing(e.target.value)}
+                  />
+                </div>
+                <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+                  Format laporan: dikelompokkan per nama konsumen, urut abjad — sesuai format manifest jastip.
+                </div>
+              </>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Tanggal Dari</Label>
-                <Input
-                  type="date"
-                  value={pdfDateFrom}
-                  onChange={(e) => setPdfDateFrom(e.target.value)}
-                />
+                <Input type="date" value={pdfDateFrom} onChange={(e) => setPdfDateFrom(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Tanggal Sampai</Label>
-                <Input
-                  type="date"
-                  value={pdfDateTo}
-                  onChange={(e) => setPdfDateTo(e.target.value)}
-                />
+                <Input type="date" value={pdfDateTo} onChange={(e) => setPdfDateTo(e.target.value)} />
               </div>
             </div>
-            {(pdfJenis !== "all" || pdfDateFrom || pdfDateTo) && (
+
+            {(pdfJenis !== "all" || pdfDateFrom || pdfDateTo || pdfNamaKapal || pdfJadwalClosing) && (
               <button
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => { setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); }}
+                onClick={() => { setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); setPdfNamaKapal(""); setPdfJadwalClosing(""); }}
               >
                 <X className="w-3 h-3 inline mr-1" />
                 Reset filter
