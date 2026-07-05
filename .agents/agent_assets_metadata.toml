@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Vnud5HPbMQImqZN1ecgTb"
+uri = "file://DOKUMENTASI.md"
+type = "text"
+title = "Dokumentasi Jastip Anggun Jaya"
