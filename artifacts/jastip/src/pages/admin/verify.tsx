@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { useListPackages } from "@workspace/api-client-react";
+import { useListPackages, useVerifyPackage } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,8 @@ type VerifyResult = "match" | "mismatch" | null;
 
 export default function AdminVerify() {
   const { toast } = useToast();
-  const { data: allPackages, isLoading } = useListPackages();
+  const { data: allPackages, isLoading, refetch: refetchPackages } = useListPackages();
+  const verifyPackageMutation = useVerifyPackage();
 
   const [selectedGroup, setSelectedGroup] = useState<PkgGroup | null>(null);
   const [scanMode, setScanMode] = useState<"idle" | "camera" | "manual">("idle");
@@ -89,6 +90,17 @@ export default function AdminVerify() {
       }
 
       const isMatch = pkg.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim();
+
+      if (isMatch && pkg.verified !== "sudah_diverifikasi") {
+        try {
+          const verified = await verifyPackageMutation.mutateAsync({ id: pkg.id });
+          pkg = verified;
+        } catch {
+          toast({ variant: "destructive", title: "Gagal menyimpan status verifikasi" });
+        }
+        refetchPackages();
+      }
+
       setVerifyResult(isMatch ? "match" : "mismatch");
       setResultPkg(pkg);
       setScanHistory((h) => [{ barcode: code, result: isMatch ? "match" : "mismatch", pkg }, ...h]);
@@ -208,6 +220,7 @@ export default function AdminVerify() {
       "Jenis Paking": p.packagingType || "",
       "Harga Barang (Rp)": p.price ?? "",
       Status: p.status === "diserahkan" ? "Diserahkan" : "Pending",
+      Verifikasi: p.verified === "sudah_diverifikasi" ? "Sudah Diverifikasi" : "Belum Diverifikasi",
       Catatan: p.notes || "",
       "Tanggal Dibuat": formatTgl(p.createdAt),
     }));
@@ -272,8 +285,8 @@ export default function AdminVerify() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {paginatedGroupItems.map((group) => {
-                  const pending = group.packages.filter((p) => p.status !== "diserahkan").length;
-                  const done = group.packages.filter((p) => p.status === "diserahkan").length;
+                  const belumVerifikasi = group.packages.filter((p) => p.verified !== "sudah_diverifikasi").length;
+                  const sudahVerifikasi = group.packages.filter((p) => p.verified === "sudah_diverifikasi").length;
                   return (
                     <Card
                       key={group.customerName}
@@ -285,8 +298,8 @@ export default function AdminVerify() {
                           <p className="font-semibold text-sm leading-tight">{group.customerName}</p>
                           <p className="text-xs text-muted-foreground">{group.packages.length} paket</p>
                           <div className="flex flex-wrap gap-1 mt-0.5">
-                            {pending > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{pending} pending</Badge>}
-                            {done > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{done} selesai</Badge>}
+                            {belumVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{belumVerifikasi} belum diverifikasi</Badge>}
+                            {sudahVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{sudahVerifikasi} sudah diverifikasi</Badge>}
                           </div>
                         </div>
                       </CardContent>
@@ -493,13 +506,13 @@ export default function AdminVerify() {
             </p>
             <div className="grid sm:grid-cols-2 gap-2">
               {selectedGroup.packages.map((p: any) => {
-                const wasScanned = scanHistory.find((h) => h.pkg?.id === p.id);
+                const isVerified = p.verified === "sudah_diverifikasi";
                 return (
-                  <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${wasScanned ? "bg-green-50 border-green-200" : "bg-muted/30"}`}>
-                    {wasScanned ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <Package className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                  <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${isVerified ? "bg-green-50 border-green-200" : "bg-muted/30"}`}>
+                    {isVerified ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <Package className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
                     <span className="font-mono flex-1 truncate">{p.resiNumber || p.barcode}</span>
-                    <Badge variant="outline" className={`text-xs shrink-0 ${p.status === "diserahkan" ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}>
-                      {p.status === "diserahkan" ? "Diserahkan" : "Pending"}
+                    <Badge variant="outline" className={`text-xs shrink-0 ${isVerified ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}>
+                      {isVerified ? "Sudah Diverifikasi" : "Belum Diverifikasi"}
                     </Badge>
                   </div>
                 );

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PackageStatus } from './packageStatus';
+import type { PackageVerified } from './packageVerified';
 
 export interface Package {
   id: number;
@@ -41,6 +42,9 @@ export interface Package {
   /** @nullable */
   notes?: string | null;
   status: PackageStatus;
+  verified?: PackageVerified;
+  /** @nullable */
+  verifiedAt?: string | null;
   customerId: number;
   customerName: string;
   customerPhone?: string;

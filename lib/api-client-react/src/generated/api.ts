@@ -947,6 +947,76 @@ export const useConfirmPickup = <TError = ErrorType<unknown>,
       return useMutation(getConfirmPickupMutationOptions(options));
     }
 
+export const getVerifyPackageUrl = (id: number,) => {
+
+
+
+
+  return `/api/packages/${id}/verify`
+}
+
+/**
+ * @summary Mark package as verified (sudah_diverifikasi)
+ */
+export const verifyPackage = async (id: number, options?: RequestInit): Promise<Package> => {
+
+  return customFetch<Package>(getVerifyPackageUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getVerifyPackageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPackage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyPackage>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['verifyPackage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyPackage>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  verifyPackage(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyPackageMutationResult = NonNullable<Awaited<ReturnType<typeof verifyPackage>>>
+
+    export type VerifyPackageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mark package as verified (sudah_diverifikasi)
+ */
+export const useVerifyPackage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPackage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyPackage>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getVerifyPackageMutationOptions(options));
+    }
+
 export const getGetBarcodeUrl = (id: number,) => {
 
 

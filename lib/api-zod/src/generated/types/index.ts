@@ -31,6 +31,7 @@ export * from './packageRow';
 export * from './packageStatus';
 export * from './packageUpdate';
 export * from './packageUpdateStatus';
+export * from './packageVerified';
 export * from './registerInput';
 export * from './reportData';
 export * from './reportEntry';

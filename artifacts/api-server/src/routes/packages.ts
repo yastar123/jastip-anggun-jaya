@@ -618,6 +618,36 @@ router.post(
   },
 );
 
+// POST /api/packages/:id/verify — mark package as verified (sudah_diverifikasi)
+router.post(
+  "/:id/verify",
+  requireAuth,
+  requireRole("admin", "owner"),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const updated = await db
+        .update(packagesTable)
+        .set({
+          verified: "sudah_diverifikasi",
+          verifiedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(packagesTable.id, id))
+        .returning();
+      const pkg = updated[0];
+      if (!pkg) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(formatPackage(pkg, new Map(), new Map()));
+    } catch (err) {
+      req.log.error(err);
+      res.status(500).json({ error: "Server error" });
+    }
+  },
+);
+
 // GET /api/packages/:id/barcode
 router.get("/:id/barcode", requireAuth, async (req, res) => {
   try {

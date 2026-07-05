@@ -92,6 +92,8 @@ export const ListPackagesResponseItem = zod.object({
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
   "customerId": zod.number(),
   "customerName": zod.string(),
   "customerPhone": zod.string().optional(),
@@ -190,6 +192,8 @@ export const GetPackageResponse = zod.object({
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
   "customerId": zod.number(),
   "customerName": zod.string(),
   "customerPhone": zod.string().optional(),
@@ -234,6 +238,8 @@ export const UpdatePackageResponse = zod.object({
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
   "customerId": zod.number(),
   "customerName": zod.string(),
   "customerPhone": zod.string().optional(),
@@ -276,6 +282,8 @@ export const ScanPackageResponse = zod.object({
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
   "customerId": zod.number(),
   "customerName": zod.string(),
   "customerPhone": zod.string().optional(),
@@ -316,6 +324,49 @@ export const ConfirmPickupResponse = zod.object({
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
   "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
+  "customerId": zod.number(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().optional(),
+  "adminId": zod.number().nullish(),
+  "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
+  "pickedUpAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Mark package as verified (sudah_diverifikasi)
+ */
+export const VerifyPackageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VerifyPackageResponse = zod.object({
+  "id": zod.number(),
+  "barcode": zod.string(),
+  "resiNumber": zod.string(),
+  "packageNumber": zod.string().nullish(),
+  "itemName": zod.string(),
+  "realWeight": zod.number().nullish(),
+  "length": zod.number().nullish(),
+  "width": zod.number().nullish(),
+  "height": zod.number().nullish(),
+  "volumeWeight": zod.number().nullish(),
+  "packagingType": zod.string().nullish(),
+  "usedWeight": zod.number().nullish(),
+  "shippingRate": zod.number().nullish(),
+  "totalWeight": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "totalShipping": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
   "customerId": zod.number(),
   "customerName": zod.string(),
   "customerPhone": zod.string().optional(),

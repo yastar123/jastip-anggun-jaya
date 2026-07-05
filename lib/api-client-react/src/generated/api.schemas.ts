@@ -57,6 +57,14 @@ export const PackageStatus = {
   picked_up: 'picked_up',
 } as const;
 
+export type PackageVerified = typeof PackageVerified[keyof typeof PackageVerified];
+
+
+export const PackageVerified = {
+  belum_diverifikasi: 'belum_diverifikasi',
+  sudah_diverifikasi: 'sudah_diverifikasi',
+} as const;
+
 export interface Package {
   id: number;
   barcode: string;
@@ -91,6 +99,9 @@ export interface Package {
   /** @nullable */
   notes?: string | null;
   status: PackageStatus;
+  verified?: PackageVerified;
+  /** @nullable */
+  verifiedAt?: string | null;
   customerId: number;
   customerName: string;
   customerPhone?: string;

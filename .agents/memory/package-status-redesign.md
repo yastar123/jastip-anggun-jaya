@@ -17,3 +17,10 @@ Package status enum is now only `["pending", "diserahkan"]`. All old references 
 - Barcode page has 2 tabs (1 Paket / Grup Paket) with pagination
 - Label print opens full A4 window with package info grid
 - Ongkir auto-calculated from bracket tables in packages-new.tsx
+
+## Verification status (separate concept from delivery status)
+Packages also have a `verified` field (`belum_diverifikasi` / `sudah_diverifikasi`) + `verifiedAt` timestamp — independent from `status` (pending/diserahkan).
+
+**Why:** Owner wanted persisted proof that admin/verify page confirmed package ownership via scan, separate from whether it's been picked up/delivered.
+
+**How to apply:** Set via `POST /api/packages/:id/verify` (called automatically from admin/verify.tsx when a scanned barcode matches the selected customer group). Don't conflate this with `status`.

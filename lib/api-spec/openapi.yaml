@@ -259,6 +259,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Package"
 
+  /packages/{id}/verify:
+    post:
+      operationId: verifyPackage
+      tags: [packages]
+      summary: Mark package as verified (sudah_diverifikasi)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Package verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
   /packages/{id}/barcode:
     get:
       operationId: getBarcode
@@ -613,6 +632,11 @@ components:
         status:
           type: string
           enum: [pending, in_transit, ready, picked_up]
+        verified:
+          type: string
+          enum: [belum_diverifikasi, sudah_diverifikasi]
+        verifiedAt:
+          type: ["string", "null"]
         customerId:
           type: integer
         customerName:

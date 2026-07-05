@@ -48,6 +48,12 @@ export const packagesTable = pgTable("packages", {
   })
     .notNull()
     .default("pending"),
+  verified: text("verified", {
+    enum: ["belum_diverifikasi", "sudah_diverifikasi"],
+  })
+    .notNull()
+    .default("belum_diverifikasi"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
   customerName: text("customer_name").notNull(),
   customerId: integer("customer_id").references(() => usersTable.id),
   adminId: integer("admin_id").references(() => usersTable.id),
