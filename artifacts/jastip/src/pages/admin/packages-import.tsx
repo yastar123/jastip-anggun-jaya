@@ -114,7 +114,7 @@ const TEMPLATE_KARGO = [
   { header: "Panjang (cm)",     key: "length",        example: "100",       required: false },
   { header: "Lebar (cm)",       key: "width",         example: "80",        required: false },
   { header: "Tinggi (cm)",      key: "height",        example: "60",        required: false },
-  { header: "Berat Real (Ton)", key: "realWeight",    example: "0.5",       required: false },
+  { header: "Berat Real (Ton)", key: "realWeight",    example: "0.5",       required: true },
   { header: "Harga Kubikasi",   key: "kargoRate",     example: "7000",      required: false },
 ];
 
@@ -237,9 +237,11 @@ export default function AdminPackagesImport() {
 
         const customerName = get("customerName");
         const resiNumber   = get("resiNumber");
+        const realWeightVal = num("realWeight");
         let error: string | undefined;
         if (!customerName) error = "Nama Konsumen kosong";
         else if (tplType === "standard" && !resiNumber) error = "No Resi kosong";
+        else if (realWeightVal === null || realWeightVal <= 0) error = "Berat Real wajib diisi";
 
         return {
           customerName,

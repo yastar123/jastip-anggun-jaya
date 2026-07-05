@@ -42,7 +42,7 @@ const packageSchema = z.object({
   serviceType: z.string().optional().nullable(),
   packageMode: z.string().optional().nullable(),
   deliveryRoute: z.string().optional().nullable(),
-  realWeight: z.coerce.number().optional().nullable(),
+  realWeight: z.coerce.number().min(0.001, "Berat real wajib diisi"),
   length: z.coerce.number().optional().nullable(),
   width: z.coerce.number().optional().nullable(),
   height: z.coerce.number().optional().nullable(),
@@ -833,7 +833,7 @@ export default function AdminPackagesNew() {
                             name={name}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>{label}</FormLabel>
+                                <FormLabel>{label} <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number" step="0.1" placeholder="0"
@@ -864,7 +864,7 @@ export default function AdminPackagesNew() {
                       name="realWeight"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>M³ / Ton (Berat Aktual)</FormLabel>
+                          <FormLabel>M³ / Ton (Berat Aktual) <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input
                               type="number" step="0.001" placeholder="0.000"
@@ -1134,7 +1134,7 @@ export default function AdminPackagesNew() {
                         name="realWeight"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Berat Real (Kg)</FormLabel>
+                            <FormLabel>Berat Real (Kg) <span className="text-destructive">*</span></FormLabel>
                             <FormControl>
                               <Input
                                 type="number" step="0.001" placeholder="0.000"
@@ -1160,7 +1160,7 @@ export default function AdminPackagesNew() {
                           name={name}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>{label}</FormLabel>
+                              <FormLabel>{label} <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></FormLabel>
                               <FormControl>
                                 <Input
                                   type="number" step="0.1" placeholder="0"
