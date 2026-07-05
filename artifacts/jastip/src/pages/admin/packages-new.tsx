@@ -682,7 +682,15 @@ export default function AdminPackagesNew() {
       {/* ===== FORM ===== */}
       {(!isGrup || grupPhase === "inputting") && (
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
+                e.preventDefault();
+              }
+            }}
+            className="space-y-6"
+          >
             {isKargo ? (
               /* ====== FORM KHUSUS JASTIP KARGO ====== */
               <>
