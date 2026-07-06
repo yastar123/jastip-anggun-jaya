@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -225,6 +225,53 @@ export default function AdminPackagesNew() {
   const params = parseQueryParams();
   const packageMode = params.packageMode;
   const isGrup = packageMode === "grup";
+
+  // ── Scanner barcode detection ─────────────────────────────────────────────
+  // Hardware scanner mengirim karakter sangat cepat (<80 ms per karakter)
+  // diikuti Enter. Kita blok Enter di input No Resi agar tidak men-submit form.
+  const resiLastKeyTimeRef = useRef<number>(0);
+  const resiIsLikelyScannerRef = useRef<boolean>(false);
+
+  function handleResiKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const now = Date.now();
+    const delta = now - resiLastKeyTimeRef.current;
+    resiLastKeyTimeRef.current = now;
+
+    // Tandai sebagai input scanner bila karakter datang sangat cepat
+    if (e.key.length === 1) {
+      if (delta < 80) {
+        resiIsLikelyScannerRef.current = true;
+      } else {
+        // Ketukan lambat = manusia mengetik manual, reset flag
+        resiIsLikelyScannerRef.current = false;
+      }
+    }
+
+    if (e.key === "Enter") {
+      // Selalu blok Enter di input ini — baik dari scanner maupun keyboard
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Setelah scanner mengisi resi, pindah fokus ke field berikutnya
+      // sehingga operator bisa langsung lanjut input tanpa klik manual
+      if (resiIsLikelyScannerRef.current) {
+        const formEl = (e.target as HTMLElement).closest("form");
+        if (formEl) {
+          const focusable = Array.from(
+            formEl.querySelectorAll<HTMLElement>(
+              "input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])"
+            )
+          );
+          const idx = focusable.indexOf(e.target as HTMLElement);
+          if (idx >= 0 && idx + 1 < focusable.length) {
+            focusable[idx + 1].focus();
+          }
+        }
+        resiIsLikelyScannerRef.current = false;
+      }
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Single-mode group state (legacy)
   const [savedGrup, setSavedGrup] = useState<{
@@ -725,7 +772,10 @@ export default function AdminPackagesNew() {
             onSubmit={form.handleSubmit(onSubmit)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") {
+                // preventDefault: cegah browser submit form via Enter
+                // stopPropagation: pastikan event tidak naik ke elemen lain
                 e.preventDefault();
+                e.stopPropagation();
               }
             }}
             className="space-y-6"
@@ -782,7 +832,12 @@ export default function AdminPackagesNew() {
                         <FormItem>
                           <FormLabel>Toko / Kurir <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input placeholder="Nama toko atau kurir pengirim" {...field} value={field.value || ""} />
+                            <Input
+                              placeholder="Nama toko atau kurir pengirim"
+                              {...field}
+                              value={field.value || ""}
+                              onKeyDown={handleResiKeyDown}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1093,7 +1148,11 @@ export default function AdminPackagesNew() {
                           <FormItem>
                             <FormLabel>No Resi <span className="text-destructive">*</span></FormLabel>
                             <FormControl>
-                              <Input placeholder="Contoh: JNE123456789" {...field} />
+                              <Input
+                                placeholder="Contoh: JNE123456789 (bisa scan barcode)"
+                                {...field}
+                                onKeyDown={handleResiKeyDown}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
