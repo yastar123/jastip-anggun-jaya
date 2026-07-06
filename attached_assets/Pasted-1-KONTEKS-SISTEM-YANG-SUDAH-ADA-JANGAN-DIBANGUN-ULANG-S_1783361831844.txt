@@ -1,0 +1,251 @@
+1. KONTEKS SISTEM YANG SUDAH ADA (JANGAN DIBANGUN ULANG)
+
+Sistem Jastip Anggun Jaya adalah platform manajemen jastip ekspedisi yang sudah berjalan (live, sudah dipakai untuk transaksi nyata). Modul yang sudah ada dan berfungsi, jangan dirombak strukturnya kecuali disebutkan eksplisit di bagian requirement:
+
+
+Login & Akun — autentikasi untuk role Admin dan Owner.
+Dashboard Admin — ringkasan operasional harian.
+Dashboard Owner / Monitor Owner — ringkasan keuangan & laporan untuk pemilik bisnis.
+Input Paket — 3 mode: input 1 paket, input grup paket, dan import Excel massal.
+Cetak Label Barcode/QR — generate label untuk paket.
+Verifikasi Paket — scan barcode saat paket tiba/diproses.
+Scan & Pembayaran — scan saat customer mengambil paket, sekaligus proses pembayaran.
+Riwayat — histori transaksi.
+Keuangan & Laporan — laporan harian, bulanan, tahunan untuk owner.
+Manajemen User — role Admin dan Owner.
+4 rumus ongkir berbeda — tergantung jenis jastip (Hemat+, Pesawat, Cargo, Pelni).
+
+
+Tabel utama saat ini: paket (dengan field seperti jenis_jastip sebagai teks/kategori di tabel paket, TANPA entitas pengiriman/batch terpisah), user (role admin/owner).
+
+
+2. ROOT CAUSE MASALAH YANG SEDANG DIPERBAIKI
+
+Sistem saat ini mengelompokkan (grouping) data paket hanya berdasarkan nama_konsumen. Ini bug arsitektur nyata, bukan sekadar tampilan, karena tidak ada entitas "batch pengiriman/periode kapal" yang memisahkan data antar periode pengiriman.
+
+Contoh kasus nyata yang harus TIDAK bisa terjadi lagi setelah perbaikan:
+
+
+Nawar Musakir input 2 paket di Jastip Hemat+ dan 2 paket di Jastip Pelni → sistem sekarang salah menggabungkan jadi "1 nama, 4 paket". Seharusnya terpisah: Nawar Musakir–Hemat+–2 paket, dan Nawar Musakir–Pelni–2 paket.
+Alinwahyudi sudah discan pengambilan (status final), tapi ketika ada input paket baru dengan nama yang sama, status lama yang sudah SUDAH_DIAMBIL malah ikut berubah lagi. Ini harus dikunci permanen.
+Filter layanan tidak solid: Jastip Pelni bisa ikut menampilkan data Jastip Hemat.
+Data antar periode kapal (misal kapal ETD 3 Juli vs kapal ETD 15 Juli) bisa tercampur karena sistem hanya mengandalkan filter tanggal input, bukan ID batch pengiriman yang eksplisit.
+
+
+Root cause: data tidak terikat pada satu batch_id (kapal + ETD + periode closing), dan grouping hanya pakai nama_konsumen bukan batch_id + jenis_jastip_id + nama_konsumen.
+
+
+3. TUJUAN PENGEMBANGAN
+
+Tambahkan entitas baru Batch Pengiriman, jadikan setiap paket wajib terikat ke satu batch_id, perbaiki semua query grouping agar berbasis batch_id + jenis_jastip_id + nama_konsumen, pecah status paket jadi lebih granular dan terkunci setelah final, serta tambahkan mekanisme arsip (soft-hide, bukan delete) dan role tambahan untuk kasus khusus.
+
+
+4. PERUBAHAN SKEMA DATABASE
+
+4.1 Tabel baru: batch_pengiriman
+
+FieldTipeKeteranganbatch_idPK, auto/uuidnama_kapalstringcontoh: "Dobonsolo"etd (tanggal_berangkat)dateperiode_closing_mulaidateperiode_closing_selesaidatekota_asalstringtujuanstringcontoh: "Manokwari"status_batchenumOPEN, CLOSED, ARSIPcreated_byFK usercreated_attimestamp
+
+Nama tampilan batch di UI mengikuti format: "{nama_kapal} - ETD {etd} - Closing {periode_closing_mulai} s/d {periode_closing_selesai}", contoh: "Dobonsolo - ETD 3 Juli 2026 - Closing 18 Juni s/d 1 Juli 2026".
+
+4.2 Perubahan tabel paket
+
+Tambahkan kolom berikut (jangan hapus kolom lama yang masih dipakai modul lain):
+
+
+batch_id (FK ke batch_pengiriman, wajib/NOT NULL untuk data baru)
+jenis_jastip_id (FK ke tabel referensi jenis jastip — ganti pendekatan teks bebas menjadi ID relasional, supaya filter Pelni tidak pernah bisa menampilkan Hemat)
+Field paket lain yang tetap dipakai: nama_konsumen, no_resi, no_paket, tanggal, berat_real, panjang, lebar, tinggi, berat_volume, total_ongkir, created_by, created_at
+
+
+Pecah status jadi 3 field terpisah (lebih rapi daripada satu status linear panjang):
+
+
+status_verifikasi — contoh: BELUM_DIVERIFIKASI, SUDAH_DIVERIFIKASI
+status_pengambilan — contoh: BELUM_DIAMBIL, SUDAH_DIAMBIL
+status_pembayaran — contoh: BELUM_DIBAYAR, DP, SUDAH_DIBAYAR
+
+
+Aturan kunci (lock): begitu status_pengambilan = SUDAH_DIAMBIL, ketiga field status paket tersebut tidak boleh berubah lagi oleh proses apapun (termasuk input paket baru dengan nama yang sama). Enforce ini di level backend/service logic, jangan hanya di UI.
+
+4.3 Query grouping — WAJIB diubah di SEMUA modul berikut
+
+Grouping/filter data paket di seluruh sistem harus berbasis:
+
+batch_id + jenis_jastip_id + nama_konsumen
+
+bukan hanya nama_konsumen. Ini berdampak ke modul-modul berikut, cek dan perbaiki satu per satu:
+
+
+Input Paket (mode 1 Paket & mode Grup)
+Import Excel
+Label Barcode / Cetak Label
+Verifikasi Paket
+Scan & Pembayaran
+Riwayat
+Monitor/Dashboard Owner
+
+
+4.4 Migrasi data lama (PENTING — sistem ini sudah live dengan data produksi)
+
+Karena paket-paket lama di database belum punya batch_id, jangan biarkan mereka jadi NULL begitu saja. Buat migration script dengan strategi berikut:
+
+
+Buat satu batch_pengiriman khusus bernama "Batch Legacy - Data Sebelum Fitur Batch" dengan status_batch = ARSIP.
+Backfill semua row paket yang batch_id IS NULL supaya menunjuk ke batch legacy ini.
+Untuk jenis_jastip_id, mapping dari nilai teks jenis_jastip yang lama ke tabel referensi jenis jastip yang baru (buat tabel referensi ini dulu kalau belum ada: Hemat+, Pesawat, Cargo, Pelni).
+Jalankan migrasi ini di transaksi database (transaction), backup dulu sebelum eksekusi, dan verifikasi jumlah row sebelum/sesudah migrasi sama persis (tidak ada data hilang).
+Setelah migrasi, batch_id di tabel paket bisa diubah jadi NOT NULL constraint untuk mencegah data baru masuk tanpa batch.
+
+
+
+5. PERUBAHAN ALUR & UI PER MODUL
+
+5.1 Input Paket Baru (mode 1 Paket & Grup Paket)
+
+Tambahkan field wajib "Batch Pengiriman" di form, sebaiknya diletakkan di bagian atas form (dekat kolom tanggal). Field ini berupa dropdown/selector yang memilih dari batch yang sudah dibuat (status OPEN).
+
+Urutan field yang disarankan:
+
+
+Tanggal
+Batch Pengiriman * (dropdown, wajib)
+Nama Pemilik Paket *
+No Resi *
+Jenis Jastip
+Lokasi Pengiriman
+
+
+Kalau belum ada batch yang dibuat sama sekali, sistem tidak boleh mengizinkan simpan, dan tampilkan pesan: "Silakan buat atau pilih Batch Pengiriman terlebih dahulu."
+
+5.2 Menu baru: Batch Pengiriman (tambahkan di sidebar)
+
+Isi menu:
+
+
+Buat Batch Baru (form: nama kapal, ETD, periode closing mulai/selesai, kota asal, tujuan)
+Daftar Batch Aktif (status OPEN)
+Daftar Batch Selesai / Arsip (status CLOSED / ARSIP)
+Detail paket dalam satu batch (list semua paket yang terikat ke batch tsb, grouped by jenis_jastip + nama_konsumen)
+Tombol "Import Excel ke batch ini"
+Tombol "Input manual ke batch ini"
+
+
+5.3 Alur Import Excel (revisi urutan langkah)
+
+
+Admin klik Import Excel
+Sistem meminta pilih batch yang sudah ada, ATAU buat batch baru langsung dari sini (nama kapal, ETD, periode closing, jenis jastip)
+Upload file Excel
+Sistem tampilkan preview data
+Sistem validasi otomatis, tandai baris bermasalah:
+
+Resi kosong
+Nama kosong
+Berat kosong
+Resi duplikat (baik duplikat dalam file maupun duplikat dengan data yang sudah ada di database)
+Jenis jastip kosong
+
+
+
+Admin klik Konfirmasi Import
+Semua data masuk dengan batch_id yang sudah dipilih — import tidak bisa jalan tanpa batch_id
+
+
+5.4 Alur Input Manual (revisi urutan langkah)
+
+Input Paket → Pilih Jenis Jastip → Pilih (1 Paket / Grup Paket) → Pilih Batch Pengiriman → Isi data paket → Simpan
+
+5.5 Status Batch dan aturan aksesnya
+
+
+OPEN/AKTIF — masih bisa tambah paket manual, susulan, atau import Excel.
+CLOSED/DITUTUP — batch dikunci, paket baru tidak boleh ditambahkan sembarangan oleh admin biasa.
+SELESAI/ARSIP — semua proses selesai, hanya bisa dilihat sebagai riwayat/read-only.
+
+
+Kasus khusus paket susulan setelah batch CLOSED: hanya role "admin utama" yang boleh menambahkan paket susulan ke batch yang sudah closed, lewat tombol khusus "Tambah Paket Susulan". Setiap penambahan ini WAJIB dicatat di audit log (siapa user-nya, kapan, batch mana, paket apa yang ditambahkan).
+
+
+Catatan implementasi role: dokumen requirement belum menentukan apakah "admin utama" ini tier baru terpisah dari role Owner yang sudah ada, atau owner sendiri yang berperan sebagai admin utama. Default aman untuk implementasi awal: perlakukan "admin utama" sebagai permission tambahan yang di-attach ke role Owner yang sudah ada (bukan bikin tabel role baru dari nol), supaya tidak menambah kompleksitas migrasi user. Kalau nanti butuh role terpisah, itu bisa jadi iterasi berikutnya.
+
+
+
+5.6 Verifikasi Paket & Label Barcode — dipisah per layanan
+
+Saat klik menu Label Barcode atau Verifikasi Paket, tampilkan pilihan submenu:
+
+
+Jastip Hemat+
+Jastip Pesawat
+Jastip Cargo
+Jastip Pelni
+
+
+Filter ini wajib berbasis jenis_jastip_id (relasi), bukan pencocokan teks, supaya filter Pelni tidak pernah menampilkan data Hemat.
+
+5.7 Verifikasi Paket — logika scan
+
+Saat barcode discan di menu Verifikasi:
+
+
+Update status_verifikasi = SUDAH_DIVERIFIKASI dan verified_at = waktu scan — berbasis barcode/package_id, BUKAN berbasis nama konsumen.
+Setelah scan sukses, frontend harus refresh/update tampilan otomatis tanpa perlu reload manual.
+Tangani validasi tambahan (opsional tapi disarankan): paket di manifest tapi belum discan → masuk daftar "Belum Ditemukan"; paket discan tapi tidak ada di manifest → "Tidak Terdaftar"; paket duplikat → beri peringatan.
+
+
+5.8 Scan & Pembayaran
+
+Saat admin scan salah satu paket atau cari berdasarkan nama, tampilkan agregasi semua paket atas nama tsb (dalam batch & jenis jastip yang sama):
+
+
+Total item, total berat, total ongkir
+Total sudah dibayar, sisa bayar
+Metode bayar: Cash / Transfer / DP / Piutang
+Diskon nominal
+Cetak nota
+
+
+Begitu proses ini menandai paket sebagai status_pengambilan = SUDAH_DIAMBIL, status tersebut final dan terkunci (lihat aturan lock di 4.2).
+
+5.9 Arsip Paket Sudah Diambil (menu baru)
+
+
+Paket dengan status_pengambilan = SUDAH_DIAMBIL tidak boleh dihapus dari database, tapi disembunyikan dari tampilan aktif di menu: Verifikasi Paket, Label Barcode aktif, Scan Pembayaran aktif.
+Paket-paket ini dipindahkan secara tampilan (bukan secara data) ke menu baru "Arsip Paket Sudah Diambil", tetap bisa diakses untuk kebutuhan laporan, riwayat pembayaran, dan bukti komplain.
+
+
+
+6. URUTAN PRIORITAS KERJA
+
+Prioritas 1 — Perbaikan Wajib (kerjakan & selesaikan dulu ini)
+
+
+Buat tabel/fitur Batch Pengiriman (skema + CRUD + menu)
+Migrasi data lama ke "Batch Legacy" (lihat bagian 4.4)
+Semua paket baru wajib punya batch_id (constraint NOT NULL setelah migrasi selesai)
+Perbaiki grouping data jadi batch_id + jenis_jastip_id + nama_konsumen di semua modul (bagian 4.3)
+Fix filter layanan berbasis jenis_jastip_id (relasi) supaya Pelni tidak menampilkan Hemat
+Scan barcode langsung update status secara real-time, berbasis barcode/package_id
+Paket SUDAH_DIAMBIL dikunci permanen, tidak boleh berubah lagi oleh input apapun
+Field wajib "Batch Pengiriman" di form Input Paket Baru (1 Paket & Grup) dan alur Import Excel
+
+
+Prioritas 2 — Perbaikan Tampilan & Fitur Tambahan (kerjakan setelah Prioritas 1 lolos testing)
+
+
+Label Barcode & Verifikasi Paket dibuat submenu per layanan (Hemat+/Pesawat/Cargo/Pelni)
+Tambah filter: nama kapal, tanggal ETD, periode closing, jenis jastip, status paket
+Menu Arsip Paket Sudah Diambil
+Role/permission "admin utama" untuk tambah paket susulan setelah batch closed + audit log
+
+
+
+7. CARA EKSEKUSI (INSTRUKSI KHUSUS UNTUK REPLIT AGENT)
+
+
+Jangan kerjakan Prioritas 1 dan 2 sekaligus. Selesaikan seluruh Prioritas 1 dulu, termasuk migrasi data.
+Sebelum mengubah skema database produksi, buat backup/dump data dulu, dan jalankan migrasi di environment testing/staging bila tersedia.
+Setelah Prioritas 1 selesai, lakukan testing regresi manual untuk alur lengkap: Input Paket → Cetak Label → Scan Verifikasi → Scan Pembayaran → Riwayat/Arsip — pastikan tidak ada modul lama yang rusak akibat perubahan skema paket.
+Baru setelah alur di atas terkonfirmasi jalan normal, lanjutkan ke Prioritas 2.
+Untuk setiap perubahan pada modul yang sudah ada (bukan bikin baru), jelaskan dulu file/fungsi mana saja yang akan diubah sebelum eksekusi, supaya mudah ditinjau ulang jika ada yang perlu diperbaiki.
