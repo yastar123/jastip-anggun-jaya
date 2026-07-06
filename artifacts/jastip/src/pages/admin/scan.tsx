@@ -147,25 +147,12 @@ export default function AdminScan() {
         return;
       }
 
-      const newItems: ScannedItem[] = [toItem(pkg)];
+      const newItem = toItem(pkg);
 
-      // Auto-tambahkan paket lain dalam grup yang sama (nama customer sama, masih pending)
-      const allPkgs = await fetchJson(`/api/packages`);
-      if (Array.isArray(allPkgs)) {
-        const customerName = (pkg.customerName || "").trim().toLowerCase();
-        const siblings = allPkgs.filter((p: any) =>
-          p.id !== pkg.id &&
-          p.status !== "diserahkan" &&
-          (p.customerName || "").trim().toLowerCase() === customerName &&
-          !items.some((i) => i.id === p.id),
-        );
-        siblings.forEach((s: any) => newItems.push(toItem(s)));
-      }
-
-      setItems((prev) => [...prev, ...newItems]);
+      setItems((prev) => [...prev, newItem]);
       toast({
-        title: newItems.length > 1 ? `✓ ${newItems.length} paket grup ditambahkan` : "✓ Paket ditambahkan",
-        description: `${pkg.customerName} — ${formatRp(newItems.reduce((s, i) => s + i.totalShipping, 0))}`,
+        title: "✓ Paket ditambahkan",
+        description: `${pkg.customerName} — ${formatRp(newItem.totalShipping)}`,
       });
     } catch {
       toast({ variant: "destructive", title: "Gagal mencari paket" });
@@ -191,7 +178,7 @@ export default function AdminScan() {
       scannerRef.current = scanner;
       await scanner.start(
         devices[devices.length - 1].id,
-        { fps: 10, qrbox: { width: 260, height: 120 } },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
         handleScanSuccess,
         undefined,
       );
@@ -576,10 +563,6 @@ export default function AdminScan() {
                           <div>
                             <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Admin Input</p>
                             <p>{item.adminName || "-"}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Paking</p>
-                            <p>{item.packagingType || "-"}</p>
                           </div>
                           <div className="md:col-span-2">
                             <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>

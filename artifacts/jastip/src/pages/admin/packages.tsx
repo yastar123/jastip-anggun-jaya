@@ -24,7 +24,6 @@ const JENIS_JASTIP = [
   "Jastip Hemat+",
   "Jastip Pelni",
   "Jastip Pesawat",
-  "Jasa Belanja",
 ];
 
 const GROUPED_JENIS = ["jastip hemat+", "jastip pelni", "jastip pesawat"];
@@ -41,10 +40,7 @@ function formatDate(d: string | null | undefined) {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
-function packagingLabel(t: string | null | undefined) {
-  const map: Record<string, string> = { karton: "Karton", plastik: "Plastik", kayu: "Kayu", bubble_wrap: "Bubble Wrap", sack: "Karung", lainnya: "Lainnya" };
-  return t ? map[t] || t : "-";
-}
+
 function fNum(n: any, decimals = 1) {
   if (n == null || n === "") return "";
   const v = Number(n);
@@ -62,7 +58,6 @@ export default function AdminPackages() {
   const [pdfDateFrom, setPdfDateFrom] = useState("");
   const [pdfDateTo, setPdfDateTo] = useState("");
   const [pdfNamaKapal, setPdfNamaKapal] = useState("");
-  const [pdfJadwalClosing, setPdfJadwalClosing] = useState("");
 
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
@@ -147,27 +142,19 @@ export default function AdminPackages() {
     const titleText = (serviceUpper[jenisKey] || pdfJenis.toUpperCase()) +
       (pdfNamaKapal ? " " + pdfNamaKapal.toUpperCase() : "");
     const rute = ruteDefault[jenisKey] || "-";
-    const closingStr = pdfJadwalClosing
-      ? new Date(pdfJadwalClosing).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" })
-      : "-";
-
     // ── Header halaman ──────────────────────────────────────────────────────
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text(titleText, pageW / 2, 11, { align: "center" });
 
     const infoRows: [string, string][] = [
-      ["Nama Kapal", pdfNamaKapal || "-"],
       ["Rute", rute],
-      ["Jadwal Closing", closingStr],
-      ["Berat", ""],
       ["Jumlah Paket", `${totalPaket} Item`],
     ];
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     const labelX = 45;
-    const sepX = 90;
     const valX = 95;
     let y = 17;
     for (const [lbl, val] of infoRows) {
@@ -175,15 +162,7 @@ export default function AdminPackages() {
       doc.text(val, valX, y);
       y += 4.2;
     }
-
-    const desc =
-      `Jastip ${serviceUpper[jenisKey] || pdfJenis} terdapat sistem perhitungan berat Real & Volume , ` +
-      `Berat Real di gunakan jika Berat Real lebih besar dari Berat Volume . ` +
-      `Sedangkan Berat Volume di gunakan ketika Nilai dari Berat Volume lebih besar dari Berat Real`;
-    doc.setFontSize(6.5);
-    const lines = doc.splitTextToSize(desc, pageW - margin * 2 - 4);
-    doc.text(lines, pageW / 2, y + 1, { align: "center" });
-    y += lines.length * 3.2 + 3;
+    y += 3;
 
     // ── Header tabel (reusable) ─────────────────────────────────────────────
     const tableHead = [[
@@ -192,7 +171,6 @@ export default function AdminPackages() {
       "NAMA\nKONSUMEN",
       "BERAT\nREAL", "P", "L", "T",
       "BERAT\nVOLUME",
-      "JENIS\nPAKING",
       "BERAT YANG\nDI GUNAKAN",
       "ONGKIR PER\nPAKET",
       "TOTAL\nBERAT",
@@ -211,12 +189,11 @@ export default function AdminPackages() {
       7:  { cellWidth: 7,  halign: "right" },
       8:  { cellWidth: 7,  halign: "right" },
       9:  { cellWidth: 11, halign: "right" },
-      10: { cellWidth: 11 },
-      11: { cellWidth: 15, halign: "right" },
-      12: { cellWidth: 20, halign: "right" },
-      13: { cellWidth: 14, halign: "right" },
-      14: { cellWidth: 17, halign: "right" },
-      15: { cellWidth: 22, halign: "right" },
+      10: { cellWidth: 15, halign: "right" },
+      11: { cellWidth: 20, halign: "right" },
+      12: { cellWidth: 14, halign: "right" },
+      13: { cellWidth: 17, halign: "right" },
+      14: { cellWidth: 22, halign: "right" },
     };
 
     // ── Loop per grup konsumen ──────────────────────────────────────────────
@@ -246,7 +223,6 @@ export default function AdminPackages() {
         fNum(p.width, 0),
         fNum(p.height, 0),
         p.volumeWeight != null ? fNum(p.volumeWeight, 1) : "0.0",
-        p.packagingType || "-",
         fNum(p.usedWeight, 1),
         p.totalShipping != null ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
         i === 0 ? totalBeratGrup.toFixed(1) : "",
@@ -305,7 +281,6 @@ export default function AdminPackages() {
       p.itemName || "-",
       p.realWeight ?? "-",
       p.usedWeight ?? "-",
-      packagingLabel(p.packagingType),
       p.totalWeight ?? "-",
       p.totalShipping ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
       p.status === "diserahkan" ? "Diserahkan" : "Pending",
@@ -313,7 +288,7 @@ export default function AdminPackages() {
 
     autoTable(doc, {
       startY: 40,
-      head: [["No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen", "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan", "Paking", "Total Berat", "Total Ongkir", "Status"]],
+      head: [["No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen", "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan", "Total Berat", "Total Ongkir", "Status"]],
       body: rows,
       styles: { fontSize: 7, cellPadding: 1.5 },
       headStyles: { fillColor: [200, 30, 30], textColor: 255, fontStyle: "bold", fontSize: 7 },
@@ -325,9 +300,9 @@ export default function AdminPackages() {
         3: { cellWidth: 18 },
         7: { halign: "right", cellWidth: 16 },
         8: { halign: "right", cellWidth: 18 },
-        10: { halign: "right", cellWidth: 16 },
-        11: { halign: "right", cellWidth: 24 },
-        12: { halign: "center", cellWidth: 18 },
+        9: { halign: "right", cellWidth: 16 },
+        10: { halign: "right", cellWidth: 24 },
+        11: { halign: "center", cellWidth: 18 },
       },
       margin: { left: 14, right: 14 },
     });
@@ -379,14 +354,14 @@ export default function AdminPackages() {
           <table className="w-full text-sm min-w-[1400px]">
             <thead>
               <tr className="border-b bg-muted/30">
-                {["Tanggal","No Resi","No Paket","Nama Konsumen","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Jenis Paking","Berat Digunakan","Ongkir/Kg","Total Berat","Total Ongkir","Status","Aksi"].map(h => (
+                {["Tanggal","No Resi","No Paket","Nama Konsumen","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Berat Digunakan","Ongkir/Kg","Total Berat","Total Ongkir","Status","Aksi"].map(h => (
                   <th key={h} className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={16} className="h-24 text-center text-muted-foreground py-10">Memuat data...</td></tr>
+                <tr><td colSpan={15} className="h-24 text-center text-muted-foreground py-10">Memuat data...</td></tr>
               ) : paginated && paginated.length > 0 ? (
                 paginated.map((pkg) => (
                   <tr key={pkg.id} className="border-b hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setLocation(`/admin/packages/${pkg.id}`)}>
@@ -402,7 +377,6 @@ export default function AdminPackages() {
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).width ?? "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).height ?? "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).volumeWeight ?? "-"}</td>
-                    <td className="py-3 px-3 whitespace-nowrap">{packagingLabel((pkg as any).packagingType)}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right font-medium">{(pkg as any).usedWeight ?? "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).shippingRate ? formatRp((pkg as any).shippingRate) : "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).totalWeight ?? "-"}</td>
@@ -414,7 +388,7 @@ export default function AdminPackages() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={16} className="h-32 text-center text-muted-foreground">Data paket tidak ditemukan.</td></tr>
+                <tr><td colSpan={15} className="h-32 text-center text-muted-foreground">Data paket tidak ditemukan.</td></tr>
               )}
             </tbody>
           </table>
@@ -458,17 +432,6 @@ export default function AdminPackages() {
                     />
                   </div>
                 )}
-                <div className="space-y-1.5">
-                  <Label>Jadwal Closing <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></Label>
-                  <Input
-                    type="date"
-                    value={pdfJadwalClosing}
-                    onChange={(e) => setPdfJadwalClosing(e.target.value)}
-                  />
-                </div>
-                <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
-                  Format laporan: dikelompokkan per nama konsumen, urut abjad — sesuai format manifest jastip.
-                </div>
               </>
             )}
 
@@ -483,10 +446,10 @@ export default function AdminPackages() {
               </div>
             </div>
 
-            {(pdfJenis !== "all" || pdfDateFrom || pdfDateTo || pdfNamaKapal || pdfJadwalClosing) && (
+            {(pdfJenis !== "all" || pdfDateFrom || pdfDateTo || pdfNamaKapal) && (
               <button
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => { setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); setPdfNamaKapal(""); setPdfJadwalClosing(""); }}
+                onClick={() => { setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); setPdfNamaKapal(""); }}
               >
                 <X className="w-3 h-3 inline mr-1" />
                 Reset filter

@@ -48,7 +48,7 @@ interface EditForm {
   itemName: string;
   serviceType: string;
   deliveryRoute: string;
-  packagingType: string;
+
   packageDate: string;
   realWeight: string;
   length: string;
@@ -91,7 +91,7 @@ export default function BarcodeGroupDetail() {
   const [editPkg, setEditPkg] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({
     resiNumber: "", packageNumber: "", customerName: "", itemName: "",
-    serviceType: "", deliveryRoute: "", packagingType: "", packageDate: "",
+    serviceType: "", deliveryRoute: "", packageDate: "",
     realWeight: "", length: "", width: "", height: "",
   });
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -107,7 +107,6 @@ export default function BarcodeGroupDetail() {
       itemName: pkg.itemName || "",
       serviceType: pkg.serviceType || "",
       deliveryRoute: pkg.deliveryRoute || "",
-      packagingType: pkg.packagingType || "",
       packageDate: pkg.packageDate ? pkg.packageDate.split("T")[0] : "",
       realWeight: pkg.realWeight != null ? String(pkg.realWeight) : "",
       length: pkg.length != null ? String(pkg.length) : "",
@@ -131,7 +130,6 @@ export default function BarcodeGroupDetail() {
           itemName: editForm.itemName || null,
           serviceType: editForm.serviceType || null,
           deliveryRoute: editForm.deliveryRoute || null,
-          packagingType: editForm.packagingType || null,
           packageDate: editForm.packageDate || null,
           realWeight: editForm.realWeight ? Number(editForm.realWeight) : null,
           length: editForm.length ? Number(editForm.length) : null,
@@ -210,7 +208,6 @@ export default function BarcodeGroupDetail() {
                 <div class="field full"><div class="fl">Rute</div><div class="fv">${p.deliveryRoute || "-"}</div></div>
                 <div class="field"><div class="fl">Berat Real</div><div class="fv">${p.realWeight != null ? p.realWeight + " Kg" : "-"}</div></div>
                 <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</div></div>
-                <div class="field"><div class="fl">Jenis Paking</div><div class="fv">${p.packagingType || "-"}</div></div>
                 <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
               </div>
             </div>
@@ -344,10 +341,6 @@ export default function BarcodeGroupDetail() {
                     <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>
                     <p>{pkg.deliveryRoute || "-"}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Paking</p>
-                    <p>{pkg.packagingType || "-"}</p>
-                  </div>
                   {(pkg.serviceType === "jastip kargo" || pkg.serviceType === "jastip pelni") && (
                     <div className="md:col-span-2">
                       <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Nama Barang</p>
@@ -451,10 +444,6 @@ export default function BarcodeGroupDetail() {
                 <Input value={editForm.itemName} onChange={e => setEditForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Contoh: Pakaian, Elektronik..." />
               </div>
             )}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Jenis Paking</label>
-              <Input value={editForm.packagingType} onChange={e => setEditForm(f => ({ ...f, packagingType: e.target.value }))} placeholder="Karton, Plastik, Kayu..." />
-            </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Berat Real (Kg)</label>
               <Input type="number" step="0.001" value={editForm.realWeight} onChange={e => setEditForm(f => ({ ...f, realWeight: e.target.value }))} placeholder="0.000" />
