@@ -46,7 +46,8 @@ router.post(
       } = req.body;
 
       if (!paymentType || !totalAmount || !packageIds?.length) {
-        return res.status(400).json({ error: "Data tidak lengkap" });
+        res.status(400).json({ error: "Data tidak lengkap" });
+        return;
       }
 
       const user = (req as any).user;
@@ -114,7 +115,7 @@ router.patch(
       res.json(updated);
     } catch (err) {
       (req as any).log?.error?.(err);
-      res.status(500).json({ error: "Gagal memperbarui pembayaran" });
+      return res.status(500).json({ error: "Gagal memperbarui pembayaran" });
     }
   },
 );
