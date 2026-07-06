@@ -103,6 +103,11 @@ export default function AdminScan() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const manualRef = useRef<HTMLInputElement>(null);
+  // Per-code debounce: prevents the camera firing the same barcode repeatedly
+  const lastScannedCodeRef = useRef<string>("");
+  const lastScannedAtRef = useRef<number>(0);
+  const scanUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SCAN_COOLDOWN_MS = 1500; // ignore same code for 1.5s after a scan
   const SCANNER_ID = "admin-scan-pos-scanner";
 
   const totalTagihan = items.reduce((s, i) => s + i.totalShipping, 0);
@@ -162,6 +167,22 @@ export default function AdminScan() {
   }
 
   const handleScanSuccess = useCallback(async (code: string) => {
+    const now = Date.now();
+    const sameCode = code === lastScannedCodeRef.current;
+    const withinCooldown = now - lastScannedAtRef.current < SCAN_COOLDOWN_MS;
+    // Drop duplicate: same barcode within cooldown window
+    if (sameCode && withinCooldown) return;
+
+    // Record this scan immediately (before await) to block concurrent callbacks
+    lastScannedCodeRef.current = code;
+    lastScannedAtRef.current = now;
+
+    // Hard-reset cooldown after window so different codes are never blocked
+    if (scanUnlockTimerRef.current) clearTimeout(scanUnlockTimerRef.current);
+    scanUnlockTimerRef.current = setTimeout(() => {
+      lastScannedCodeRef.current = "";
+    }, SCAN_COOLDOWN_MS);
+
     await lookupAndAdd(code);
   }, [items]);
 
@@ -188,11 +209,21 @@ export default function AdminScan() {
     }
   }
 
+  function resetScanDebounce() {
+    lastScannedCodeRef.current = "";
+    lastScannedAtRef.current = 0;
+    if (scanUnlockTimerRef.current) {
+      clearTimeout(scanUnlockTimerRef.current);
+      scanUnlockTimerRef.current = null;
+    }
+  }
+
   async function stopCamera() {
     if (scannerRef.current) {
       try { await scannerRef.current.stop(); } catch {}
       scannerRef.current = null;
     }
+    resetScanDebounce();
     setScanMode("idle");
   }
 
