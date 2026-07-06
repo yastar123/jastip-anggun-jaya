@@ -103,12 +103,25 @@ export default function AdminScan() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const manualRef = useRef<HTMLInputElement>(null);
-  // Per-code debounce: prevents the camera firing the same barcode repeatedly
+  // ── Anti-spam refs ───────────────────────────────────────────────────────
+  // lastScannedCodeRef: kode terakhir yang berhasil diproses.
+  //   Selama kamera masih mengarah ke barcode yang sama, kode ini tidak berubah
+  //   sehingga scan berikutnya langsung diabaikan — TANPA batas waktu.
+  //   Hanya di-reset saat kamera dimatikan, atau ketika kode berbeda terdeteksi,
+  //   atau ketika lookup gagal (agar user bisa coba ulang).
   const lastScannedCodeRef = useRef<string>("");
-  const lastScannedAtRef = useRef<number>(0);
-  const scanUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const SCAN_COOLDOWN_MS = 1500; // ignore same code for 1.5s after a scan
+  // isScanProcessingRef: lock saat lookupAndAdd sedang berjalan (async).
+  //   Mencegah callback kamera yang datang berturut-turut masuk bersamaan.
+  const isScanProcessingRef = useRef<boolean>(false);
+  // itemsRef: bayangan items state yang selalu up-to-date.
+  //   Digunakan oleh handleScanSuccess (stable callback) agar bisa cek daftar
+  //   terbaru tanpa terjebak stale closure.
+  const itemsRef = useRef<ScannedItem[]>([]);
+  // ─────────────────────────────────────────────────────────────────────────
   const SCANNER_ID = "admin-scan-pos-scanner";
+
+  // Sync itemsRef setiap kali items berubah agar callback scanner (stable) bisa cek data terbaru
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
   const totalTagihan = items.reduce((s, i) => s + i.totalShipping, 0);
   const uangNum = Number(uangDibayar.replace(/\D/g, "")) || 0;
@@ -120,9 +133,11 @@ export default function AdminScan() {
     return r.json();
   }
 
-  async function lookupAndAdd(code: string) {
+  // Mengembalikan true = boleh coba lagi dengan kode yang sama (tidak ditemukan / error)
+  //               false = lock tetap terpasang (berhasil / sudah ada / sudah diserahkan)
+  async function lookupAndAdd(code: string): Promise<boolean> {
     const trimmed = code.trim();
-    if (!trimmed) return;
+    if (!trimmed) return true;
     setIsLooking(true);
     setAlreadyDelivered(null);
     try {
@@ -137,54 +152,61 @@ export default function AdminScan() {
 
       if (!pkg) {
         toast({ variant: "destructive", title: "Paket tidak ditemukan", description: `Barcode: ${trimmed}` });
-        return;
+        return true; // unlock → user boleh coba scan ulang barcode yang sama
       }
 
       if (pkg.status === "diserahkan") {
         setAlreadyDelivered(pkg);
         toast({ title: "Sudah diserahkan sebelumnya", description: `${pkg.customerName} — ${pkg.resiNumber || pkg.barcode}` });
-        return;
+        return false; // tetap lock → tampilkan warning, jangan proses ulang
       }
 
-      const alreadyAdded = items.some((i) => i.id === pkg.id);
+      // Gunakan itemsRef (bukan state items) agar tidak terjebak stale closure
+      const alreadyAdded = itemsRef.current.some((i) => i.id === pkg.id);
       if (alreadyAdded) {
         toast({ title: "Sudah ditambahkan", description: `${pkg.resiNumber || pkg.barcode} sudah ada dalam daftar.` });
-        return;
+        return false; // tetap lock → paket sudah ada, tidak perlu scan ulang
       }
 
       const newItem = toItem(pkg);
-
       setItems((prev) => [...prev, newItem]);
       toast({
         title: "✓ Paket ditambahkan",
         description: `${pkg.customerName} — ${formatRp(newItem.totalShipping)}`,
       });
+      return false; // tetap lock → sukses, jangan proses lagi selama kamera di sini
     } catch {
       toast({ variant: "destructive", title: "Gagal mencari paket" });
+      return true; // unlock → biarkan coba ulang bila ini error sementara
     } finally {
       setIsLooking(false);
     }
   }
 
   const handleScanSuccess = useCallback(async (code: string) => {
-    const now = Date.now();
-    const sameCode = code === lastScannedCodeRef.current;
-    const withinCooldown = now - lastScannedAtRef.current < SCAN_COOLDOWN_MS;
-    // Drop duplicate: same barcode within cooldown window
-    if (sameCode && withinCooldown) return;
+    // ① Kode yang sama masih terbaca kamera → abaikan sepenuhnya (tidak ada batas waktu).
+    //   Lock hanya dibuka bila kamera berpindah ke barcode berbeda, kamera dimatikan,
+    //   atau bila lookup sebelumnya gagal (tidak ditemukan / error).
+    if (code === lastScannedCodeRef.current) return;
 
-    // Record this scan immediately (before await) to block concurrent callbacks
+    // ② lookupAndAdd sebelumnya masih berjalan (async) → abaikan callback masuk berikutnya.
+    if (isScanProcessingRef.current) return;
+
+    // Pasang lock segera sebelum operasi async
+    isScanProcessingRef.current = true;
     lastScannedCodeRef.current = code;
-    lastScannedAtRef.current = now;
 
-    // Hard-reset cooldown after window so different codes are never blocked
-    if (scanUnlockTimerRef.current) clearTimeout(scanUnlockTimerRef.current);
-    scanUnlockTimerRef.current = setTimeout(() => {
-      lastScannedCodeRef.current = "";
-    }, SCAN_COOLDOWN_MS);
-
-    await lookupAndAdd(code);
-  }, [items]);
+    try {
+      const allowRetry = await lookupAndAdd(code);
+      if (allowRetry) {
+        // Barcode tidak ditemukan atau error → hapus lock agar user bisa coba lagi
+        lastScannedCodeRef.current = "";
+      }
+    } finally {
+      // Pastikan processing lock SELALU dibuka, bahkan bila terjadi error tak terduga
+      isScanProcessingRef.current = false;
+    }
+  }, []); // deps kosong: semua akses lewat ref / setState (stable), tidak ada stale closure
 
   async function startCamera() {
     setScanMode("camera");
@@ -211,11 +233,7 @@ export default function AdminScan() {
 
   function resetScanDebounce() {
     lastScannedCodeRef.current = "";
-    lastScannedAtRef.current = 0;
-    if (scanUnlockTimerRef.current) {
-      clearTimeout(scanUnlockTimerRef.current);
-      scanUnlockTimerRef.current = null;
-    }
+    isScanProcessingRef.current = false;
   }
 
   async function stopCamera() {
