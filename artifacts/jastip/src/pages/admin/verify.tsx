@@ -16,17 +16,33 @@ import {
 
 interface PkgGroup {
   customerName: string;
+  serviceType: string;
+  batchId: number | null;
   packages: any[];
 }
 
-function groupByName(packages: any[]): PkgGroup[] {
+// Group by customerName + serviceType + batchId
+// Fixes: konsumen yang punya paket di Hemat+ DAN Pelni tidak lagi digabung dalam satu grup
+function groupByNameAndService(packages: any[]): PkgGroup[] {
   const map: Record<string, any[]> = {};
   for (const p of packages) {
     if (!p.customerName) continue;
-    if (!map[p.customerName]) map[p.customerName] = [];
-    map[p.customerName].push(p);
+    // Filter: jangan tampilkan paket yang sudah dikunci (SUDAH_DIAMBIL)
+    if (p.statusPengambilan === "SUDAH_DIAMBIL") continue;
+    const key = [
+      p.customerName.trim().toLowerCase(),
+      (p.serviceType || "").toLowerCase(),
+      String(p.batchId ?? ""),
+    ].join("|");
+    if (!map[key]) map[key] = [];
+    map[key].push(p);
   }
-  return Object.entries(map).map(([customerName, pkgs]) => ({ customerName, packages: pkgs }));
+  return Object.entries(map).map(([, pkgs]) => ({
+    customerName: pkgs[0].customerName,
+    serviceType: pkgs[0].serviceType || "",
+    batchId: pkgs[0].batchId ?? null,
+    packages: pkgs,
+  }));
 }
 
 type VerifyResult = "match" | "mismatch" | null;
@@ -52,8 +68,8 @@ export default function AdminVerify() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const SCANNER_ID = "verify-qr-scanner";
 
-  const grupPackages = (allPackages || []).filter((p: any) => p.packageMode === "grup" || true);
-  const allGroups = groupByName(grupPackages);
+  // Semua paket aktif (belum diambil), dikelompokkan per customerName+serviceType+batchId
+  const allGroups = groupByNameAndService(allPackages || []);
   const filteredGroups = allGroups.filter((g) =>
     !searchGroup || g.customerName.toLowerCase().includes(searchGroup.toLowerCase())
   );
@@ -89,9 +105,13 @@ export default function AdminVerify() {
         return;
       }
 
-      const isMatch = pkg.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim();
+      // Cocokkan berdasarkan customerName + serviceType + batchId (bukan nama saja)
+      const isMatch =
+        pkg.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim() &&
+        (pkg.serviceType || "").toLowerCase() === selectedGroup.serviceType.toLowerCase() &&
+        pkg.batchId === selectedGroup.batchId;
 
-      if (isMatch && pkg.verified !== "sudah_diverifikasi") {
+      if (isMatch && pkg.statusVerifikasi !== "SUDAH_DIVERIFIKASI") {
         try {
           const verified = await verifyPackageMutation.mutateAsync({ id: pkg.id });
           pkg = verified;
@@ -219,8 +239,8 @@ export default function AdminVerify() {
       "Total Ongkir (Rp)": p.totalShipping ?? "",
       "Jenis Paking": p.packagingType || "",
       "Harga Barang (Rp)": p.price ?? "",
-      Status: p.status === "diserahkan" ? "Diserahkan" : "Pending",
-      Verifikasi: p.verified === "sudah_diverifikasi" ? "Sudah Diverifikasi" : "Belum Diverifikasi",
+      Status: p.statusPengambilan === "SUDAH_DIAMBIL" ? "Diserahkan" : "Pending",
+      Verifikasi: p.statusVerifikasi === "SUDAH_DIVERIFIKASI" ? "Sudah Diverifikasi" : "Belum Diverifikasi",
       Catatan: p.notes || "",
       "Tanggal Dibuat": formatTgl(p.createdAt),
     }));
@@ -285,21 +305,24 @@ export default function AdminVerify() {
             <>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {paginatedGroupItems.map((group) => {
-                  const belumVerifikasi = group.packages.filter((p) => p.verified !== "sudah_diverifikasi").length;
-                  const sudahVerifikasi = group.packages.filter((p) => p.verified === "sudah_diverifikasi").length;
+                  const belumVerifikasi = group.packages.filter((p) => p.statusVerifikasi !== "SUDAH_DIVERIFIKASI").length;
+                  const sudahVerifikasi = group.packages.filter((p) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
                   return (
                     <Card
-                      key={group.customerName}
+                      key={`${group.customerName}|${group.serviceType}|${group.batchId ?? ""}`}
                       className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
                       onClick={() => setSelectedGroup(group)}
                     >
                       <CardContent className="pt-4 pb-3">
                         <div className="flex flex-col gap-1.5">
                           <p className="font-semibold text-sm leading-tight">{group.customerName}</p>
+                          {group.serviceType && (
+                            <Badge variant="outline" className="text-xs w-fit capitalize">{group.serviceType.replace("jastip ", "")}</Badge>
+                          )}
                           <p className="text-xs text-muted-foreground">{group.packages.length} paket</p>
                           <div className="flex flex-wrap gap-1 mt-0.5">
-                            {belumVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{belumVerifikasi} belum diverifikasi</Badge>}
-                            {sudahVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{sudahVerifikasi} sudah diverifikasi</Badge>}
+                            {belumVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{belumVerifikasi} belum</Badge>}
+                            {sudahVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{sudahVerifikasi} ✓</Badge>}
                           </div>
                         </div>
                       </CardContent>
@@ -334,7 +357,7 @@ export default function AdminVerify() {
                 <div className="flex-1">
                   <p className="font-semibold text-base">{selectedGroup.customerName}</p>
                   <p className="text-sm text-muted-foreground">
-                    {selectedGroup.packages.length} paket · Scan barcode untuk verifikasi
+                    {selectedGroup.packages.length} paket · {selectedGroup.serviceType ? selectedGroup.serviceType.replace("jastip ", "Jastip ") + " · " : ""}Scan barcode untuk verifikasi
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -506,7 +529,7 @@ export default function AdminVerify() {
             </p>
             <div className="grid sm:grid-cols-2 gap-2">
               {selectedGroup.packages.map((p: any) => {
-                const isVerified = p.verified === "sudah_diverifikasi";
+                const isVerified = p.statusVerifikasi === "SUDAH_DIVERIFIKASI";
                 return (
                   <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${isVerified ? "bg-green-50 border-green-200" : "bg-muted/30"}`}>
                     {isVerified ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <Package className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}

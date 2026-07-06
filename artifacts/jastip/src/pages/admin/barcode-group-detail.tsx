@@ -76,13 +76,20 @@ export default function BarcodeGroupDetail() {
   const q = new URLSearchParams(window.location.search);
   const groupName = q.get("name") || "";
   const idsParam = q.get("ids") || "";
+  const filterServiceType = q.get("serviceType") || "";
+  const filterBatchId = q.get("batchId") ? Number(q.get("batchId")) : null;
   const filterIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
   const { data: packages, isLoading } = useListPackages();
 
   const groupPackages = (packages || []).filter((p: any) => {
     if (filterIds) return filterIds.includes(p.id);
-    return (p.customerName || "").trim().toLowerCase() === groupName.trim().toLowerCase();
+    const nameMatch = (p.customerName || "").trim().toLowerCase() === groupName.trim().toLowerCase();
+    if (!nameMatch) return false;
+    // Narrow by serviceType and batchId when passed (composite group identity)
+    if (filterServiceType && (p.serviceType || "").toLowerCase() !== filterServiceType.toLowerCase()) return false;
+    if (filterBatchId !== null && p.batchId !== filterBatchId) return false;
+    return true;
   });
 
   const totalWeight = groupPackages.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0);

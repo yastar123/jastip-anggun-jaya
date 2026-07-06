@@ -9,7 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Camera, Upload, ScanLine, X, Hash, Trash2, CheckCircle2, XCircle,
+  Camera, Upload, ScanLine, X, Hash, Trash2, CheckCircle2,
   ShoppingCart, RotateCcw, Banknote, CreditCard, Clock, ChevronDown, ChevronUp,
   AlertTriangle, Users,
 } from "lucide-react";
@@ -93,7 +93,6 @@ export default function AdminScan() {
   const [items, setItems] = useState<ScannedItem[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [alreadyDelivered, setAlreadyDelivered] = useState<any>(null);
-  const [revertingId, setRevertingId] = useState<number | null>(null);
 
   const [showPayModal, setShowPayModal] = useState(false);
   const [uangDibayar, setUangDibayar] = useState("");
@@ -323,24 +322,7 @@ export default function AdminScan() {
     setUangDibayar(digits ? Number(digits).toLocaleString("id-ID") : "");
   }
 
-  async function tolakDelivered() {
-    if (!alreadyDelivered) return;
-    setRevertingId(alreadyDelivered.id);
-    try {
-      const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${alreadyDelivered.id}/tolak`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (!r.ok) throw new Error("Gagal");
-      toast({ title: "Dikembalikan ke Pending", description: `${alreadyDelivered.resiNumber} dikembalikan ke Pending.` });
-      setAlreadyDelivered(null);
-    } catch {
-      toast({ variant: "destructive", title: "Gagal mengembalikan paket" });
-    } finally {
-      setRevertingId(null);
-    }
-  }
+  // Fungsi tolak sengaja dihapus — setelah SUDAH_DIAMBIL, status terkunci permanen (spec §4.2)
 
   async function handleKonfirmasiBayar() {
     setIsSaving(true);
@@ -427,22 +409,14 @@ export default function AdminScan() {
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-amber-900">
-                Paket sudah diserahkan sebelumnya
+                Paket sudah diserahkan &amp; dikunci permanen
               </p>
               <p className="text-xs text-amber-700 truncate">
                 {alreadyDelivered.customerName} — {alreadyDelivered.resiNumber || alreadyDelivered.barcode}
                 {alreadyDelivered.pickedUpAt ? ` · Diserahkan: ${formatDate(alreadyDelivered.pickedUpAt)}` : ""}
               </p>
+              <p className="text-xs text-amber-600 mt-0.5">Status tidak dapat diubah kembali.</p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-amber-400 text-amber-800 hover:bg-amber-100 shrink-0"
-              onClick={tolakDelivered}
-              disabled={revertingId === alreadyDelivered.id}
-            >
-              {revertingId === alreadyDelivered.id ? "..." : "Kembalikan ke Pending"}
-            </Button>
             <Button size="icon" variant="ghost" className="shrink-0" onClick={() => setAlreadyDelivered(null)}>
               <X className="w-4 h-4" />
             </Button>

@@ -405,7 +405,12 @@ function GroupedBarcodeItem({
           size="sm"
           variant="outline"
           className="w-full text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
-          onClick={() => setLocation(`${base}/barcode-group?name=${encodeURIComponent(first?.customerName || "")}`)}
+          onClick={() => {
+            const params = new URLSearchParams({ name: first?.customerName || "" });
+            if (first?.serviceType) params.set("serviceType", first.serviceType);
+            if (first?.batchId != null) params.set("batchId", String(first.batchId));
+            setLocation(`${base}/barcode-group?${params.toString()}`);
+          }}
         >
           <Pencil className="w-3 h-3 mr-1" /> Edit / Kelola Paket
         </Button>
@@ -454,17 +459,27 @@ export default function AdminBarcode() {
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()),
   );
 
-  // Always group packages by customerName
-  const groupedByCustomer: { customerName: string; pkgs: any[] }[] = [];
+  // Group packages by customerName + serviceType + batchId
+  // Fixes: "Nawar Musakir Hemat+" dan "Nawar Musakir Pelni" tidak lagi digabung
+  const groupedByCustomer: { customerName: string; serviceType: string; batchId: number | null; pkgs: any[] }[] = [];
   {
     const map = new Map<string, any[]>();
     for (const p of filtered) {
-      const key = (p.customerName || "").trim().toLowerCase();
+      const key = [
+        (p.customerName || "").trim().toLowerCase(),
+        (p.serviceType || "").toLowerCase(),
+        String(p.batchId ?? ""),
+      ].join("|");
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(p);
     }
     for (const [, pkgs] of map) {
-      groupedByCustomer.push({ customerName: pkgs[0]?.customerName || "", pkgs });
+      groupedByCustomer.push({
+        customerName: pkgs[0]?.customerName || "",
+        serviceType: pkgs[0]?.serviceType || "",
+        batchId: pkgs[0]?.batchId ?? null,
+        pkgs,
+      });
     }
   }
 
@@ -757,7 +772,7 @@ export default function AdminBarcode() {
           <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             {paginatedGroups.map((group) => (
               <GroupedBarcodeItem
-                key={group.customerName || group.pkgs[0]?.id}
+                key={`${group.customerName}|${group.serviceType}|${group.batchId ?? ""}`}
                 pkgs={group.pkgs}
               />
             ))}
