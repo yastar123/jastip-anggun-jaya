@@ -52,9 +52,7 @@ export type PackageStatus = typeof PackageStatus[keyof typeof PackageStatus];
 
 export const PackageStatus = {
   pending: 'pending',
-  in_transit: 'in_transit',
-  ready: 'ready',
-  picked_up: 'picked_up',
+  diserahkan: 'diserahkan',
 } as const;
 
 export type PackageVerified = typeof PackageVerified[keyof typeof PackageVerified];
@@ -63,6 +61,31 @@ export type PackageVerified = typeof PackageVerified[keyof typeof PackageVerifie
 export const PackageVerified = {
   belum_diverifikasi: 'belum_diverifikasi',
   sudah_diverifikasi: 'sudah_diverifikasi',
+} as const;
+
+export type PackageStatusVerifikasi = typeof PackageStatusVerifikasi[keyof typeof PackageStatusVerifikasi];
+
+
+export const PackageStatusVerifikasi = {
+  BELUM_DIVERIFIKASI: 'BELUM_DIVERIFIKASI',
+  SUDAH_DIVERIFIKASI: 'SUDAH_DIVERIFIKASI',
+} as const;
+
+export type PackageStatusPengambilan = typeof PackageStatusPengambilan[keyof typeof PackageStatusPengambilan];
+
+
+export const PackageStatusPengambilan = {
+  BELUM_DIAMBIL: 'BELUM_DIAMBIL',
+  SUDAH_DIAMBIL: 'SUDAH_DIAMBIL',
+} as const;
+
+export type PackageStatusPembayaran = typeof PackageStatusPembayaran[keyof typeof PackageStatusPembayaran];
+
+
+export const PackageStatusPembayaran = {
+  BELUM_DIBAYAR: 'BELUM_DIBAYAR',
+  DP: 'DP',
+  SUDAH_DIBAYAR: 'SUDAH_DIBAYAR',
 } as const;
 
 export interface Package {
@@ -102,9 +125,20 @@ export interface Package {
   verified?: PackageVerified;
   /** @nullable */
   verifiedAt?: string | null;
-  customerId: number;
+  statusVerifikasi?: PackageStatusVerifikasi;
+  statusPengambilan?: PackageStatusPengambilan;
+  statusPembayaran?: PackageStatusPembayaran;
+  /** @nullable */
+  batchId?: number | null;
+  /** @nullable */
+  serviceTypeId?: number | null;
+  /** @nullable */
+  serviceType?: string | null;
+  /** @nullable */
+  customerId: number | null;
   customerName: string;
-  customerPhone?: string;
+  /** @nullable */
+  customerPhone?: string | null;
   /** @nullable */
   adminId?: number | null;
   /** @nullable */
@@ -118,10 +152,11 @@ export interface Package {
 }
 
 export interface PackageInput {
+  batchId: number;
   resiNumber: string;
   /** @nullable */
   packageNumber?: string | null;
-  itemName: string;
+  itemName?: string;
   /** @nullable */
   realWeight?: number | null;
   /** @nullable */
@@ -148,7 +183,7 @@ export interface PackageInput {
   weight?: number | null;
   /** @nullable */
   notes?: string | null;
-  customerId: number;
+  customerId?: number;
   /** @nullable */
   packageDate?: string | null;
 }
@@ -158,9 +193,7 @@ export type PackageUpdateStatus = typeof PackageUpdateStatus[keyof typeof Packag
 
 export const PackageUpdateStatus = {
   pending: 'pending',
-  in_transit: 'in_transit',
-  ready: 'ready',
-  picked_up: 'picked_up',
+  diserahkan: 'diserahkan',
 } as const;
 
 export interface PackageUpdate {
@@ -205,6 +238,7 @@ export interface PackageRow {
 }
 
 export interface PackageImport {
+  batchId: number;
   packages: PackageRow[];
 }
 
@@ -295,6 +329,88 @@ export interface ReportData {
   entries: ReportEntry[];
 }
 
+export interface ServiceType {
+  id: number;
+  name: string;
+  label: string;
+}
+
+export type BatchStatusBatch = typeof BatchStatusBatch[keyof typeof BatchStatusBatch];
+
+
+export const BatchStatusBatch = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+  ARSIP: 'ARSIP',
+} as const;
+
+export interface Batch {
+  id: number;
+  namaKapal: string;
+  etd: string;
+  periodeClosingMulai: string;
+  periodeClosingSelesai: string;
+  kotaAsal: string;
+  tujuan: string;
+  statusBatch: BatchStatusBatch;
+  label: string;
+  /** @nullable */
+  createdBy?: number | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type BatchWithCount = Batch & {
+  packageCount?: number;
+};
+
+export type BatchDetailGroupsItem = { [key: string]: unknown };
+
+export type BatchDetail = BatchWithCount & {
+  groups?: BatchDetailGroupsItem[];
+};
+
+export interface BatchInput {
+  namaKapal: string;
+  etd: string;
+  periodeClosingMulai: string;
+  periodeClosingSelesai: string;
+  kotaAsal: string;
+  tujuan?: string;
+}
+
+export type BatchUpdateStatusBatch = typeof BatchUpdateStatusBatch[keyof typeof BatchUpdateStatusBatch];
+
+
+export const BatchUpdateStatusBatch = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+  ARSIP: 'ARSIP',
+} as const;
+
+export interface BatchUpdate {
+  namaKapal?: string;
+  etd?: string;
+  periodeClosingMulai?: string;
+  periodeClosingSelesai?: string;
+  kotaAsal?: string;
+  tujuan?: string;
+  statusBatch?: BatchUpdateStatusBatch;
+}
+
+export type ListBatchesParams = {
+statusBatch?: ListBatchesStatusBatch;
+};
+
+export type ListBatchesStatusBatch = typeof ListBatchesStatusBatch[keyof typeof ListBatchesStatusBatch];
+
+
+export const ListBatchesStatusBatch = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+  ARSIP: 'ARSIP',
+} as const;
+
 export type ListPackagesParams = {
 status?: ListPackagesStatus;
 /**
@@ -317,6 +433,22 @@ dateTo?: string | null;
  * @nullable
  */
 search?: string | null;
+/**
+ * @nullable
+ */
+batchId?: number | null;
+/**
+ * @nullable
+ */
+serviceTypeId?: number | null;
+/**
+ * @nullable
+ */
+statusPengambilan?: string | null;
+/**
+ * @nullable
+ */
+statusVerifikasi?: string | null;
 };
 
 export type ListPackagesStatus = typeof ListPackagesStatus[keyof typeof ListPackagesStatus];
@@ -324,9 +456,7 @@ export type ListPackagesStatus = typeof ListPackagesStatus[keyof typeof ListPack
 
 export const ListPackagesStatus = {
   pending: 'pending',
-  in_transit: 'in_transit',
-  ready: 'ready',
-  picked_up: 'picked_up',
+  diserahkan: 'diserahkan',
 } as const;
 
 export type ListCustomersParams = {

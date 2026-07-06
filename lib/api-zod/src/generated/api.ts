@@ -61,15 +61,131 @@ export const GetMeResponse = zod.object({
 
 
 /**
+ * @summary List all batches with package count
+ */
+export const ListBatchesQueryParams = zod.object({
+  "statusBatch": zod.enum(['OPEN', 'CLOSED', 'ARSIP']).optional()
+})
+
+export const ListBatchesResponseItem = zod.object({
+  "id": zod.number(),
+  "namaKapal": zod.string(),
+  "etd": zod.string(),
+  "periodeClosingMulai": zod.string(),
+  "periodeClosingSelesai": zod.string(),
+  "kotaAsal": zod.string(),
+  "tujuan": zod.string(),
+  "statusBatch": zod.enum(['OPEN', 'CLOSED', 'ARSIP']),
+  "label": zod.string(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+}).and(zod.object({
+  "packageCount": zod.number().optional()
+}))
+export const ListBatchesResponse = zod.array(ListBatchesResponseItem)
+
+
+/**
+ * @summary Create a new batch
+ */
+export const CreateBatchBody = zod.object({
+  "namaKapal": zod.string(),
+  "etd": zod.string(),
+  "periodeClosingMulai": zod.string(),
+  "periodeClosingSelesai": zod.string(),
+  "kotaAsal": zod.string(),
+  "tujuan": zod.string().optional()
+})
+
+
+/**
+ * @summary Get batch detail with packages grouped
+ */
+export const GetBatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBatchResponse = zod.object({
+  "id": zod.number(),
+  "namaKapal": zod.string(),
+  "etd": zod.string(),
+  "periodeClosingMulai": zod.string(),
+  "periodeClosingSelesai": zod.string(),
+  "kotaAsal": zod.string(),
+  "tujuan": zod.string(),
+  "statusBatch": zod.enum(['OPEN', 'CLOSED', 'ARSIP']),
+  "label": zod.string(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+}).and(zod.object({
+  "packageCount": zod.number().optional()
+})).and(zod.object({
+  "groups": zod.array(zod.object({
+
+}).passthrough()).optional()
+}))
+
+
+/**
+ * @summary Update batch status or details
+ */
+export const UpdateBatchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateBatchBody = zod.object({
+  "namaKapal": zod.string().optional(),
+  "etd": zod.string().optional(),
+  "periodeClosingMulai": zod.string().optional(),
+  "periodeClosingSelesai": zod.string().optional(),
+  "kotaAsal": zod.string().optional(),
+  "tujuan": zod.string().optional(),
+  "statusBatch": zod.enum(['OPEN', 'CLOSED', 'ARSIP']).optional()
+})
+
+export const UpdateBatchResponse = zod.object({
+  "id": zod.number(),
+  "namaKapal": zod.string(),
+  "etd": zod.string(),
+  "periodeClosingMulai": zod.string(),
+  "periodeClosingSelesai": zod.string(),
+  "kotaAsal": zod.string(),
+  "tujuan": zod.string(),
+  "statusBatch": zod.enum(['OPEN', 'CLOSED', 'ARSIP']),
+  "label": zod.string(),
+  "createdBy": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary List all service types
+ */
+export const ListServiceTypesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "label": zod.string()
+})
+export const ListServiceTypesResponse = zod.array(ListServiceTypesResponseItem)
+
+
+/**
  * @summary List packages (filtered by role)
  */
 export const ListPackagesQueryParams = zod.object({
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']).optional(),
+  "status": zod.enum(['pending', 'diserahkan']).optional(),
   "customerId": zod.coerce.number().nullish(),
   "adminId": zod.coerce.number().nullish(),
   "dateFrom": zod.coerce.string().nullish(),
   "dateTo": zod.coerce.string().nullish(),
-  "search": zod.coerce.string().nullish()
+  "search": zod.coerce.string().nullish(),
+  "batchId": zod.coerce.number().nullish(),
+  "serviceTypeId": zod.coerce.number().nullish(),
+  "statusPengambilan": zod.coerce.string().nullish(),
+  "statusVerifikasi": zod.coerce.string().nullish()
 })
 
 export const ListPackagesResponseItem = zod.object({
@@ -91,12 +207,18 @@ export const ListPackagesResponseItem = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),
@@ -111,9 +233,10 @@ export const ListPackagesResponse = zod.array(ListPackagesResponseItem)
  * @summary Create a new package (admin only)
  */
 export const CreatePackageBody = zod.object({
+  "batchId": zod.number(),
   "resiNumber": zod.string(),
   "packageNumber": zod.string().nullish(),
-  "itemName": zod.string(),
+  "itemName": zod.string().optional(),
   "realWeight": zod.number().nullish(),
   "length": zod.number().nullish(),
   "width": zod.number().nullish(),
@@ -127,7 +250,7 @@ export const CreatePackageBody = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "customerId": zod.number(),
+  "customerId": zod.number().optional(),
   "packageDate": zod.string().nullish()
 })
 
@@ -136,6 +259,7 @@ export const CreatePackageBody = zod.object({
  * @summary Import packages from Excel data (admin only)
  */
 export const ImportPackagesBody = zod.object({
+  "batchId": zod.number(),
   "packages": zod.array(zod.object({
   "packageDate": zod.string().nullish(),
   "resiNumber": zod.string(),
@@ -191,12 +315,18 @@ export const GetPackageResponse = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),
@@ -214,7 +344,7 @@ export const UpdatePackageParams = zod.object({
 })
 
 export const UpdatePackageBody = zod.object({
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']).optional(),
+  "status": zod.enum(['pending', 'diserahkan']).optional(),
   "notes": zod.string().nullish()
 })
 
@@ -237,12 +367,18 @@ export const UpdatePackageResponse = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),
@@ -281,12 +417,18 @@ export const ScanPackageResponse = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),
@@ -323,12 +465,18 @@ export const SerahkanPackageResponse = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),
@@ -364,12 +512,18 @@ export const TolakPackageResponse = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),
@@ -405,12 +559,18 @@ export const VerifyPackageResponse = zod.object({
   "totalShipping": zod.number().nullish(),
   "weight": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "status": zod.enum(['pending', 'diserahkan']),
   "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
   "verifiedAt": zod.string().nullish(),
-  "customerId": zod.number(),
+  "statusVerifikasi": zod.enum(['BELUM_DIVERIFIKASI', 'SUDAH_DIVERIFIKASI']).optional(),
+  "statusPengambilan": zod.enum(['BELUM_DIAMBIL', 'SUDAH_DIAMBIL']).optional(),
+  "statusPembayaran": zod.enum(['BELUM_DIBAYAR', 'DP', 'SUDAH_DIBAYAR']).optional(),
+  "batchId": zod.number().nullish(),
+  "serviceTypeId": zod.number().nullish(),
+  "serviceType": zod.string().nullish(),
+  "customerId": zod.number().nullable(),
   "customerName": zod.string(),
-  "customerPhone": zod.string().optional(),
+  "customerPhone": zod.string().nullish(),
   "adminId": zod.number().nullish(),
   "adminName": zod.string().nullish(),
   "packageDate": zod.string().nullish(),

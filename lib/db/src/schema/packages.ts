@@ -9,6 +9,8 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
+import { batchesTable } from "./batches";
+import { serviceTypesTable } from "./service-types";
 
 export const packagesTable = pgTable("packages", {
   id: serial("id").primaryKey(),
@@ -43,6 +45,7 @@ export const packagesTable = pgTable("packages", {
   // Legacy weight (kept for backward compat)
   weight: numeric("weight", { precision: 10, scale: 2 }),
   notes: text("notes"),
+  // ── Legacy single-status (kept for backward compat) ──────────────────────
   status: text("status", {
     enum: ["pending", "diserahkan"],
   })
@@ -54,6 +57,26 @@ export const packagesTable = pgTable("packages", {
     .notNull()
     .default("belum_diverifikasi"),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  // ── Granular status fields (new) ──────────────────────────────────────────
+  statusVerifikasi: text("status_verifikasi", {
+    enum: ["BELUM_DIVERIFIKASI", "SUDAH_DIVERIFIKASI"],
+  })
+    .notNull()
+    .default("BELUM_DIVERIFIKASI"),
+  statusPengambilan: text("status_pengambilan", {
+    enum: ["BELUM_DIAMBIL", "SUDAH_DIAMBIL"],
+  })
+    .notNull()
+    .default("BELUM_DIAMBIL"),
+  statusPembayaran: text("status_pembayaran", {
+    enum: ["BELUM_DIBAYAR", "DP", "SUDAH_DIBAYAR"],
+  })
+    .notNull()
+    .default("BELUM_DIBAYAR"),
+  // ── Batch & service type (new) ────────────────────────────────────────────
+  // nullable initially; will be backfilled by migration, then constrained
+  batchId: integer("batch_id").references(() => batchesTable.id),
+  serviceTypeId: integer("service_type_id").references(() => serviceTypesTable.id),
   customerName: text("customer_name").notNull(),
   customerId: integer("customer_id").references(() => usersTable.id),
   adminId: integer("admin_id").references(() => usersTable.id),

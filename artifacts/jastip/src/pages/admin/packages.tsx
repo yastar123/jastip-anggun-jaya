@@ -76,7 +76,7 @@ export default function AdminPackages() {
 
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
-    status: status === "all" ? undefined : (status as PackageStatus),
+    status: status === "all" ? undefined : (status as any),
   });
 
   function applyTableFilters(data: any[]): any[] {

@@ -29,4 +29,20 @@ dateTo?: string | null;
  * @nullable
  */
 search?: string | null;
+/**
+ * @nullable
+ */
+batchId?: number | null;
+/**
+ * @nullable
+ */
+serviceTypeId?: number | null;
+/**
+ * @nullable
+ */
+statusPengambilan?: string | null;
+/**
+ * @nullable
+ */
+statusVerifikasi?: string | null;
 };

@@ -11,7 +11,5 @@ export type PackageUpdateStatus = typeof PackageUpdateStatus[keyof typeof Packag
 
 export const PackageUpdateStatus = {
   pending: 'pending',
-  in_transit: 'in_transit',
-  ready: 'ready',
-  picked_up: 'picked_up',
+  diserahkan: 'diserahkan',
 } as const;

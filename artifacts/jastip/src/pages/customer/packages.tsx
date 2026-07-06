@@ -34,8 +34,8 @@ export default function CustomerPackages() {
 
   const filteredPackages = packages?.filter(pkg => {
     if (filter === "all") return true;
-    if (filter === "picked_up") return pkg.status === "picked_up";
-    if (filter === "pending") return pkg.status !== "picked_up";
+    if (filter === "picked_up") return pkg.status === "diserahkan";
+    if (filter === "pending") return pkg.status !== "diserahkan";
     return true;
   });
 

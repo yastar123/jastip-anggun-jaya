@@ -25,6 +25,11 @@ import type {
   AdminWithStats,
   AuthResponse,
   BarcodeData,
+  Batch,
+  BatchDetail,
+  BatchInput,
+  BatchUpdate,
+  BatchWithCount,
   ChartPoint,
   CustomerWithStats,
   DashboardSummary,
@@ -32,6 +37,7 @@ import type {
   GetReportParams,
   HealthStatus,
   ImportResult,
+  ListBatchesParams,
   ListCustomersParams,
   ListPackagesParams,
   LoginInput,
@@ -43,6 +49,7 @@ import type {
   ReportData,
   ResetPasswordInput,
   ScanResult,
+  ServiceType,
   SuccessResponse,
   User
 } from './api.schemas';
@@ -424,6 +431,387 @@ export const useLogout = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getLogoutMutationOptions(options));
     }
+
+export const getListBatchesUrl = (params?: ListBatchesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/batches?${stringifiedParams}` : `/api/batches`
+}
+
+/**
+ * @summary List all batches with package count
+ */
+export const listBatches = async (params?: ListBatchesParams, options?: RequestInit): Promise<BatchWithCount[]> => {
+
+  return customFetch<BatchWithCount[]>(getListBatchesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBatchesQueryKey = (params?: ListBatchesParams,) => {
+    return [
+    `/api/batches`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListBatchesQueryOptions = <TData = Awaited<ReturnType<typeof listBatches>>, TError = ErrorType<unknown>>(params?: ListBatchesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBatchesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBatches>>> = ({ signal }) => listBatches(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listBatches>>>
+export type ListBatchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all batches with package count
+ */
+
+export function useListBatches<TData = Awaited<ReturnType<typeof listBatches>>, TError = ErrorType<unknown>>(
+ params?: ListBatchesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBatchesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBatchUrl = () => {
+
+
+
+
+  return `/api/batches`
+}
+
+/**
+ * @summary Create a new batch
+ */
+export const createBatch = async (batchInput: BatchInput, options?: RequestInit): Promise<Batch> => {
+
+  return customFetch<Batch>(getCreateBatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      batchInput,)
+  }
+);}
+
+
+
+
+export const getCreateBatchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBatch>>, TError,{data: BodyType<BatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBatch>>, TError,{data: BodyType<BatchInput>}, TContext> => {
+
+const mutationKey = ['createBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBatch>>, {data: BodyType<BatchInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBatchMutationResult = NonNullable<Awaited<ReturnType<typeof createBatch>>>
+    export type CreateBatchMutationBody = BodyType<BatchInput>
+    export type CreateBatchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new batch
+ */
+export const useCreateBatch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBatch>>, TError,{data: BodyType<BatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBatch>>,
+        TError,
+        {data: BodyType<BatchInput>},
+        TContext
+      > => {
+      return useMutation(getCreateBatchMutationOptions(options));
+    }
+
+export const getGetBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/batches/${id}`
+}
+
+/**
+ * @summary Get batch detail with packages grouped
+ */
+export const getBatch = async (id: number, options?: RequestInit): Promise<BatchDetail> => {
+
+  return customFetch<BatchDetail>(getGetBatchUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBatchQueryKey = (id: number,) => {
+    return [
+    `/api/batches/${id}`
+    ] as const;
+    }
+
+
+export const getGetBatchQueryOptions = <TData = Awaited<ReturnType<typeof getBatch>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBatchQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBatch>>> = ({ signal }) => getBatch(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBatch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBatchQueryResult = NonNullable<Awaited<ReturnType<typeof getBatch>>>
+export type GetBatchQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get batch detail with packages grouped
+ */
+
+export function useGetBatch<TData = Awaited<ReturnType<typeof getBatch>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBatch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBatchQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateBatchUrl = (id: number,) => {
+
+
+
+
+  return `/api/batches/${id}`
+}
+
+/**
+ * @summary Update batch status or details
+ */
+export const updateBatch = async (id: number,
+    batchUpdate: BatchUpdate, options?: RequestInit): Promise<Batch> => {
+
+  return customFetch<Batch>(getUpdateBatchUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      batchUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateBatchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBatch>>, TError,{id: number;data: BodyType<BatchUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBatch>>, TError,{id: number;data: BodyType<BatchUpdate>}, TContext> => {
+
+const mutationKey = ['updateBatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBatch>>, {id: number;data: BodyType<BatchUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBatch(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBatchMutationResult = NonNullable<Awaited<ReturnType<typeof updateBatch>>>
+    export type UpdateBatchMutationBody = BodyType<BatchUpdate>
+    export type UpdateBatchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update batch status or details
+ */
+export const useUpdateBatch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBatch>>, TError,{id: number;data: BodyType<BatchUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBatch>>,
+        TError,
+        {id: number;data: BodyType<BatchUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateBatchMutationOptions(options));
+    }
+
+export const getListServiceTypesUrl = () => {
+
+
+
+
+  return `/api/batches/service-types/list`
+}
+
+/**
+ * @summary List all service types
+ */
+export const listServiceTypes = async ( options?: RequestInit): Promise<ServiceType[]> => {
+
+  return customFetch<ServiceType[]>(getListServiceTypesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListServiceTypesQueryKey = () => {
+    return [
+    `/api/batches/service-types/list`
+    ] as const;
+    }
+
+
+export const getListServiceTypesQueryOptions = <TData = Awaited<ReturnType<typeof listServiceTypes>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceTypes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceTypesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceTypes>>> = ({ signal }) => listServiceTypes({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceTypes>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListServiceTypesQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceTypes>>>
+export type ListServiceTypesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all service types
+ */
+
+export function useListServiceTypes<TData = Awaited<ReturnType<typeof listServiceTypes>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listServiceTypes>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListServiceTypesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListPackagesUrl = (params?: ListPackagesParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, packagesTable, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, packagesTable, usersTable, serviceTypesTable, batchesTable } from "@workspace/db";
+import { eq, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -134,7 +134,7 @@ function formatPackage(
 // GET /api/packages
 router.get("/", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
-    const { status, customerId, adminId, dateFrom, dateTo, search } =
+    const { status, customerId, adminId, dateFrom, dateTo, search, batchId, serviceTypeId, statusPengambilan, statusVerifikasi } =
       req.query as any;
 
     const admins = await db
@@ -150,6 +150,10 @@ router.get("/", requireAuth, requireRole("admin", "owner"), async (req, res) => 
       .orderBy(packagesTable.createdAt);
 
     if (status) rows = rows.filter((p) => p.status === status);
+    if (statusPengambilan) rows = rows.filter((p) => p.statusPengambilan === statusPengambilan);
+    if (statusVerifikasi) rows = rows.filter((p) => p.statusVerifikasi === statusVerifikasi);
+    if (batchId) rows = rows.filter((p) => p.batchId === Number(batchId));
+    if (serviceTypeId) rows = rows.filter((p) => p.serviceTypeId === Number(serviceTypeId));
     if (customerId)
       rows = rows.filter((p) => p.customerId === Number(customerId));
     if (adminId) rows = rows.filter((p) => p.adminId === Number(adminId));
@@ -207,6 +211,7 @@ router.post(
         customerId,
         customerName,
         packageDate,
+        batchId,
       } = req.body;
 
       if (!resiNumber || (!customerId && !customerName)) {
@@ -214,6 +219,33 @@ router.post(
           error: "resiNumber and customerName or customerId required",
         });
         return;
+      }
+
+      if (!batchId) {
+        res.status(400).json({ error: "batchId wajib diisi — pilih Batch Pengiriman terlebih dahulu" });
+        return;
+      }
+
+      // Validate batch exists and is OPEN
+      const batches = await db.select().from(batchesTable).where(eq(batchesTable.id, Number(batchId))).limit(1);
+      if (!batches[0]) {
+        res.status(400).json({ error: "Batch tidak ditemukan" });
+        return;
+      }
+      if (batches[0].statusBatch === "CLOSED") {
+        res.status(400).json({ error: "Batch sudah ditutup. Hubungi Owner untuk menambah paket susulan." });
+        return;
+      }
+      if (batches[0].statusBatch === "ARSIP") {
+        res.status(400).json({ error: "Batch sudah diarsip dan tidak dapat menerima paket baru" });
+        return;
+      }
+
+      // Resolve serviceTypeId from serviceType text
+      let serviceTypeId: number | null = null;
+      if (serviceType) {
+        const stRows = await db.select().from(serviceTypesTable).where(eq(serviceTypesTable.name, serviceType)).limit(1);
+        serviceTypeId = stRows[0]?.id ?? null;
       }
 
       const divisor = getVolumeDivisor(serviceType);
@@ -265,6 +297,8 @@ router.post(
         ...(notes ? { notes } : {}),
         ...(customerName ? { customerName } : {}),
         ...(customerId ? { customerId: Number(customerId) } : {}),
+        batchId: Number(batchId),
+        ...(serviceTypeId !== null ? { serviceTypeId } : {}),
       };
       const inserted = await db
         .insert(packagesTable)
@@ -298,11 +332,28 @@ router.post(
   async (req, res) => {
     try {
       const user = (req as any).user;
-      const { packages: rows } = req.body;
+      const { packages: rows, batchId } = req.body;
       if (!rows || !Array.isArray(rows)) {
         res.status(400).json({ error: "packages array required" });
         return;
       }
+      if (!batchId) {
+        res.status(400).json({ error: "batchId wajib diisi — pilih Batch Pengiriman terlebih dahulu" });
+        return;
+      }
+      // Validate batch
+      const batches = await db.select().from(batchesTable).where(eq(batchesTable.id, Number(batchId))).limit(1);
+      if (!batches[0] || batches[0].statusBatch === "ARSIP") {
+        res.status(400).json({ error: "Batch tidak valid atau sudah diarsip" });
+        return;
+      }
+      if (batches[0].statusBatch === "CLOSED") {
+        res.status(400).json({ error: "Batch sudah ditutup. Hubungi Owner untuk menambah paket susulan." });
+        return;
+      }
+      // Pre-load service type map for fast lookup
+      const allServiceTypes = await db.select().from(serviceTypesTable);
+      const serviceTypeByName = new Map(allServiceTypes.map((t) => [t.name, t.id]));
       let success = 0, failed = 0;
       const errors: string[] = [];
       const createdIds: number[] = [];
@@ -359,6 +410,8 @@ router.post(
             deliveryRoute: deliveryRoute ? String(deliveryRoute) : null,
             packageDate: packageDate ? new Date(String(packageDate)) : new Date(),
             packageMode: packageMode ? String(packageMode) : "grup",
+            batchId: Number(batchId),
+            serviceTypeId: serviceType ? (serviceTypeByName.get(String(serviceType)) ?? null) : null,
           }).returning({ id: packagesTable.id });
           if (inserted[0]?.id) createdIds.push(inserted[0].id);
           success++;
@@ -402,7 +455,7 @@ router.get("/scan/:barcode", requireAuth, requireRole("admin", "owner"), async (
       res.json({ valid: false, message: "Paket tidak ditemukan" });
       return;
     }
-    if (pkg.status === "diserahkan") {
+    if (pkg.statusPengambilan === "SUDAH_DIAMBIL" || pkg.status === "diserahkan") {
       res.json({ valid: false, message: "Paket sudah diserahkan sebelumnya", package: formatPackage(pkg, new Map(), new Map()) });
       return;
     }
@@ -466,6 +519,25 @@ router.patch(
   async (req, res) => {
     try {
       const id = Number(req.params.id);
+
+      // Lock: packages that have been picked up cannot be changed.
+      // For customerName-only patches (grup flow), lock does not apply — check separately.
+      const keys = Object.keys(req.body);
+      const isCustomerNameOnly = keys.length === 1 && keys[0] === "customerName";
+
+      if (!isCustomerNameOnly) {
+        // Atomic lock check: read the package and verify it is not locked before proceeding
+        const lockCheck = await db
+          .select({ statusPengambilan: packagesTable.statusPengambilan, status: packagesTable.status })
+          .from(packagesTable)
+          .where(eq(packagesTable.id, id))
+          .limit(1);
+        if (lockCheck[0]?.statusPengambilan === "SUDAH_DIAMBIL" || lockCheck[0]?.status === "diserahkan") {
+          res.status(400).json({ error: "Paket sudah diambil dan tidak dapat diubah lagi" });
+          return;
+        }
+      }
+
       const {
         status, notes,
         resiNumber, packageNumber, customerName, itemName,
@@ -576,7 +648,12 @@ router.post(
       const id = Number(req.params.id);
       const updated = await db
         .update(packagesTable)
-        .set({ status: "diserahkan", pickedUpAt: new Date(), updatedAt: new Date() })
+        .set({
+          status: "diserahkan",
+          statusPengambilan: "SUDAH_DIAMBIL",
+          pickedUpAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(eq(packagesTable.id, id))
         .returning();
       const pkg = updated[0];
@@ -600,16 +677,30 @@ router.post(
   async (req, res) => {
     try {
       const id = Number(req.params.id);
+      // Atomic lock: update only if package is NOT already picked up
       const updated = await db
         .update(packagesTable)
-        .set({ status: "pending", updatedAt: new Date() })
-        .where(eq(packagesTable.id, id))
+        .set({ status: "pending", statusPengambilan: "BELUM_DIAMBIL", updatedAt: new Date() })
+        .where(and(
+          eq(packagesTable.id, id),
+          ne(packagesTable.statusPengambilan, "SUDAH_DIAMBIL"),
+        ))
         .returning();
-      const pkg = updated[0];
-      if (!pkg) {
-        res.status(404).json({ error: "Not found" });
+      if (!updated.length) {
+        // Either package not found or it was locked
+        const exists = await db
+          .select({ id: packagesTable.id })
+          .from(packagesTable)
+          .where(eq(packagesTable.id, id))
+          .limit(1);
+        if (!exists.length) {
+          res.status(404).json({ error: "Paket tidak ditemukan" });
+        } else {
+          res.status(400).json({ error: "Paket sudah diambil dan tidak dapat ditolak lagi" });
+        }
         return;
       }
+      const pkg = updated[0];
       res.json(formatPackage(pkg, new Map(), new Map()));
     } catch (err) {
       req.log.error(err);
@@ -631,6 +722,7 @@ router.post(
         .set({
           verified: "sudah_diverifikasi",
           verifiedAt: new Date(),
+          statusVerifikasi: "SUDAH_DIVERIFIKASI",
           updatedAt: new Date(),
         })
         .where(eq(packagesTable.id, id))

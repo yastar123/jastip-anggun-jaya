@@ -20,6 +20,7 @@ import AdminBarcodeGroupDetail from "@/pages/admin/barcode-group-detail";
 import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
+import AdminBatches from "@/pages/admin/batches";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
@@ -115,6 +116,9 @@ function Router() {
       <Route path="/admin/packages/import">
         {(params) => <ProtectedRoute role="admin" component={AdminPackagesImport} params={params} />}
       </Route>
+      <Route path="/admin/batches">
+        {(params) => <ProtectedRoute role="admin" component={AdminBatches} params={params} />}
+      </Route>
       <Route path="/admin/packages/:id">
         {(params) => <ProtectedRoute role="admin" component={AdminPackagesDetail} params={params} />}
       </Route>
@@ -167,6 +171,9 @@ function Router() {
       </Route>
 
       {/* Owner — Admin Tools */}
+      <Route path="/owner/batches">
+        {(params) => <ProtectedRoute role="owner" component={AdminBatches} params={params} />}
+      </Route>
       <Route path="/owner/packages/type">
         {(params) => <ProtectedRoute role="owner" component={AdminPackagesType} params={params} />}
       </Route>

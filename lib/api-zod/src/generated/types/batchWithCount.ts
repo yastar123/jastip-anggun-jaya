@@ -5,9 +5,8 @@
  * Jastip Anggun Jaya API
  * OpenAPI spec version: 0.1.0
  */
-import type { PackageRow } from './packageRow';
+import type { Batch } from './batch';
 
-export interface PackageImport {
-  batchId: number;
-  packages: PackageRow[];
-}
+export type BatchWithCount = Batch & {
+  packageCount?: number;
+};

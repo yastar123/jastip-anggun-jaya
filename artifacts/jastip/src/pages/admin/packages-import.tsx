@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useImportPackages, getListPackagesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -195,6 +195,34 @@ export default function AdminPackagesImport() {
   const [serviceType,   setServiceType]   = useState("");
   const [deliveryRoute, setDeliveryRoute] = useState("");
   const [packageDate,   setPackageDate]   = useState(todayStr());
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(() => {
+    const stored = localStorage.getItem("jaj_last_batch_id");
+    return stored ? Number(stored) : null;
+  });
+  const [openBatches, setOpenBatches] = useState<any[]>([]);
+
+  // Load open batches on mount
+  useEffect(() => {
+    const token = localStorage.getItem("jaj_token");
+    fetch("/api/batches?statusBatch=OPEN", { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then((batches: any[]) => {
+        setOpenBatches(batches);
+        // Auto-select first if current selection is gone
+        if (batches.length > 0) {
+          const stored = localStorage.getItem("jaj_last_batch_id");
+          const storedId = stored ? Number(stored) : null;
+          const ids = batches.map((b: any) => b.id);
+          if (!storedId || !ids.includes(storedId)) {
+            setSelectedBatchId(batches[0].id);
+            localStorage.setItem("jaj_last_batch_id", String(batches[0].id));
+          } else {
+            setSelectedBatchId(storedId);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progress, setProgress]         = useState(0);
@@ -383,7 +411,12 @@ export default function AdminPackagesImport() {
       }));
 
       setProgress(50);
-      const res = await importPackages.mutateAsync({ data: { packages: payload } });
+      if (!selectedBatchId) {
+        toast({ variant: "destructive", title: "Pilih Batch Pengiriman", description: "Silakan pilih Batch Pengiriman sebelum import." });
+        setIsSubmitting(false);
+        return;
+      }
+      const res = await importPackages.mutateAsync({ data: { packages: payload, batchId: selectedBatchId } as any });
       setProgress(100);
       setImportResult(res);
 

@@ -1,3 +1,4 @@
-- [Jastip JAJ project](jastip-project.md) — main working app is at artifacts/jastip (NOT jastip-app); password hash = SHA256(pw + "jaj_salt_2024")
+ - [Jastip JAJ project](jastip-project.md) — main working app is at artifacts/jastip (NOT jastip-app); password hash = SHA256(pw + "jaj_salt_2024")
 - [Package status redesign](package-status-redesign.md) — statuses reduced to pending/diserahkan; scan page has Serahkan/Tolak buttons
 - [Scan anti-spam design](scan-antispam.md) — 3-layer duplicate guard; addedIdsRef is the critical atomic gate (itemsRef alone is stale)
+- [Batch pengiriman feature](batch-feature.md) — Priority 1 complete: batches table, batchId on packages, lock/status fields, batch management page, batch selector in input/import forms

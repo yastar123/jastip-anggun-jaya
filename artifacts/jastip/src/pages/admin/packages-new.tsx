@@ -222,6 +222,40 @@ export default function AdminPackagesNew() {
   const { data: savedKargoRate } = useKargoRate();
 
   const createPackage = useCreatePackage();
+
+  // ── Batch selection ────────────────────────────────────────────────────────
+  // Persist last-used batchId in localStorage so admin doesn't re-select every time
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(() => {
+    const stored = localStorage.getItem("jaj_last_batch_id");
+    return stored ? Number(stored) : null;
+  });
+  const { data: openBatches = [] } = useQuery<any[]>({
+    queryKey: ["batches", "OPEN"],
+    queryFn: async () => {
+      const token = localStorage.getItem("jaj_token");
+      const res = await fetch("/api/batches?statusBatch=OPEN", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  // Auto-select the first open batch if nothing is selected or last batch is gone
+  useEffect(() => {
+    if (openBatches.length === 0) return;
+    const ids = openBatches.map((b: any) => b.id);
+    if (!selectedBatchId || !ids.includes(selectedBatchId)) {
+      const newId = openBatches[0].id;
+      setSelectedBatchId(newId);
+      localStorage.setItem("jaj_last_batch_id", String(newId));
+    }
+  }, [openBatches, selectedBatchId]);
+  function handleBatchChange(val: string) {
+    const id = Number(val);
+    setSelectedBatchId(id);
+    localStorage.setItem("jaj_last_batch_id", String(id));
+  }
+  const selectedBatch = openBatches.find((b: any) => b.id === selectedBatchId) ?? null;
   const params = parseQueryParams();
   const packageMode = params.packageMode;
   const isGrup = packageMode === "grup";
@@ -408,6 +442,11 @@ export default function AdminPackagesNew() {
       return;
     }
 
+    if (!selectedBatchId) {
+      toast({ variant: "destructive", title: "Pilih Batch Pengiriman", description: "Silakan pilih atau buat Batch Pengiriman terlebih dahulu." });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -417,6 +456,7 @@ export default function AdminPackagesNew() {
         const result = await createPackage.mutateAsync({
           data: {
             ...values,
+            batchId: selectedBatchId,
             totalWeight: packageMode === "grup" ? newTotalWeight : (values.realWeight ?? undefined),
           } as any,
         });
@@ -455,6 +495,7 @@ export default function AdminPackagesNew() {
         const result = await createPackage.mutateAsync({
           data: {
             ...values,
+            batchId: selectedBatchId,
             customerName: values.customerName || "",
             totalWeight: newWeight,
           } as any,
@@ -780,6 +821,42 @@ export default function AdminPackagesNew() {
             }}
             className="space-y-6"
           >
+            {/* ── Batch Pengiriman Selector ── */}
+            <Card className={openBatches.length === 0 ? "border-destructive/50 bg-destructive/5" : "border-primary/20 bg-primary/5"}>
+              <CardContent className="pt-4 pb-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold flex items-center gap-2">
+                    🚢 Batch Pengiriman <span className="text-destructive">*</span>
+                  </label>
+                  {openBatches.length === 0 ? (
+                    <div className="text-sm text-destructive">
+                      Belum ada Batch Pengiriman aktif.{" "}
+                      <button
+                        type="button"
+                        className="underline font-medium"
+                        onClick={() => setLocation(`${base}/batches`)}
+                      >
+                        Buat batch baru di sini.
+                      </button>
+                    </div>
+                  ) : (
+                    <Select value={String(selectedBatchId ?? "")} onValueChange={handleBatchChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih batch pengiriman..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {openBatches.map((b: any) => (
+                          <SelectItem key={b.id} value={String(b.id)}>
+                            {b.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
             {isKargo ? (
               /* ====== FORM KHUSUS JASTIP KARGO ====== */
               <>

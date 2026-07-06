@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PackageStatus } from './packageStatus';
+import type { PackageStatusPembayaran } from './packageStatusPembayaran';
+import type { PackageStatusPengambilan } from './packageStatusPengambilan';
+import type { PackageStatusVerifikasi } from './packageStatusVerifikasi';
 import type { PackageVerified } from './packageVerified';
 
 export interface Package {
@@ -45,9 +48,20 @@ export interface Package {
   verified?: PackageVerified;
   /** @nullable */
   verifiedAt?: string | null;
-  customerId: number;
+  statusVerifikasi?: PackageStatusVerifikasi;
+  statusPengambilan?: PackageStatusPengambilan;
+  statusPembayaran?: PackageStatusPembayaran;
+  /** @nullable */
+  batchId?: number | null;
+  /** @nullable */
+  serviceTypeId?: number | null;
+  /** @nullable */
+  serviceType?: string | null;
+  /** @nullable */
+  customerId: number | null;
   customerName: string;
-  customerPhone?: string;
+  /** @nullable */
+  customerPhone?: string | null;
   /** @nullable */
   adminId?: number | null;
   /** @nullable */

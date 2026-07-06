@@ -31,6 +31,7 @@ import {
   UserCircle,
   ShieldCheck,
   History,
+  Ship,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: any; exact?: boolean };
@@ -47,6 +48,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const adminNav: NavItem[] = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, exact: true },
     { name: "Semua Paket", href: "/admin/packages", icon: Package },
+    { name: "Batch Pengiriman", href: "/admin/batches", icon: Ship, exact: true },
     { name: "Input Paket", href: "/admin/packages/type", icon: FileInput, exact: true },
     { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet, exact: true },
     { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
@@ -72,6 +74,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     {
       label: "Admin Tools",
       items: [
+        { name: "Batch Pengiriman", href: "/owner/batches", icon: Ship, exact: true },
         { name: "Input Paket", href: "/owner/packages/type", icon: FileInput, exact: true },
         { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet, exact: true },
         { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },

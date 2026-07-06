@@ -7,10 +7,11 @@
  */
 
 export interface PackageInput {
+  batchId: number;
   resiNumber: string;
   /** @nullable */
   packageNumber?: string | null;
-  itemName: string;
+  itemName?: string;
   /** @nullable */
   realWeight?: number | null;
   /** @nullable */
@@ -37,7 +38,7 @@ export interface PackageInput {
   weight?: number | null;
   /** @nullable */
   notes?: string | null;
-  customerId: number;
+  customerId?: number;
   /** @nullable */
   packageDate?: string | null;
 }

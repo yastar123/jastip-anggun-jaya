@@ -11,7 +11,7 @@ export default function CustomerHistory() {
   
   const { data: packages, isLoading } = useListPackages({
     customerId: user?.id,
-    status: 'picked_up'
+    status: 'diserahkan'
   });
 
   return (

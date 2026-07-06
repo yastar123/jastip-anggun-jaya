@@ -11,6 +11,8 @@ tags:
     description: Health operations
   - name: auth
     description: Authentication
+  - name: batches
+    description: Batch pengiriman management
   - name: packages
     description: Package management
   - name: customers
@@ -98,6 +100,103 @@ paths:
         "200":
           description: Logged out
 
+  # ─── BATCHES ────────────────────────────────────────────────────────────────
+
+  /batches:
+    get:
+      operationId: listBatches
+      tags: [batches]
+      summary: List all batches with package count
+      parameters:
+        - name: statusBatch
+          in: query
+          schema:
+            type: string
+            enum: [OPEN, CLOSED, ARSIP]
+      responses:
+        "200":
+          description: List of batches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BatchWithCount"
+    post:
+      operationId: createBatch
+      tags: [batches]
+      summary: Create a new batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchInput"
+      responses:
+        "201":
+          description: Batch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Batch"
+
+  /batches/{id}:
+    get:
+      operationId: getBatch
+      tags: [batches]
+      summary: Get batch detail with packages grouped
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Batch detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchDetail"
+    patch:
+      operationId: updateBatch
+      tags: [batches]
+      summary: Update batch status or details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchUpdate"
+      responses:
+        "200":
+          description: Batch updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Batch"
+
+  /batches/service-types/list:
+    get:
+      operationId: listServiceTypes
+      tags: [batches]
+      summary: List all service types
+      responses:
+        "200":
+          description: Service types list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceType"
+
   # ─── PACKAGES ───────────────────────────────────────────────────────────────
 
   /packages:
@@ -110,7 +209,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, in_transit, ready, picked_up]
+            enum: [pending, diserahkan]
         - name: customerId
           in: query
           schema:
@@ -128,6 +227,22 @@ paths:
           schema:
             type: ["string", "null"]
         - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: batchId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: serviceTypeId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: statusPengambilan
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: statusVerifikasi
           in: query
           schema:
             type: ["string", "null"]
@@ -650,18 +765,33 @@ components:
           type: ["string", "null"]
         status:
           type: string
-          enum: [pending, in_transit, ready, picked_up]
+          enum: [pending, diserahkan]
         verified:
           type: string
           enum: [belum_diverifikasi, sudah_diverifikasi]
         verifiedAt:
           type: ["string", "null"]
+        statusVerifikasi:
+          type: string
+          enum: [BELUM_DIVERIFIKASI, SUDAH_DIVERIFIKASI]
+        statusPengambilan:
+          type: string
+          enum: [BELUM_DIAMBIL, SUDAH_DIAMBIL]
+        statusPembayaran:
+          type: string
+          enum: [BELUM_DIBAYAR, DP, SUDAH_DIBAYAR]
+        batchId:
+          type: ["integer", "null"]
+        serviceTypeId:
+          type: ["integer", "null"]
+        serviceType:
+          type: ["string", "null"]
         customerId:
-          type: integer
+          type: ["integer", "null"]
         customerName:
           type: string
         customerPhone:
-          type: string
+          type: ["string", "null"]
         adminId:
           type: ["integer", "null"]
         adminName:
@@ -674,13 +804,13 @@ components:
           type: string
         updatedAt:
           type: string
-          serviceType:
-            type: ["string", "null"]
 
     PackageInput:
       type: object
-      required: [resiNumber, itemName, customerId]
+      required: [resiNumber, batchId]
       properties:
+        batchId:
+          type: integer
         resiNumber:
           type: string
         packageNumber:
@@ -725,14 +855,16 @@ components:
       properties:
         status:
           type: string
-          enum: [pending, in_transit, ready, picked_up]
+          enum: [pending, diserahkan]
         notes:
           type: ["string", "null"]
 
     PackageImport:
       type: object
-      required: [packages]
+      required: [packages, batchId]
       properties:
+        batchId:
+          type: integer
         packages:
           type: array
           items:
@@ -954,3 +1086,98 @@ components:
           type: integer
         outgoing:
           type: integer
+
+    ServiceType:
+      type: object
+      required: [id, name, label]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        label:
+          type: string
+
+    Batch:
+      type: object
+      required: [id, namaKapal, etd, periodeClosingMulai, periodeClosingSelesai, kotaAsal, tujuan, statusBatch, label, createdAt]
+      properties:
+        id:
+          type: integer
+        namaKapal:
+          type: string
+        etd:
+          type: string
+        periodeClosingMulai:
+          type: string
+        periodeClosingSelesai:
+          type: string
+        kotaAsal:
+          type: string
+        tujuan:
+          type: string
+        statusBatch:
+          type: string
+          enum: [OPEN, CLOSED, ARSIP]
+        label:
+          type: string
+        createdBy:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    BatchWithCount:
+      allOf:
+        - $ref: "#/components/schemas/Batch"
+        - type: object
+          properties:
+            packageCount:
+              type: integer
+
+    BatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/BatchWithCount"
+        - type: object
+          properties:
+            groups:
+              type: array
+              items:
+                type: object
+
+    BatchInput:
+      type: object
+      required: [namaKapal, etd, periodeClosingMulai, periodeClosingSelesai, kotaAsal]
+      properties:
+        namaKapal:
+          type: string
+        etd:
+          type: string
+        periodeClosingMulai:
+          type: string
+        periodeClosingSelesai:
+          type: string
+        kotaAsal:
+          type: string
+        tujuan:
+          type: string
+
+    BatchUpdate:
+      type: object
+      properties:
+        namaKapal:
+          type: string
+        etd:
+          type: string
+        periodeClosingMulai:
+          type: string
+        periodeClosingSelesai:
+          type: string
+        kotaAsal:
+          type: string
+        tujuan:
+          type: string
+        statusBatch:
+          type: string
+          enum: [OPEN, CLOSED, ARSIP]

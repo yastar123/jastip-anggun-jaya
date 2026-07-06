@@ -11,7 +11,5 @@ export type ListPackagesStatus = typeof ListPackagesStatus[keyof typeof ListPack
 
 export const ListPackagesStatus = {
   pending: 'pending',
-  in_transit: 'in_transit',
-  ready: 'ready',
-  picked_up: 'picked_up',
+  diserahkan: 'diserahkan',
 } as const;

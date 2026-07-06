@@ -42,7 +42,7 @@ export default function OwnerPackages() {
 
   const { data: packages, isLoading, refetch } = useListPackages({
     search: search || undefined,
-    status: status === "all" ? undefined : (status as PackageStatus),
+    status: status === "all" ? undefined : (status as any),
   });
 
   const total = packages?.length || 0;
