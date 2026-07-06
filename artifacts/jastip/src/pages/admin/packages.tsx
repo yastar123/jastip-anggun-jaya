@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Pagination } from "@/components/pagination";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, FileDown, X } from "lucide-react";
+import { Search, FileDown, X, Filter } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -41,6 +41,18 @@ function formatDate(d: string | null | undefined) {
   return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function serviceTypeLabel(t: string | null | undefined) {
+  if (!t) return "-";
+  const map: Record<string, string> = {
+    "jastip cargo": "Jastip Cargo",
+    "jastip hemat+": "Jastip Hemat+",
+    "jastip pelni": "Jastip Pelni",
+    "jastip pesawat": "Jastip Pesawat",
+    "jasa belanja": "Jasa Belanja",
+  };
+  return map[t.toLowerCase()] || t;
+}
+
 function fNum(n: any, decimals = 1) {
   if (n == null || n === "") return "";
   const v = Number(n);
@@ -50,6 +62,9 @@ function fNum(n: any, decimals = 1) {
 export default function AdminPackages() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [filterJenis, setFilterJenis] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
 
@@ -64,12 +79,37 @@ export default function AdminPackages() {
     status: status === "all" ? undefined : (status as PackageStatus),
   });
 
-  const total = packages?.length || 0;
+  function applyTableFilters(data: any[]): any[] {
+    let filtered = [...data];
+    if (filterJenis !== "all") {
+      filtered = filtered.filter((p) =>
+        (p.serviceType || "").toLowerCase() === filterJenis.toLowerCase()
+      );
+    }
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom);
+      from.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((p) => new Date(p.packageDate || p.createdAt) >= from);
+    }
+    if (filterDateTo) {
+      const to = new Date(filterDateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((p) => new Date(p.packageDate || p.createdAt) <= to);
+    }
+    return filtered;
+  }
+
+  const displayed = applyTableFilters(packages || []);
+  const total = displayed.length;
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginated = packages?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated = displayed.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const hasTableFilter = filterJenis !== "all" || filterDateFrom || filterDateTo;
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleStatus(v: string) { setStatus(v); setPage(1); }
+  function handleFilterJenis(v: string) { setFilterJenis(v); setPage(1); }
+  function resetTableFilters() { setFilterJenis("all"); setFilterDateFrom(""); setFilterDateTo(""); setPage(1); }
 
   function getFilteredPackages() {
     if (!packages) return [];
@@ -334,34 +374,87 @@ export default function AdminPackages() {
       </div>
 
       <Card>
-        <div className="p-4 border-b flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Cari resi, no paket, nama customer..." className="pl-9" value={search} onChange={(e) => handleSearch(e.target.value)} />
+        <div className="p-4 border-b space-y-3">
+          {/* Row 1: search + export */}
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Cari resi, no paket, nama customer..." className="pl-9" value={search} onChange={(e) => handleSearch(e.target.value)} />
+            </div>
           </div>
-          <Select value={status} onValueChange={handleStatus}>
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Filter Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="diserahkan">Diserahkan</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Row 2: filters */}
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium shrink-0">
+              <Filter className="w-3.5 h-3.5" /> Filter:
+            </div>
+            <Select value={status} onValueChange={handleStatus}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="diserahkan">Diserahkan</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterJenis} onValueChange={handleFilterJenis}>
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="Jenis Jastip" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Jenis</SelectItem>
+                {JENIS_JASTIP.map((j) => (
+                  <SelectItem key={j} value={j}>{j}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground shrink-0">Tanggal:</span>
+              <Input
+                type="date"
+                className="w-[145px] text-sm"
+                value={filterDateFrom}
+                onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
+              />
+              <span className="text-xs text-muted-foreground">–</span>
+              <Input
+                type="date"
+                className="w-[145px] text-sm"
+                value={filterDateTo}
+                onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
+              />
+            </div>
+            {hasTableFilter && (
+              <button
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground flex items-center gap-1"
+                onClick={resetTableFilters}
+              >
+                <X className="w-3 h-3" /> Reset filter
+              </button>
+            )}
+          </div>
+          {/* Active filter summary */}
+          {hasTableFilter && (
+            <p className="text-xs text-muted-foreground">
+              Menampilkan <span className="font-semibold text-foreground">{total}</span> paket
+              {filterJenis !== "all" && <> · Jenis: <span className="font-medium text-foreground">{filterJenis}</span></>}
+              {filterDateFrom && <> · Dari: <span className="font-medium text-foreground">{new Date(filterDateFrom).toLocaleDateString("id-ID")}</span></>}
+              {filterDateTo && <> · s/d: <span className="font-medium text-foreground">{new Date(filterDateTo).toLocaleDateString("id-ID")}</span></>}
+            </p>
+          )}
         </div>
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm min-w-[1400px]">
             <thead>
               <tr className="border-b bg-muted/30">
-                {["Tanggal","No Resi","No Paket","Nama Konsumen","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Berat Digunakan","Ongkir/Kg","Total Berat","Total Ongkir","Status","Aksi"].map(h => (
+                {["Tanggal","No Resi","No Paket","Nama Konsumen","Jenis Jastip","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Berat Digunakan","Ongkir/Kg","Total Berat","Total Ongkir","Status","Aksi"].map(h => (
                   <th key={h} className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={15} className="h-24 text-center text-muted-foreground py-10">Memuat data...</td></tr>
+                <tr><td colSpan={16} className="h-24 text-center text-muted-foreground py-10">Memuat data...</td></tr>
               ) : paginated && paginated.length > 0 ? (
                 paginated.map((pkg) => (
                   <tr key={pkg.id} className="border-b hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setLocation(`/admin/packages/${pkg.id}`)}>
@@ -371,6 +464,11 @@ export default function AdminPackages() {
                     <td className="py-3 px-3 whitespace-nowrap">
                       <div className="font-medium">{pkg.customerName || "-"}</div>
                       <div className="text-xs text-muted-foreground">{pkg.customerPhone || ""}</div>
+                    </td>
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">
+                        {serviceTypeLabel((pkg as any).serviceType)}
+                      </span>
                     </td>
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).realWeight ?? "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).length ?? "-"}</td>
@@ -388,7 +486,7 @@ export default function AdminPackages() {
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={15} className="h-32 text-center text-muted-foreground">Data paket tidak ditemukan.</td></tr>
+                <tr><td colSpan={16} className="h-32 text-center text-muted-foreground">Data paket tidak ditemukan.</td></tr>
               )}
             </tbody>
           </table>
