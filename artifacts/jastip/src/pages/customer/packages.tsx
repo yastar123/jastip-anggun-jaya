@@ -68,8 +68,47 @@ export default function CustomerPackages() {
         </TabsList>
 
         <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm min-w-[1600px]">
+          {/* Mobile card view */}
+          <CardContent className="p-0 md:hidden">
+            {isLoading ? (
+              <div className="h-24 flex items-center justify-center text-muted-foreground animate-pulse text-sm">Memuat data paket...</div>
+            ) : paginated && paginated.length > 0 ? (
+              <div className="divide-y">
+                {paginated.map((pkg) => (
+                  <div
+                    key={pkg.id}
+                    className="p-4 cursor-pointer hover:bg-muted/20 active:bg-muted/30 transition-colors"
+                    onClick={() => setLocation(`/customer/packages/${pkg.id}`)}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{pkg.customerName || user?.name || "-"}</p>
+                        <p className="text-xs font-mono text-muted-foreground truncate">{pkg.resiNumber || "-"}{(pkg as any).packageNumber ? ` · #${(pkg as any).packageNumber}` : ""}</p>
+                      </div>
+                      <StatusBadge status={pkg.status} />
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                      <span>{formatDate((pkg as any).packageDate || pkg.createdAt)}</span>
+                      {(pkg as any).usedWeight && <span>Berat: {(pkg as any).usedWeight} Kg</span>}
+                      {(pkg as any).serviceType && <span>{(pkg as any).serviceType.replace("jastip ", "Jastip ")}</span>}
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="font-bold text-primary text-sm">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</span>
+                      <span className="text-xs text-primary font-medium flex items-center gap-1"><Eye className="w-3 h-3" /> Detail</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-40 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <PackageOpen className="w-10 h-10 opacity-30" />
+                <p className="text-sm">Tidak ada paket dalam kategori ini.</p>
+              </div>
+            )}
+          </CardContent>
+          {/* Desktop table */}
+          <CardContent className="p-0 overflow-x-auto hidden md:block">
+            <table className="w-full text-sm min-w-[1400px]">
               <thead>
                 <tr className="border-b bg-muted/30">
                   {headers.map(h => (
@@ -82,7 +121,7 @@ export default function CustomerPackages() {
                   <tr><td colSpan={17} className="h-24 text-center text-muted-foreground py-10 animate-pulse">Memuat data paket...</td></tr>
                 ) : paginated && paginated.length > 0 ? (
                   paginated.map((pkg) => (
-                    <tr key={pkg.id} className="border-b hover:bg-muted/20 transition-colors">
+                    <tr key={pkg.id} className="border-b hover:bg-muted/20 transition-colors cursor-pointer" onClick={() => setLocation(`/customer/packages/${pkg.id}`)}>
                       <td className="py-3 px-3 whitespace-nowrap text-muted-foreground">{formatDate((pkg as any).packageDate || pkg.createdAt)}</td>
                       <td className="py-3 px-3 font-mono font-medium whitespace-nowrap">{pkg.resiNumber || "-"}</td>
                       <td className="py-3 px-3 font-mono whitespace-nowrap">{(pkg as any).packageNumber || "-"}</td>
@@ -99,7 +138,7 @@ export default function CustomerPackages() {
                       <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).price ? formatRp((pkg as any).price) : "-"}</td>
                       <td className="py-3 px-3 whitespace-nowrap text-right font-semibold text-primary">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</td>
                       <td className="py-3 px-3 whitespace-nowrap"><StatusBadge status={pkg.status} /></td>
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" onClick={() => setLocation(`/customer/packages/${pkg.id}`)}>
                           <Eye className="w-3.5 h-3.5 mr-1" />Detail
                         </Button>

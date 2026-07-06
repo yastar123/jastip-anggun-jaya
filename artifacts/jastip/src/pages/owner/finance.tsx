@@ -176,16 +176,16 @@ export default function OwnerFinance() {
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-sm text-muted-foreground whitespace-nowrap">Dari:</span>
-              <Input type="date" className="w-[160px]" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDetailPage(1); }} />
+              <Input type="date" className="w-full sm:w-[160px]" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDetailPage(1); }} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="text-sm text-muted-foreground whitespace-nowrap">Sampai:</span>
-              <Input type="date" className="w-[160px]" value={dateTo} onChange={e => { setDateTo(e.target.value); setDetailPage(1); }} />
+              <Input type="date" className="w-full sm:w-[160px]" value={dateTo} onChange={e => { setDateTo(e.target.value); setDetailPage(1); }} />
             </div>
             <Select value={serviceFilter} onValueChange={v => { setServiceFilter(v); setDetailPage(1); }}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Semua Jenis" />
               </SelectTrigger>
               <SelectContent>

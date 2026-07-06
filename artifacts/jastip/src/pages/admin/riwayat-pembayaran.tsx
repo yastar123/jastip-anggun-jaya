@@ -161,7 +161,7 @@ export default function RiwayatPembayaran() {
           </p>
         </div>
         <Select value={filterType} onValueChange={handleFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Filter Jenis" />
           </SelectTrigger>
           <SelectContent>

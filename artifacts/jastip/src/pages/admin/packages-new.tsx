@@ -860,7 +860,7 @@ export default function AdminPackagesNew() {
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                         Ukuran (Panjang × Lebar × Tinggi ÷ 1.000.000 Kubik)
                       </p>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {[
                           { name: "length" as const, label: "Panjang (cm)" },
                           { name: "width" as const, label: "Lebar (cm)" },
@@ -1217,7 +1217,7 @@ export default function AdminPackagesNew() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
                         { name: "length" as const, label: "Panjang (cm)" },
                         { name: "width" as const, label: "Lebar (cm)" },

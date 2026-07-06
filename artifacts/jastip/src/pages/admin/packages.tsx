@@ -388,7 +388,7 @@ export default function AdminPackages() {
               <Filter className="w-3.5 h-3.5" /> Filter:
             </div>
             <Select value={status} onValueChange={handleStatus}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -398,7 +398,7 @@ export default function AdminPackages() {
               </SelectContent>
             </Select>
             <Select value={filterJenis} onValueChange={handleFilterJenis}>
-              <SelectTrigger className="w-[170px]">
+              <SelectTrigger className="w-full sm:w-[170px]">
                 <SelectValue placeholder="Jenis Jastip" />
               </SelectTrigger>
               <SelectContent>
@@ -408,21 +408,23 @@ export default function AdminPackages() {
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 w-full sm:w-auto">
               <span className="text-xs text-muted-foreground shrink-0">Tanggal:</span>
-              <Input
-                type="date"
-                className="w-[145px] text-sm"
-                value={filterDateFrom}
-                onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
-              />
-              <span className="text-xs text-muted-foreground">–</span>
-              <Input
-                type="date"
-                className="w-[145px] text-sm"
-                value={filterDateTo}
-                onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
-              />
+              <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                <Input
+                  type="date"
+                  className="w-full sm:w-[145px] text-sm"
+                  value={filterDateFrom}
+                  onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
+                />
+                <span className="text-xs text-muted-foreground shrink-0">–</span>
+                <Input
+                  type="date"
+                  className="w-full sm:w-[145px] text-sm"
+                  value={filterDateTo}
+                  onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
+                />
+              </div>
             </div>
             {hasTableFilter && (
               <button
@@ -443,7 +445,43 @@ export default function AdminPackages() {
             </p>
           )}
         </div>
-        <CardContent className="p-0 overflow-x-auto">
+        {/* Mobile card view */}
+        <CardContent className="p-0 md:hidden">
+          {isLoading ? (
+            <div className="h-24 flex items-center justify-center text-muted-foreground text-sm">Memuat data...</div>
+          ) : paginated && paginated.length > 0 ? (
+            <div className="divide-y">
+              {paginated.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="p-4 cursor-pointer hover:bg-muted/20 active:bg-muted/30 transition-colors"
+                  onClick={() => setLocation(`/admin/packages/${pkg.id}`)}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{pkg.customerName || "-"}</p>
+                      <p className="text-xs font-mono text-muted-foreground truncate">{pkg.resiNumber || "-"}{(pkg as any).packageNumber ? ` · #${(pkg as any).packageNumber}` : ""}</p>
+                    </div>
+                    <StatusBadge status={pkg.status} />
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                    <span className="inline-flex items-center rounded-full px-1.5 py-0.5 bg-primary/10 text-primary font-medium">{serviceTypeLabel((pkg as any).serviceType)}</span>
+                    <span>{formatDate((pkg as any).packageDate || pkg.createdAt)}</span>
+                    {(pkg as any).usedWeight && <span>{(pkg as any).usedWeight} Kg</span>}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="font-bold text-primary text-sm">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</span>
+                    <span className="text-xs text-primary font-medium">Detail →</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">Data paket tidak ditemukan.</div>
+          )}
+        </CardContent>
+        {/* Desktop table */}
+        <CardContent className="p-0 overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[1400px]">
             <thead>
               <tr className="border-b bg-muted/30">

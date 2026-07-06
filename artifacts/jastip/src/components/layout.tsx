@@ -159,12 +159,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <header className="h-14 border-b bg-background flex items-center px-4 md:px-6 sticky top-0 z-10">
             <SidebarTrigger className="mr-4 md:hidden" />
             <div className="flex-1" />
-            <div className="text-sm font-medium text-muted-foreground">
+            <div className="text-sm font-medium text-muted-foreground hidden sm:block">
               {new Date().toLocaleDateString("id-ID", {
                 weekday: "long",
                 year: "numeric",
                 month: "long",
                 day: "numeric",
+              })}
+            </div>
+            <div className="text-xs font-medium text-muted-foreground sm:hidden">
+              {new Date().toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
               })}
             </div>
           </header>

@@ -292,7 +292,7 @@ function BarcodeItem({
         <div className="flex justify-center bg-white border rounded-lg p-2 mb-3">
           <canvas ref={canvasRef} />
         </div>
-        <div className="grid grid-cols-2 gap-1 mb-2 text-xs text-muted-foreground">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mb-2 text-xs text-muted-foreground">
           {pkg.usedWeight != null && <span>Berat: {pkg.usedWeight} Kg</span>}
           {pkg.totalShipping != null && <span>Ongkir: {formatRp(pkg.totalShipping)}</span>}
         </div>

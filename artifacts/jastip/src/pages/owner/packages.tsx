@@ -269,7 +269,36 @@ export default function OwnerPackages() {
             </SelectContent>
           </Select>
         </div>
-        <CardContent className="p-0 overflow-x-auto">
+        {/* Mobile card view */}
+        <CardContent className="p-0 md:hidden">
+          {isLoading ? (
+            <div className="h-24 flex items-center justify-center text-muted-foreground text-sm">Memuat data...</div>
+          ) : paginated && paginated.length > 0 ? (
+            <div className="divide-y">
+              {paginated.map((pkg) => (
+                <div key={pkg.id} className="p-4 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{pkg.customerName || "-"}</p>
+                      <p className="text-xs font-mono text-muted-foreground truncate">{pkg.resiNumber || "-"}{(pkg as any).packageNumber ? ` · #${(pkg as any).packageNumber}` : ""}</p>
+                    </div>
+                    <StatusBadge status={pkg.status} />
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground mt-1">
+                    <span>{(pkg as any).serviceType?.replace("jastip ", "Jastip ") || "-"}</span>
+                    <span>{formatDate((pkg as any).packageDate || pkg.createdAt)}</span>
+                    {(pkg as any).usedWeight && <span>{(pkg as any).usedWeight} Kg</span>}
+                  </div>
+                  <span className="font-bold text-primary text-sm mt-1 block">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">Data paket tidak ditemukan.</div>
+          )}
+        </CardContent>
+        {/* Desktop table */}
+        <CardContent className="p-0 overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[1400px]">
             <thead>
               <tr className="border-b bg-muted/30">
