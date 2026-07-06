@@ -117,6 +117,10 @@ export default function AdminScan() {
   //   Digunakan oleh handleScanSuccess (stable callback) agar bisa cek daftar
   //   terbaru tanpa terjebak stale closure.
   const itemsRef = useRef<ScannedItem[]>([]);
+  // addedIdsRef: set ID paket yang sudah diklaim (ditambahkan atau sedang diproses).
+  //   Di-update sinkron sebelum setItems → tidak ada race condition antar
+  //   concurrent lookupAndAdd calls, bahkan kalau itemsRef belum di-sync.
+  const addedIdsRef = useRef<Set<number>>(new Set());
   // ─────────────────────────────────────────────────────────────────────────
   const SCANNER_ID = "admin-scan-pos-scanner";
 
@@ -162,11 +166,15 @@ export default function AdminScan() {
       }
 
       // Gunakan itemsRef (bukan state items) agar tidak terjebak stale closure
-      const alreadyAdded = itemsRef.current.some((i) => i.id === pkg.id);
-      if (alreadyAdded) {
+      // Deduplikasi atomik: cek & klaim ID secara sinkron via addedIdsRef.
+      // addedIdsRef di-update SEBELUM await apapun, sehingga dua concurrent
+      // lookupAndAdd calls tidak bisa sama-sama lolos — yang kedua akan melihat
+      // ID sudah diklaim meski itemsRef belum di-sync ke state terbaru.
+      if (addedIdsRef.current.has(pkg.id)) {
         toast({ title: "Sudah ditambahkan", description: `${pkg.resiNumber || pkg.barcode} sudah ada dalam daftar.` });
-        return false; // tetap lock → paket sudah ada, tidak perlu scan ulang
+        return false; // tetap lock
       }
+      addedIdsRef.current.add(pkg.id); // klaim ID — sinkron, tidak ada race
 
       const newItem = toItem(pkg);
       setItems((prev) => [...prev, newItem]);
@@ -282,6 +290,7 @@ export default function AdminScan() {
   function removeItem(id: number) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setExpandedIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+    addedIdsRef.current.delete(id); // hapus klaim agar bisa scan ulang paket ini
   }
 
   function toggleExpand(id: number) {
@@ -299,6 +308,7 @@ export default function AdminScan() {
     setUangDibayar("");
     setPaymentType("tunai");
     setAlreadyDelivered(null);
+    addedIdsRef.current.clear(); // bersihkan semua klaim ID
     stopCamera();
   }
 
