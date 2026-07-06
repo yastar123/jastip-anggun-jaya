@@ -132,7 +132,7 @@ function formatPackage(
 }
 
 // GET /api/packages
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
     const { status, customerId, adminId, dateFrom, dateTo, search } =
       req.query as any;
@@ -376,7 +376,7 @@ router.post(
 );
 
 // GET /api/packages/scan/:barcode
-router.get("/scan/:barcode", requireAuth, async (req, res) => {
+router.get("/scan/:barcode", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
     const barcode = String(req.params.barcode);
     let pkgs = await db
@@ -429,7 +429,7 @@ router.get("/scan/:barcode", requireAuth, async (req, res) => {
 });
 
 // GET /api/packages/:id
-router.get("/:id", requireAuth, async (req, res) => {
+router.get("/:id", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const pkgs = await db
@@ -649,7 +649,7 @@ router.post(
 );
 
 // GET /api/packages/:id/barcode
-router.get("/:id/barcode", requireAuth, async (req, res) => {
+router.get("/:id/barcode", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const pkgs = await db

@@ -112,7 +112,7 @@ router.patch(
         .where(eq(paymentsTable.id, id))
         .returning();
 
-      res.json(updated);
+      return res.json(updated);
     } catch (err) {
       (req as any).log?.error?.(err);
       return res.status(500).json({ error: "Gagal memperbarui pembayaran" });

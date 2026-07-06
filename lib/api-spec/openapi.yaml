@@ -240,11 +240,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScanResult"
 
-  /packages/{id}/confirm-pickup:
+  /packages/{id}/serahkan:
     post:
-      operationId: confirmPickup
+      operationId: serahkanPackage
       tags: [packages]
-      summary: Admin confirms package pickup after customer scan
+      summary: Mark package as diserahkan (handed over to customer)
       parameters:
         - name: id
           in: path
@@ -253,7 +253,26 @@ paths:
             type: integer
       responses:
         "200":
-          description: Pickup confirmed
+          description: Package marked as diserahkan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Package"
+
+  /packages/{id}/tolak:
+    post:
+      operationId: tolakPackage
+      tags: [packages]
+      summary: Reject a package (set back to pending)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Package rejected
           content:
             application/json:
               schema:

@@ -877,20 +877,20 @@ export function useScanPackage<TData = Awaited<ReturnType<typeof scanPackage>>, 
 
 
 
-export const getConfirmPickupUrl = (id: number,) => {
+export const getSerahkanPackageUrl = (id: number,) => {
 
 
 
 
-  return `/api/packages/${id}/confirm-pickup`
+  return `/api/packages/${id}/serahkan`
 }
 
 /**
- * @summary Admin confirms package pickup after customer scan
+ * @summary Mark package as diserahkan (handed over to customer)
  */
-export const confirmPickup = async (id: number, options?: RequestInit): Promise<Package> => {
+export const serahkanPackage = async (id: number, options?: RequestInit): Promise<Package> => {
 
-  return customFetch<Package>(getConfirmPickupUrl(id),
+  return customFetch<Package>(getSerahkanPackageUrl(id),
   {
     ...options,
     method: 'POST'
@@ -902,11 +902,11 @@ export const confirmPickup = async (id: number, options?: RequestInit): Promise<
 
 
 
-export const getConfirmPickupMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmPickup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof confirmPickup>>, TError,{id: number}, TContext> => {
+export const getSerahkanPackageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof serahkanPackage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof serahkanPackage>>, TError,{id: number}, TContext> => {
 
-const mutationKey = ['confirmPickup'];
+const mutationKey = ['serahkanPackage'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -916,10 +916,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmPickup>>, {id: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof serahkanPackage>>, {id: number}> = (props) => {
           const {id} = props ?? {};
 
-          return  confirmPickup(id,requestOptions)
+          return  serahkanPackage(id,requestOptions)
         }
 
 
@@ -929,22 +929,92 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type ConfirmPickupMutationResult = NonNullable<Awaited<ReturnType<typeof confirmPickup>>>
+    export type SerahkanPackageMutationResult = NonNullable<Awaited<ReturnType<typeof serahkanPackage>>>
 
-    export type ConfirmPickupMutationError = ErrorType<unknown>
+    export type SerahkanPackageMutationError = ErrorType<unknown>
 
     /**
- * @summary Admin confirms package pickup after customer scan
+ * @summary Mark package as diserahkan (handed over to customer)
  */
-export const useConfirmPickup = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmPickup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useSerahkanPackage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof serahkanPackage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof confirmPickup>>,
+        Awaited<ReturnType<typeof serahkanPackage>>,
         TError,
         {id: number},
         TContext
       > => {
-      return useMutation(getConfirmPickupMutationOptions(options));
+      return useMutation(getSerahkanPackageMutationOptions(options));
+    }
+
+export const getTolakPackageUrl = (id: number,) => {
+
+
+
+
+  return `/api/packages/${id}/tolak`
+}
+
+/**
+ * @summary Reject a package (set back to pending)
+ */
+export const tolakPackage = async (id: number, options?: RequestInit): Promise<Package> => {
+
+  return customFetch<Package>(getTolakPackageUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getTolakPackageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tolakPackage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof tolakPackage>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['tolakPackage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof tolakPackage>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  tolakPackage(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TolakPackageMutationResult = NonNullable<Awaited<ReturnType<typeof tolakPackage>>>
+
+    export type TolakPackageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reject a package (set back to pending)
+ */
+export const useTolakPackage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof tolakPackage>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof tolakPackage>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getTolakPackageMutationOptions(options));
     }
 
 export const getVerifyPackageUrl = (id: number,) => {

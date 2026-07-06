@@ -298,13 +298,54 @@ export const ScanPackageResponse = zod.object({
 
 
 /**
- * @summary Admin confirms package pickup after customer scan
+ * @summary Mark package as diserahkan (handed over to customer)
  */
-export const ConfirmPickupParams = zod.object({
+export const SerahkanPackageParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const ConfirmPickupResponse = zod.object({
+export const SerahkanPackageResponse = zod.object({
+  "id": zod.number(),
+  "barcode": zod.string(),
+  "resiNumber": zod.string(),
+  "packageNumber": zod.string().nullish(),
+  "itemName": zod.string(),
+  "realWeight": zod.number().nullish(),
+  "length": zod.number().nullish(),
+  "width": zod.number().nullish(),
+  "height": zod.number().nullish(),
+  "volumeWeight": zod.number().nullish(),
+  "packagingType": zod.string().nullish(),
+  "usedWeight": zod.number().nullish(),
+  "shippingRate": zod.number().nullish(),
+  "totalWeight": zod.number().nullish(),
+  "price": zod.number().nullish(),
+  "totalShipping": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "status": zod.enum(['pending', 'in_transit', 'ready', 'picked_up']),
+  "verified": zod.enum(['belum_diverifikasi', 'sudah_diverifikasi']).optional(),
+  "verifiedAt": zod.string().nullish(),
+  "customerId": zod.number(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string().optional(),
+  "adminId": zod.number().nullish(),
+  "adminName": zod.string().nullish(),
+  "packageDate": zod.string().nullish(),
+  "pickedUpAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Reject a package (set back to pending)
+ */
+export const TolakPackageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const TolakPackageResponse = zod.object({
   "id": zod.number(),
   "barcode": zod.string(),
   "resiNumber": zod.string(),
