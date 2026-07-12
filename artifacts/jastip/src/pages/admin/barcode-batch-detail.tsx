@@ -21,6 +21,9 @@ import {
   QrCode, Pencil, Trash2, Search,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { Pagination } from "@/components/pagination";
+
+const PAGE_SIZE = 15;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -251,6 +254,8 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
   const [search, setSearch] = useState("");
+  const [filterServiceType, setFilterServiceType] = useState("all");
+  const [page, setPage] = useState(1);
 
   const { data: batches } = useListBatches();
   const { data: packages, isLoading } = useListPackages();
@@ -266,15 +271,23 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   );
 
   const filtered = batchPkgs.filter((p: any) =>
-    !search ||
-    (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.customerName || "").toLowerCase().includes(search.toLowerCase())
+    (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
+    (!search ||
+      (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const totalWeight = batchPkgs.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0);
   const totalShipping = batchPkgs.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
+
+  function handleSearch(v: string) { setSearch(v); setPage(1); }
+  function handleFilter(v: string) { setFilterServiceType(v); setPage(1); }
 
   // ── Edit state ──────────────────────────────────────────────────────────────
   const [editPkg, setEditPkg] = useState<any | null>(null);
@@ -485,15 +498,34 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Cari resi, barcode, nama..."
-          className="pl-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Search + Filter */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Cari resi, barcode, nama..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+        </div>
+        <Select value={filterServiceType} onValueChange={handleFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Semua Jenis Jastip" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Semua Jenis Jastip</SelectItem>
+            <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
+            <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
+            <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
+            <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
+          </SelectContent>
+        </Select>
+        {(search || filterServiceType !== "all") && (
+          <p className="text-sm text-muted-foreground">
+            {filtered.length} dari {batchPkgs.length} paket
+          </p>
+        )}
       </div>
 
       {/* Content */}
@@ -511,19 +543,14 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
           <p className="font-semibold text-base">
             {batchPkgs.length === 0 ? "Belum ada paket dalam batch ini" : "Tidak ada paket yang cocok"}
           </p>
-          {search && (
-            <p className="text-sm mt-1">Coba ubah kata kunci pencarian</p>
+          {(search || filterServiceType !== "all") && (
+            <p className="text-sm mt-1">Coba ubah filter atau kata kunci pencarian</p>
           )}
         </div>
       ) : (
         <>
-          {search && (
-            <p className="text-sm text-muted-foreground">
-              Menampilkan {filtered.length} dari {batchPkgs.length} paket
-            </p>
-          )}
           <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map((pkg: any) => (
+            {paginated.map((pkg: any) => (
               <PackageBarcodeCard
                 key={pkg.id}
                 pkg={pkg}
@@ -533,6 +560,13 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
               />
             ))}
           </div>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            total={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </>
       )}
 
