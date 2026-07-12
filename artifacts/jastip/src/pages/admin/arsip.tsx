@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { useListPackages } from "@workspace/api-client-react";
+import { useListPackages, useListBatches } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
-import { ArrowLeft, Archive, Search, Users, Package } from "lucide-react";
+import {
+  Archive, Search, Ship, CheckCircle2, Lock, Clock,
+  ChevronDown, Download, Package,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import * as XLSX from "xlsx";
-import { Download } from "lucide-react";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 function formatRp(n: any) {
   if (n == null) return "-";
@@ -20,64 +22,49 @@ function formatRp(n: any) {
 
 function formatTgl(val: any) {
   if (!val) return "";
-  try { return new Date(val).toLocaleDateString("id-ID"); } catch { return String(val); }
+  try { return new Date(val).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }); }
+  catch { return String(val); }
+}
+
+function batchStatusColor(status: string) {
+  if (status === "OPEN") return "bg-green-100 text-green-800 border-green-200";
+  if (status === "CLOSED") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
+}
+
+function batchStatusIcon(status: string) {
+  if (status === "OPEN") return <CheckCircle2 className="w-3 h-3" />;
+  if (status === "CLOSED") return <Lock className="w-3 h-3" />;
+  return <Archive className="w-3 h-3" />;
+}
+
+function batchStatusLabel(status: string) {
+  if (status === "OPEN") return "Aktif";
+  if (status === "CLOSED") return "Ditutup";
+  return "Arsip";
 }
 
 export default function AdminArsip() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
-  const { data: packages, isLoading } = useListPackages();
+
+  const { data: packages, isLoading: pkgLoading } = useListPackages();
+  const { data: batches, isLoading: batchLoading } = useListBatches();
+  const isLoading = pkgLoading || batchLoading;
+
   const [search, setSearch] = useState("");
-  const [filterServiceType, setFilterServiceType] = useState<string>("all");
   const [page, setPage] = useState(1);
 
   const allPackages = packages || [];
+  const allBatches = batches || [];
 
-  // Hanya tampilkan paket yang SUDAH_DIAMBIL
+  // Semua paket yang sudah diserahkan/diambil
   const arsipPackages = allPackages.filter(
     (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
   );
 
-  const filtered = arsipPackages.filter(
-    (p: any) =>
-      (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
-      (
-        !search ||
-        (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
-        (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-        (p.customerName || "").toLowerCase().includes(search.toLowerCase())
-      )
-  );
-
-  // Group by customerName + serviceType + batchId
-  const groupedByCustomer: { customerName: string; serviceType: string; batchId: number | null; pkgs: any[] }[] = [];
-  {
-    const map = new Map<string, any[]>();
-    for (const p of filtered) {
-      const key = [
-        (p.customerName || "").trim().toLowerCase(),
-        (p.serviceType || "").toLowerCase(),
-        String(p.batchId ?? ""),
-      ].join("|");
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
-    }
-    for (const [, pkgs] of map) {
-      groupedByCustomer.push({
-        customerName: pkgs[0]?.customerName || "",
-        serviceType: pkgs[0]?.serviceType || "",
-        batchId: pkgs[0]?.batchId ?? null,
-        pkgs,
-      });
-    }
-  }
-
-  const total = groupedByCustomer.length;
-  const totalPackages = filtered.length;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginatedGroups = groupedByCustomer.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
+  // Untuk export: semua arsip
   function exportExcel() {
     const rows = arsipPackages.map((p: any, i: number) => ({
       No: i + 1,
@@ -99,21 +86,62 @@ export default function AdminArsip() {
     XLSX.writeFile(wb, `arsip-paket-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
+  // Hitung per batch
+  type BatchStat = {
+    batch: any;
+    diserahkan: number;
+    pending: number;
+    total: number;
+  };
+
+  const batchStats: BatchStat[] = allBatches
+    .map((batch: any) => {
+      const batchPkgs = allPackages.filter((p: any) => p.batchId === batch.id);
+      const diserahkan = batchPkgs.filter(
+        (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
+      ).length;
+      const pending = batchPkgs.filter(
+        (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+      ).length;
+      return { batch, diserahkan, pending, total: batchPkgs.length };
+    })
+    // Only show batches that have at least 1 package (total > 0)
+    .filter((s: BatchStat) => s.total > 0);
+
+  // Paket tanpa batch yang sudah diserahkan
+  const noBatchArsip = arsipPackages.filter((p: any) => p.batchId == null);
+  const noBatchPending = allPackages.filter(
+    (p: any) => p.batchId == null && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  ).length;
+
+  // Filter by search (batch name)
+  const filteredStats = batchStats.filter((s: BatchStat) =>
+    !search ||
+    (s.batch.namaKapal || "").toLowerCase().includes(search.toLowerCase()) ||
+    (s.batch.kotaAsal || "").toLowerCase().includes(search.toLowerCase()) ||
+    (s.batch.tujuan || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredStats.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filteredStats.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const totalDiserahkan = arsipPackages.length;
+  const totalPending = allPackages.filter(
+    (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  ).length;
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => setLocation(`${base}/barcode`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Archive className="h-7 w-7 text-green-600" /> Arsip Paket Sudah Diambil
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Data paket yang telah diserahkan ke konsumen. Read-only — tidak dapat diubah.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Archive className="h-7 w-7 text-green-600" /> Arsip Paket
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Paket dikelompokkan per batch. Klik batch untuk melihat barcode paket yang sudah diserahkan.
+          </p>
         </div>
         <Button
           variant="outline"
@@ -125,144 +153,177 @@ export default function AdminArsip() {
         </Button>
       </div>
 
-      {/* Ringkasan */}
+      {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total Konsumen", value: groupedByCustomer.length, icon: Users, color: "text-blue-600" },
-          { label: "Total Paket", value: arsipPackages.length, icon: Package, color: "text-green-600" },
-          {
-            label: "Total Ongkir",
-            value: formatRp(arsipPackages.reduce((s: number, p: any) => s + (p.totalShipping ?? 0), 0)),
-            icon: null,
-            color: "text-primary",
-          },
-          {
-            label: "Lunas",
-            value: arsipPackages.filter((p: any) => p.statusPembayaran === "SUDAH_DIBAYAR").length + " paket",
-            icon: null,
-            color: "text-green-600",
-          },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="pt-4 pb-3">
-              <p className="text-xs text-muted-foreground font-medium">{stat.label}</p>
-              <p className={`text-xl font-bold mt-0.5 ${stat.color}`}>{stat.value}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Total Batch</p>
+            <p className="text-xl font-bold mt-0.5 text-blue-600">{allBatches.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Sudah Diserahkan</p>
+            <p className="text-xl font-bold mt-0.5 text-green-600">{totalDiserahkan} paket</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Belum Diserahkan</p>
+            <p className="text-xl font-bold mt-0.5 text-amber-600">{totalPending} paket</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Total Ongkir Arsip</p>
+            <p className="text-xl font-bold mt-0.5 text-primary">
+              {formatRp(arsipPackages.reduce((s: number, p: any) => s + (p.totalShipping ?? 0), 0))}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filter jenis jastip */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { value: "all", label: "Semua Jastip" },
-          { value: "jastip pesawat", label: "Pesawat" },
-          { value: "jastip hemat+", label: "Hemat+" },
-          { value: "jastip kargo", label: "Kargo" },
-          { value: "jastip pelni", label: "Pelni" },
-        ].map((opt) => {
-          const count = opt.value === "all"
-            ? arsipPackages.length
-            : arsipPackages.filter((p: any) => (p.serviceType || "").toLowerCase() === opt.value).length;
-          return (
-            <Button
-              key={opt.value}
-              size="sm"
-              variant={filterServiceType === opt.value ? "default" : "outline"}
-              onClick={() => { setFilterServiceType(opt.value); setPage(1); }}
-              className="text-xs"
-            >
-              {opt.label}
-              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${filterServiceType === opt.value ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
-                {count}
-              </span>
-            </Button>
-          );
-        })}
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari nama batch, kota..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        />
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari nama, resi, barcode..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <Badge variant="secondary">{total} konsumen · {totalPackages} paket</Badge>
-      </div>
-
+      {/* Batch list */}
       {isLoading ? (
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="animate-pulse"><CardContent className="h-24 pt-4 bg-muted/20" /></Card>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="h-24 pt-4 bg-muted/20" />
+            </Card>
           ))}
         </div>
-      ) : total === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
+      ) : filteredStats.length === 0 && noBatchArsip.length === 0 ? (
+        <div className="text-center py-20 text-muted-foreground">
           <Archive className="w-16 h-16 mx-auto mb-4 opacity-20" />
-          <p className="text-lg font-medium">Belum ada paket yang diarsip</p>
-          <p className="text-sm mt-1">Paket yang sudah diserahkan ke konsumen akan muncul di sini</p>
+          <p className="text-lg font-medium">
+            {allBatches.length === 0 ? "Belum ada batch" : "Tidak ada batch yang cocok"}
+          </p>
+          <p className="text-sm mt-1">
+            {allBatches.length === 0
+              ? "Buat batch pengiriman terlebih dahulu"
+              : "Coba ubah kata kunci pencarian"}
+          </p>
         </div>
       ) : (
         <>
           <div className="space-y-3">
-            {paginatedGroups.map((group) => {
-              const totalShipping = group.pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
-              const totalWeight = group.pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
-              const lunas = group.pkgs.filter((p) => p.statusPembayaran === "SUDAH_DIBAYAR").length;
-              const piutang = group.pkgs.filter((p) => p.statusPembayaran === "BELUM_DIBAYAR").length;
-              const dp = group.pkgs.filter((p) => p.statusPembayaran === "DP").length;
+            {paginated.map(({ batch, diserahkan, pending, total }) => {
+              const pct = total > 0 ? Math.round((diserahkan / total) * 100) : 0;
               return (
-                <Card key={`${group.customerName}|${group.serviceType}|${group.batchId ?? ""}`} className="border-green-200 bg-green-50/30">
-                  <CardContent className="pt-4 pb-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-bold text-base">{group.customerName}</p>
-                          {group.serviceType && (
-                            <Badge variant="outline" className="text-xs capitalize bg-white">
-                              {group.serviceType.replace("jastip ", "Jastip ")}
-                            </Badge>
-                          )}
-                          <Badge className="text-xs bg-green-600 text-white">✓ Sudah Diambil</Badge>
+                <Card
+                  key={batch.id}
+                  className={`border-2 cursor-pointer hover:shadow-md transition-shadow ${
+                    batch.statusBatch === "OPEN" ? "border-blue-200" : "border-gray-200"
+                  }`}
+                  onClick={() => setLocation(`${base}/arsip/batch/${batch.id}`)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      {/* Left: icon + info */}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={`p-2 rounded-lg shrink-0 ${batch.statusBatch === "OPEN" ? "bg-blue-100" : "bg-gray-100"}`}>
+                          <Ship className={`w-5 h-5 ${batch.statusBatch === "OPEN" ? "text-blue-700" : "text-gray-500"}`} />
                         </div>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {group.pkgs.length} paket · {totalWeight.toFixed(3)} Kg · {formatRp(totalShipping)}
-                        </p>
-                        {(lunas > 0 || piutang > 0 || dp > 0) && (
-                          <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                            {lunas > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{lunas} lunas</Badge>}
-                            {dp > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{dp} DP</Badge>}
-                            {piutang > 0 && <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">{piutang} piutang</Badge>}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-base leading-snug">{batch.namaKapal}</span>
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${batchStatusColor(batch.statusBatch)}`}>
+                              {batchStatusIcon(batch.statusBatch)}
+                              {batchStatusLabel(batch.statusBatch)}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Daftar resi */}
-                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                      {group.pkgs.map((p, i) => (
-                        <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground bg-white rounded px-2 py-1 border border-green-100">
-                          <span className="font-mono truncate max-w-[160px]">#{i + 1} {p.resiNumber || p.barcode || "-"}</span>
-                          <span className="shrink-0 ml-2">
-                            {p.usedWeight != null ? p.usedWeight + " Kg" : "-"}
-                            {p.totalShipping != null && <span className="ml-1 text-primary font-semibold"> · {formatRp(p.totalShipping)}</span>}
-                          </span>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {batch.kotaAsal} → {batch.tujuan}
+                            &nbsp;·&nbsp; ETD: {formatTgl(batch.etd)}
+                            &nbsp;·&nbsp; Closing: {formatTgl(batch.periodeClosingMulai)} – {formatTgl(batch.periodeClosingSelesai)}
+                          </p>
+
+                          {/* Status counts */}
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 className="w-3 h-3" />
+                              {diserahkan} diserahkan
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                              <Clock className="w-3 h-3" />
+                              {pending} belum diserahkan
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {total} total paket
+                            </span>
+                          </div>
+
+                          {/* Progress bar */}
+                          {total > 0 && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-green-500 rounded-full transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground shrink-0">{pct}% selesai</span>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Right: chevron */}
+                      <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
                     </div>
-                  </CardContent>
+                  </CardHeader>
                 </Card>
               );
             })}
+
+            {/* Paket tanpa batch */}
+            {noBatchArsip.length > 0 && !search && (
+              <Card className="border-2 border-dashed border-gray-300 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setLocation(`${base}/arsip/batch/no-batch`)}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-gray-100 shrink-0">
+                      <Package className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-base">Paket Tanpa Batch</span>
+                        <Badge variant="outline" className="text-xs">Tidak ada batch</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" /> {noBatchArsip.length} diserahkan
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                          <Clock className="w-3 h-3" /> {noBatchPending} belum diserahkan
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" />
+                  </div>
+                </CardHeader>
+              </Card>
+            )}
           </div>
-          {totalPages > 1 && (
-            <div className="border rounded-lg">
-              <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            </div>
-          )}
+
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            total={filteredStats.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </>
       )}
     </div>

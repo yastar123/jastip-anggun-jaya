@@ -23,6 +23,7 @@ import AdminVerify from "@/pages/admin/verify";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
 import AdminBatches from "@/pages/admin/batches";
 import AdminArsip from "@/pages/admin/arsip";
+import ArsipBatchDetail from "@/pages/admin/arsip-batch-detail";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
@@ -145,6 +146,9 @@ function Router() {
       <Route path="/admin/arsip">
         {(params) => <ProtectedRoute role="admin" component={AdminArsip} params={params} />}
       </Route>
+      <Route path="/admin/arsip/batch/:id">
+        {(params) => <ProtectedRoute role="admin" component={ArsipBatchDetail} params={params} />}
+      </Route>
       <Route path="/admin/settings">
         {(params) => <ProtectedRoute role="admin" component={OwnerSettings} params={params} />}
       </Route>
@@ -211,6 +215,9 @@ function Router() {
       </Route>
       <Route path="/owner/arsip">
         {(params) => <ProtectedRoute role="owner" component={AdminArsip} params={params} />}
+      </Route>
+      <Route path="/owner/arsip/batch/:id">
+        {(params) => <ProtectedRoute role="owner" component={ArsipBatchDetail} params={params} />}
       </Route>
 
       <Route component={NotFound} />
