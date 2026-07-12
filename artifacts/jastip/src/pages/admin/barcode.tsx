@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2, Ship, ChevronDown, ChevronUp, Lock, Archive, Clock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const PAGE_SIZE = 15;
@@ -434,10 +434,324 @@ function GroupedBarcodeItem({
   );
 }
 
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function batchStatusColor(status: string) {
+  if (status === "OPEN") return "bg-green-100 text-green-800 border-green-200";
+  if (status === "CLOSED") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
+}
+
+function batchStatusIcon(status: string) {
+  if (status === "OPEN") return <CheckCircle2 className="w-3 h-3" />;
+  if (status === "CLOSED") return <Lock className="w-3 h-3" />;
+  return <Archive className="w-3 h-3" />;
+}
+
+function batchStatusLabel(status: string) {
+  if (status === "OPEN") return "Aktif";
+  if (status === "CLOSED") return "Ditutup";
+  return "Arsip";
+}
+
+function fmtDate(d: string) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function groupPkgsByCustomer(pkgs: any[]) {
+  const map = new Map<string, any[]>();
+  for (const p of pkgs) {
+    const key = [
+      (p.customerName || "").trim().toLowerCase(),
+      (p.serviceType || "").toLowerCase(),
+      String(p.batchId ?? ""),
+    ].join("|");
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(p);
+  }
+  return [...map.values()];
+}
+
+// ── BatchBarcodeSection ───────────────────────────────────────────────────────
+
+function BatchBarcodeSection({
+  batch,
+  packages,
+  batchLabel,
+  search,
+  filterServiceType,
+  onEdit,
+  onDelete,
+}: {
+  batch: any;
+  packages: any[];
+  batchLabel: string;
+  search: string;
+  filterServiceType: string;
+  onEdit: (pkg: any) => void;
+  onDelete: (pkg: any) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const batchPkgs = packages.filter((p: any) => p.batchId === batch.id &&
+    p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan");
+
+  const filtered = batchPkgs.filter((p: any) =>
+    (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
+    (!search ||
+      (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const groups = groupPkgsByCustomer(filtered);
+  const totalBatchPkgs = batchPkgs.length;
+  const hasFilter = filterServiceType !== "all" || !!search;
+
+  async function printBatch() {
+    if (!batchPkgs.length) return;
+    const pages: string[] = [];
+    for (const pkg of batchPkgs) {
+      const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
+      let qrDataUrl = "";
+      try {
+        qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+      } catch { continue; }
+      pages.push(`
+        <div class="page">
+          <div class="label">
+            <div class="header">
+              <div class="brand-name">JASTIP ANGGUN JAYA</div>
+              <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+            </div>
+            <div class="body-wrap">
+              <div class="qr-wrap">
+                <img src="${qrDataUrl}" alt="QR Code" />
+                <div class="qr-label">${qrValue}</div>
+              </div>
+              <div class="info-section">
+                <div class="customer">${pkg.customerName || "-"}</div>
+                <div class="batch-tag">📦 ${batchLabel}</div>
+                <div class="info-grid">
+                  <div class="info-item"><span class="info-label">No. Resi</span><span class="info-value mono">${pkg.resiNumber || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">No. Paket</span><span class="info-value mono">${pkg.packageNumber || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Tanggal</span><span class="info-value">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Jenis Jastip</span><span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Rute</span><span class="info-value">${pkg.deliveryRoute || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Berat Real</span><span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Berat Digunakan</span><span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Jenis Paking</span><span class="info-value">${pkg.packagingType || "-"}</span></div>
+                  <div class="info-item"><span class="info-label">Total Ongkir</span><span class="info-value red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+          </div>
+        </div>
+      `);
+    }
+    if (!pages.length) return;
+    const html = `<!DOCTYPE html>
+<html><head>
+  <title>Print Barcode — ${batchLabel}</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; background: #fff; }
+    .page { width: 100%; height: calc(297mm - 24mm); display: flex; align-items: stretch; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
+    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .header { background: #c00; color: #fff; padding: 14px 20px; }
+    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .body-wrap { flex: 1; display: flex; flex-direction: row; align-items: stretch; }
+    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; border-right: 2px dashed #ddd; min-width: 180px; }
+    .qr-wrap img { width: 150px; height: 150px; display: block; }
+    .qr-label { font-size: 8px; color: #999; margin-top: 6px; font-family: monospace; text-align: center; word-break: break-all; max-width: 150px; }
+    .info-section { flex: 1; padding: 16px 20px; }
+    .customer { font-size: 20px; font-weight: 900; color: #111; margin-bottom: 4px; }
+    .batch-tag { font-size: 10px; font-weight: 700; color: #1d4ed8; margin-bottom: 10px; border-bottom: 1.5px solid #eee; padding-bottom: 8px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+    .info-item { display: flex; flex-direction: column; gap: 2px; }
+    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info-value { font-size: 12px; font-weight: 700; color: #111; line-height: 1.3; }
+    .info-value.mono { font-family: monospace; font-size: 11px; }
+    .info-value.red { color: #c00; font-size: 14px; }
+    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 8px 20px; font-size: 9px; color: #aaa; text-align: center; }
+  </style>
+</head><body>
+  ${pages.join("")}
+  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+</body></html>`;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  }
+
+  return (
+    <Card className={`border-2 ${batch.statusBatch === "OPEN" ? "border-blue-200" : "border-gray-200"}`}>
+      {/* Batch header — always visible, clickable */}
+      <CardHeader
+        className="pb-3 cursor-pointer select-none hover:bg-muted/30 transition-colors rounded-t-lg"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`p-2 rounded-lg shrink-0 ${batch.statusBatch === "OPEN" ? "bg-blue-100" : "bg-gray-100"}`}>
+              <Ship className={`w-5 h-5 ${batch.statusBatch === "OPEN" ? "text-blue-700" : "text-gray-500"}`} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-base leading-snug">{batch.namaKapal}</span>
+                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${batchStatusColor(batch.statusBatch)}`}>
+                  {batchStatusIcon(batch.statusBatch)}
+                  {batchStatusLabel(batch.statusBatch)}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {batch.kotaAsal} → {batch.tujuan} &nbsp;·&nbsp;
+                ETD: {fmtDate(batch.etd)} &nbsp;·&nbsp;
+                Closing: {fmtDate(batch.periodeClosingMulai)} – {fmtDate(batch.periodeClosingSelesai)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                <span className="font-semibold text-foreground">{totalBatchPkgs} paket aktif</span>
+                {hasFilter && filtered.length !== totalBatchPkgs && (
+                  <span className="ml-1 text-primary font-medium">· {filtered.length} ditampilkan (filter aktif)</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {totalBatchPkgs > 0 && (
+              <button
+                className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 px-2 py-1 rounded hover:bg-muted transition-colors"
+                onClick={(e) => { e.stopPropagation(); printBatch(); }}
+                title="Cetak semua barcode batch ini"
+              >
+                <Printer className="w-3.5 h-3.5" /> Cetak
+              </button>
+            )}
+            {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Expanded: barcode grid */}
+      {expanded && (
+        <CardContent className="pt-0 pb-4">
+          <div className="border-t pt-4">
+            {groups.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                {hasFilter ? "Tidak ada paket yang cocok dengan filter saat ini." : "Belum ada paket dalam batch ini."}
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                {groups.map((pkgs) => (
+                  <GroupedBarcodeItem
+                    key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|${pkgs[0]?.batchId ?? ""}`}
+                    pkgs={pkgs}
+                    batchLabel={batchLabel}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ── NoBatchSection ────────────────────────────────────────────────────────────
+
+function NoBatchSection({
+  packages,
+  search,
+  filterServiceType,
+  onEdit,
+  onDelete,
+}: {
+  packages: any[];
+  search: string;
+  filterServiceType: string;
+  onEdit: (pkg: any) => void;
+  onDelete: (pkg: any) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const noBatch = packages.filter(
+    (p: any) => p.batchId == null && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  );
+
+  const filtered = noBatch.filter((p: any) =>
+    (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
+    (!search ||
+      (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const groups = groupPkgsByCustomer(filtered);
+
+  if (noBatch.length === 0) return null;
+
+  return (
+    <Card className="border-2 border-dashed border-gray-300">
+      <CardHeader
+        className="pb-3 cursor-pointer select-none hover:bg-muted/30 transition-colors rounded-t-lg"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="p-2 rounded-lg bg-gray-100 shrink-0">
+              <Clock className="w-5 h-5 text-gray-500" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base">Paket Tanpa Batch</span>
+                <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full border font-medium bg-gray-100 text-gray-600 border-gray-200">
+                  Belum diassign
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                <span className="font-semibold text-foreground">{noBatch.length} paket</span> — belum dimasukkan ke batch pengiriman manapun
+              </p>
+            </div>
+          </div>
+          {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent className="pt-0 pb-4">
+          <div className="border-t pt-4">
+            {groups.length === 0 ? (
+              <p className="text-center py-8 text-sm text-muted-foreground">Tidak ada paket yang cocok dengan filter saat ini.</p>
+            ) : (
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                {groups.map((pkgs) => (
+                  <GroupedBarcodeItem
+                    key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|nobatch`}
+                    pkgs={pkgs}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ── AdminBarcode ──────────────────────────────────────────────────────────────
+
 export default function AdminBarcode() {
   const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
   const { data: packages, isLoading } = useListPackages();
   const { data: batches } = useListBatches();
   const queryClient = useQueryClient();
@@ -461,69 +775,29 @@ export default function AdminBarcode() {
   const [deletePkg, setDeletePkg] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [printServiceType, setPrintServiceType] = useState<string>("");
   const [filterServiceType, setFilterServiceType] = useState<string>("all");
 
   const idsParam = new URLSearchParams(window.location.search).get("ids");
   const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
   const allPackages = packages || [];
+  const allBatches = batches || [];
 
-  // Hanya tampilkan paket AKTIF (belum diambil) — SUDAH_DIAMBIL masuk ke Arsip
+  // Hanya tampilkan paket AKTIF (belum diambil)
   const activePackages = allPackages.filter(
     (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
   );
-
-  const filtered = (highlightIds
-    ? activePackages.filter((p: any) => highlightIds.includes(p.id))
-    : activePackages
-  ).filter(
-    (p: any) =>
-      (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
-      (
-        !search ||
-        (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
-        (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-        (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-        (p.customerName || "").toLowerCase().includes(search.toLowerCase())
-      ),
-  );
-
-  // Group packages by customerName + serviceType + batchId
-  // Fixes: "Nawar Musakir Hemat+" dan "Nawar Musakir Pelni" tidak lagi digabung
-  const groupedByCustomer: { customerName: string; serviceType: string; batchId: number | null; pkgs: any[] }[] = [];
-  {
-    const map = new Map<string, any[]>();
-    for (const p of filtered) {
-      const key = [
-        (p.customerName || "").trim().toLowerCase(),
-        (p.serviceType || "").toLowerCase(),
-        String(p.batchId ?? ""),
-      ].join("|");
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
-    }
-    for (const [, pkgs] of map) {
-      groupedByCustomer.push({
-        customerName: pkgs[0]?.customerName || "",
-        serviceType: pkgs[0]?.serviceType || "",
-        batchId: pkgs[0]?.batchId ?? null,
-        pkgs,
-      });
-    }
-  }
-
-  const total = groupedByCustomer.length;
-  const totalPackages = filtered.length;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginatedGroups = groupedByCustomer.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const paginated: any[] = [];
 
   const sudahDiambilCount = allPackages.filter(
     (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
   ).length;
 
-  function handleSearch(v: string) { setSearch(v); setPage(1); }
+  // Paket tanpa batch (batchId null)
+  const noBatchPkgs = activePackages.filter((p: any) => p.batchId == null);
+
+  const totalActive = activePackages.length;
+
+  function handleSearch(v: string) { setSearch(v); }
 
   function openEdit(pkg: any) {
     setEditPkg(pkg);
@@ -685,23 +959,12 @@ export default function AdminBarcode() {
     await doPrintBarcodes(allPackages, "Print Semua Barcode — Jastip Anggun Jaya");
   }
 
-  async function printByServiceType() {
-    if (!printServiceType) return;
-    const pkgs = allPackages.filter(
-      (p: any) => (p.serviceType || "").toLowerCase() === printServiceType.toLowerCase()
-    );
-    if (!pkgs.length) {
-      toast({ variant: "destructive", title: "Tidak ada paket", description: `Tidak ditemukan paket dengan jenis: ${printServiceType}` });
-      return;
-    }
-    await doPrintBarcodes(pkgs, `Print Barcode — ${printServiceType}`);
-  }
-
   const editIsKargo = editForm.serviceType === "jastip kargo";
   const editRouteOpts = deliveryRouteOptions[editForm.serviceType] || [];
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" onClick={() => setLocation(`${base}/packages`)}>
@@ -712,69 +975,43 @@ export default function AdminBarcode() {
               <QrCode className="h-7 w-7 text-primary" />
               Label Barcode Paket
             </h1>
-            <p className="text-muted-foreground mt-1">Cetak, unduh, edit, atau hapus barcode paket.</p>
+            <p className="text-muted-foreground mt-1">
+              Barcode dikelompokkan per batch pengiriman. Klik batch untuk melihat &amp; cetak barcode.
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0 items-center">
           <Button
             variant="outline"
             onClick={printAllBarcodes}
-            disabled={allPackages.length === 0}
+            disabled={activePackages.length === 0}
             className="flex items-center gap-2"
           >
-            <Printer className="h-4 w-4" /> Print Semua Barcode
+            <Printer className="h-4 w-4" /> Print Semua
           </Button>
-          <div className="flex items-center gap-1 border rounded-md overflow-hidden">
-            <Select value={printServiceType} onValueChange={setPrintServiceType}>
-              <SelectTrigger className="border-0 rounded-none h-9 w-40 focus:ring-0 text-xs">
-                <SelectValue placeholder="Pilih jenis jastip..." />
-              </SelectTrigger>
-              <SelectContent>
-                {SERVICE_TYPES.map((s) => {
-                  const count = allPackages.filter(
-                    (p: any) => (p.serviceType || "").toLowerCase() === s.value
-                  ).length;
-                  return (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label} {count > 0 && <span className="text-muted-foreground">({count})</span>}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={printByServiceType}
-              disabled={!printServiceType || allPackages.length === 0}
-              className="rounded-none border-l h-9 px-3 flex items-center gap-1.5 text-xs"
-            >
-              <Printer className="h-3.5 w-3.5" /> Print
-            </Button>
-          </div>
         </div>
       </div>
 
+      {/* Notif paket baru dari input grup */}
       {highlightIds && highlightIds.length > 0 && (
         <Card className="border-green-500 bg-green-50">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
               <div className="flex-1">
-                <p className="font-semibold text-green-800">Barcode siap — {highlightIds.length} paket ({groupedByCustomer.length} konsumen) dalam sesi Grup ini</p>
-                <p className="text-sm text-green-700 mt-0.5">Paket dengan nama yang sama digabung menjadi 1 barcode. Silakan cetak atau unduh.</p>
+                <p className="font-semibold text-green-800">Barcode siap — {highlightIds.length} paket baru ditambahkan</p>
+                <p className="text-sm text-green-700 mt-0.5">Cari batch yang sesuai dan klik untuk melihat barcode.</p>
               </div>
               <Button size="sm" variant="outline" className="border-green-400 text-green-700" onClick={() => setLocation(`${base}/barcode`)}>
-                Lihat Semua
+                Refresh
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-
-      {/* Filter jenis jastip */}
-      <div className="flex flex-wrap gap-2">
+      {/* Filter jenis jastip + search */}
+      <div className="flex flex-wrap items-center gap-2">
         {[
           { value: "all", label: "Semua Jastip" },
           { value: "jastip pesawat", label: "Pesawat" },
@@ -783,14 +1020,14 @@ export default function AdminBarcode() {
           { value: "jastip pelni", label: "Pelni" },
         ].map((opt) => {
           const count = opt.value === "all"
-            ? activePackages.length
+            ? totalActive
             : activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === opt.value).length;
           return (
             <Button
               key={opt.value}
               size="sm"
               variant={filterServiceType === opt.value ? "default" : "outline"}
-              onClick={() => { setFilterServiceType(opt.value); setPage(1); }}
+              onClick={() => setFilterServiceType(opt.value)}
               className="text-xs"
             >
               {opt.label}
@@ -801,63 +1038,69 @@ export default function AdminBarcode() {
           );
         })}
         {sudahDiambilCount > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-xs border-green-300 text-green-700 hover:bg-green-50"
-            onClick={() => setLocation(`${base}/arsip`)}
-          >
-            <span className="mr-1">✓</span> Arsip Sudah Diambil
-            <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">{sudahDiambilCount}</span>
+          <Button size="sm" variant="outline" className="text-xs border-green-300 text-green-700 hover:bg-green-50"
+            onClick={() => setLocation(`${base}/arsip`)}>
+            <span className="mr-1">✓</span> Arsip ({sudahDiambilCount})
           </Button>
         )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative ml-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Cari barcode, no resi, konsumen..."
-            className="pl-9"
+            placeholder="Cari konsumen, resi..."
+            className="pl-9 w-56 text-sm"
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
           />
         </div>
-        <Badge variant="secondary">
-          {`${total} konsumen · ${totalPackages} paket`}
-        </Badge>
       </div>
 
+      {/* Main content: batch cards */}
       {isLoading ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <Card key={i} className="animate-pulse"><CardContent className="pt-4 h-48 bg-muted/20 rounded-xl" /></Card>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="animate-pulse"><CardContent className="pt-4 h-20 bg-muted/20 rounded-xl" /></Card>
           ))}
         </div>
-      ) : total === 0 ? (
+      ) : allBatches.length === 0 && noBatchPkgs.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <QrCode className="w-16 h-16 mx-auto mb-4 opacity-20" />
           <p className="text-lg font-medium">Belum ada paket</p>
-          <p className="text-sm mt-1">Tambah paket terlebih dahulu untuk membuat barcode</p>
-          <Button className="mt-4" onClick={() => setLocation(`${base}/packages/type`)}>Input Paket Baru</Button>
+          <p className="text-sm mt-1">Buat batch dan tambah paket terlebih dahulu</p>
+          <div className="flex gap-2 justify-center mt-4">
+            <Button variant="outline" onClick={() => setLocation(`${base}/batches`)}>Kelola Batch</Button>
+            <Button onClick={() => setLocation(`${base}/packages/type`)}>Input Paket</Button>
+          </div>
         </div>
       ) : (
-        <>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-            {paginatedGroups.map((group) => (
-              <GroupedBarcodeItem
-                key={`${group.customerName}|${group.serviceType}|${group.batchId ?? ""}`}
-                pkgs={group.pkgs}
-                batchLabel={group.batchId != null ? (batchMap.get(group.batchId) ?? `Batch #${group.batchId}`) : undefined}
+        <div className="space-y-3">
+          {/* Batch sections */}
+          {allBatches.map((batch: any) => {
+            const label = batch.namaKapal || `Batch #${batch.id}`;
+            return (
+              <BatchBarcodeSection
+                key={batch.id}
+                batch={batch}
+                packages={allPackages}
+                batchLabel={label}
+                search={search}
+                filterServiceType={filterServiceType}
+                onEdit={openEdit}
+                onDelete={(pkg) => setDeletePkg(pkg)}
               />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className="border rounded-lg">
-              <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            </div>
+            );
+          })}
+
+          {/* Paket tanpa batch */}
+          {noBatchPkgs.length > 0 && (
+            <NoBatchSection
+              packages={allPackages}
+              search={search}
+              filterServiceType={filterServiceType}
+              onEdit={openEdit}
+              onDelete={(pkg) => setDeletePkg(pkg)}
+            />
           )}
-        </>
+        </div>
       )}
 
       {/* Edit Dialog */}
