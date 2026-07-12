@@ -1,185 +1,116 @@
-import { useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useListBatches, useListPackages } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Pagination } from "@/components/pagination";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Banknote, CreditCard, Clock, History, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
-import { toast } from "sonner";
+import { History, Ship, ChevronRight, CheckCircle2, Lock, Archive } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
-async function fetchAllPackages() {
-  const token = localStorage.getItem("jaj_token");
-  const res = await fetch("/api/packages", { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) return [];
-  return res.json();
-}
-
-const PAGE_SIZE = 10;
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatRp(n: any) {
-  if (!n) return "Rp 0";
+  if (!n && n !== 0) return "Rp 0";
   return `Rp ${Number(n).toLocaleString("id-ID")}`;
 }
-function formatDate(d: string) {
-  return new Date(d).toLocaleDateString("id-ID", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
-}
-function formatTime(d: string) {
-  return new Date(d).toLocaleTimeString("id-ID", {
-    hour: "2-digit", minute: "2-digit",
-  });
+
+function fmtDate(d: string) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
-const PAYMENT_META: Record<string, { label: string; icon: any; badgeClass: string; rowClass: string }> = {
-  tunai: {
-    label: "Tunai",
-    icon: Banknote,
-    badgeClass: "bg-green-100 text-green-700 border-green-200",
-    rowClass: "border-l-4 border-l-green-400",
-  },
-  transfer: {
-    label: "Transfer",
-    icon: CreditCard,
-    badgeClass: "bg-blue-100 text-blue-700 border-blue-200",
-    rowClass: "border-l-4 border-l-blue-400",
-  },
-  piutang: {
-    label: "Piutang",
-    icon: Clock,
-    badgeClass: "bg-orange-100 text-orange-700 border-orange-200",
-    rowClass: "border-l-4 border-l-orange-400",
-  },
-};
+function batchStatusColor(s: string) {
+  if (s === "OPEN") return "bg-green-100 text-green-800 border-green-200";
+  if (s === "CLOSED") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
+}
 
-async function fetchPayments(paymentType: string) {
+function batchStatusIcon(s: string) {
+  if (s === "OPEN") return <CheckCircle2 className="w-3 h-3" />;
+  if (s === "CLOSED") return <Lock className="w-3 h-3" />;
+  return <Archive className="w-3 h-3" />;
+}
+
+function batchStatusLabel(s: string) {
+  if (s === "OPEN") return "Aktif";
+  if (s === "CLOSED") return "Ditutup";
+  return "Arsip";
+}
+
+async function fetchPayments() {
   const token = localStorage.getItem("jaj_token");
-  const url = paymentType !== "all"
-    ? `/api/payments?paymentType=${paymentType}`
-    : "/api/payments";
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error("Gagal memuat data");
+  const res = await fetch("/api/payments", { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error("Gagal memuat data pembayaran");
   return res.json();
 }
 
-async function bayarPiutang(id: number, paymentType: "tunai" | "transfer") {
-  const token = localStorage.getItem("jaj_token");
-  const res = await fetch(`/api/payments/${id}/bayar`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ paymentType }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Gagal memperbarui pembayaran");
-  }
-  return res.json();
-}
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function RiwayatPembayaran() {
-  const [filterType, setFilterType] = useState<string>("all");
-  const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [dialogPayment, setDialogPayment] = useState<any | null>(null);
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
 
-  const queryClient = useQueryClient();
-
-  const { data: payments = [], isLoading, error } = useQuery({
-    queryKey: ["payments", filterType],
-    queryFn: () => fetchPayments(filterType),
+  const { data: payments = [], isLoading } = useQuery({
+    queryKey: ["payments"],
+    queryFn: fetchPayments,
   });
 
-  const { data: allPackages = [] } = useQuery({
-    queryKey: ["packages-all"],
-    queryFn: fetchAllPackages,
-  });
+  const { data: packages = [] } = useListPackages();
+  const { data: batches = [] } = useListBatches();
 
-  const mutation = useMutation({
-    mutationFn: ({ id, type }: { id: number; type: "tunai" | "transfer" }) =>
-      bayarPiutang(id, type),
-    onSuccess: (_, vars) => {
-      toast.success(`Piutang berhasil diubah ke ${vars.type === "tunai" ? "Tunai" : "Transfer"}`);
-      queryClient.invalidateQueries({ queryKey: ["payments"] });
-      setDialogPayment(null);
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Gagal memperbarui pembayaran");
-    },
-  });
+  const pkgMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const p of packages as any[]) m[p.id] = p;
+    return m;
+  }, [packages]);
 
-  const pkgMap: Record<number, any> = {};
-  for (const p of allPackages) {
-    pkgMap[p.id] = p;
-  }
+  const batchMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const b of batches as any[]) m[b.id] = b;
+    return m;
+  }, [batches]);
 
-  function enrichPkg(pkg: any) {
-    const live = pkgMap[pkg.id];
-    if (!live) return pkg;
-    return {
-      ...pkg,
-      packageDate:   pkg.packageDate   || live.packageDate,
-      deliveryRoute: pkg.deliveryRoute || live.deliveryRoute,
-      realWeight:    pkg.realWeight    != null ? pkg.realWeight    : live.realWeight,
-      usedWeight:    pkg.usedWeight    != null ? pkg.usedWeight    : live.usedWeight,
-      packagingType: pkg.packagingType || live.packagingType,
-    };
-  }
+  // Group payments by batchId (use first packageId to look up batch)
+  const batchGroups = useMemo(() => {
+    const map = new Map<number, { batchId: number; payments: any[] }>();
+    for (const pmt of payments as any[]) {
+      const ids: number[] = pmt.packageIds ?? [];
+      const batchId: number | null = ids.length ? (pkgMap[ids[0]]?.batchId ?? null) : null;
+      if (batchId === null) continue;
+      if (!map.has(batchId)) map.set(batchId, { batchId, payments: [] });
+      map.get(batchId)!.payments.push(pmt);
+    }
+    return [...map.values()].sort((a, b) => {
+      const aT = Math.max(...a.payments.map((p: any) => new Date(p.createdAt).getTime()));
+      const bT = Math.max(...b.payments.map((p: any) => new Date(p.createdAt).getTime()));
+      return bT - aT;
+    });
+  }, [payments, pkgMap]);
 
-  const total = payments.length;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
-  const paginated = payments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  function handleFilter(v: string) {
-    setFilterType(v);
-    setPage(1);
-    setExpandedId(null);
-  }
-
-  const totalTagihan = payments.reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
-  const totalTunai = payments.filter((p: any) => p.paymentType === "tunai").reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
-  const totalTransfer = payments.filter((p: any) => p.paymentType === "transfer").reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
-  const totalPiutang = payments.filter((p: any) => p.paymentType === "piutang").reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
+  // Grand totals across all batches
+  const grandTotal = (payments as any[]).reduce((s, p) => s + Number(p.totalAmount || 0), 0);
+  const grandTunai = (payments as any[]).filter(p => p.paymentType === "tunai").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
+  const grandTransfer = (payments as any[]).filter(p => p.paymentType === "transfer").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
+  const grandPiutang = (payments as any[]).filter(p => p.paymentType === "piutang").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <History className="h-7 w-7 text-primary" /> Riwayat Pembayaran
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Rekap seluruh transaksi pembayaran dari Kalkulator Scan.
-          </p>
-        </div>
-        <Select value={filterType} onValueChange={handleFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter Jenis" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Jenis</SelectItem>
-            <SelectItem value="tunai">Tunai</SelectItem>
-            <SelectItem value="transfer">Transfer</SelectItem>
-            <SelectItem value="piutang">Piutang</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <History className="h-7 w-7 text-primary" /> Riwayat Pembayaran
+        </h1>
+        <p className="text-muted-foreground mt-1">Rekap pembayaran per batch pengiriman. Klik batch untuk melihat detail.</p>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Grand summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Total Semua", value: totalTagihan, color: "text-primary", bg: "bg-primary/5 border-primary/20" },
-          { label: "Tunai", value: totalTunai, color: "text-green-700", bg: "bg-green-50 border-green-200" },
-          { label: "Transfer", value: totalTransfer, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-          { label: "Piutang", value: totalPiutang, color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
+          { label: "Total Semua", value: grandTotal, color: "text-primary", bg: "bg-primary/5 border-primary/20" },
+          { label: "Tunai", value: grandTunai, color: "text-green-700", bg: "bg-green-50 border-green-200" },
+          { label: "Transfer", value: grandTransfer, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
+          { label: "Piutang", value: grandPiutang, color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
         ].map((s) => (
           <Card key={s.label} className={`border ${s.bg}`}>
             <CardContent className="p-4">
@@ -190,198 +121,91 @@ export default function RiwayatPembayaran() {
         ))}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="h-40 flex items-center justify-center text-muted-foreground">Memuat data...</div>
-          ) : error ? (
-            <div className="h-40 flex items-center justify-center text-destructive">Gagal memuat data pembayaran.</div>
-          ) : paginated.length === 0 ? (
-            <div className="h-40 flex flex-col items-center justify-center text-muted-foreground gap-2">
-              <History className="w-10 h-10 opacity-20" />
-              <p>Belum ada riwayat pembayaran.</p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {paginated.map((p: any) => {
-                const meta = PAYMENT_META[p.paymentType] || PAYMENT_META.tunai;
-                const Icon = meta.icon;
-                const isExpanded = expandedId === p.id;
-                const pkgSummary: any[] = p.packageSummary || [];
-                const pkgCount = Array.isArray(p.packageIds) ? p.packageIds.length : pkgSummary.length;
-                const isPiutang = p.paymentType === "piutang";
+      {/* Batch cards */}
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="h-48 pt-4 bg-muted/20" />
+            </Card>
+          ))}
+        </div>
+      ) : batchGroups.length === 0 ? (
+        <div className="text-center py-24 text-muted-foreground">
+          <History className="w-14 h-14 mx-auto mb-4 opacity-20" />
+          <p className="font-semibold text-base">Belum ada riwayat pembayaran</p>
+          <p className="text-sm mt-1">Data akan muncul setelah ada pembayaran di Kalkulator Scan</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {batchGroups.map(({ batchId, payments: pmts }) => {
+            const batch = batchMap[batchId];
+            const totalAll = pmts.reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
+            const totalTunai = pmts.filter((p: any) => p.paymentType === "tunai").reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
+            const totalTransfer = pmts.filter((p: any) => p.paymentType === "transfer").reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
+            const totalPiutang = pmts.filter((p: any) => p.paymentType === "piutang").reduce((s: number, p: any) => s + Number(p.totalAmount || 0), 0);
+            const piutangCount = pmts.filter((p: any) => p.paymentType === "piutang").length;
 
-                return (
-                  <div key={p.id} className={`${meta.rowClass} transition-colors hover:bg-muted/20`}>
-                    <div
-                      className="flex items-center gap-4 px-5 py-4 cursor-pointer"
-                      onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                    >
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-muted/50">
-                        <Icon className="w-4 h-4" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={`text-xs ${meta.badgeClass}`}>
-                            {meta.label}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {pkgCount} paket
-                          </span>
-                          {p.adminName && (
-                            <span className="text-xs text-muted-foreground">· {p.adminName}</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {formatDate(p.createdAt)} — {formatTime(p.createdAt)}
-                        </p>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <p className="font-black text-base text-primary">{formatRp(p.totalAmount)}</p>
-                        {p.paymentType === "tunai" && p.changeAmount != null && (
-                          <p className="text-xs text-muted-foreground">
-                            Kembalian: {formatRp(p.changeAmount)}
-                          </p>
-                        )}
-                      </div>
-
-                      {isPiutang && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0 text-orange-600 border-orange-300 hover:bg-orange-50 hover:text-orange-700 gap-1.5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDialogPayment(p);
-                          }}
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          Sudah Dibayar
-                        </Button>
-                      )}
-
-                      <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7 text-muted-foreground">
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </Button>
+            return (
+              <Card
+                key={batchId}
+                className="cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all border-2 hover:border-primary/40"
+                onClick={() => setLocation(`${base}/riwayat-pembayaran/batch/${batchId}`)}
+              >
+                <CardContent className="pt-5 pb-4 space-y-4">
+                  {/* Batch header */}
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                      <Ship className="w-4 h-4 text-primary" />
                     </div>
-
-                    {isExpanded && (
-                      <div className="px-5 pb-4 space-y-3">
-                        {pkgSummary.length > 0 ? (
-                          pkgSummary.map((pkg: any, i: number) => { const pkg2 = enrichPkg(pkg); return (
-                            <div key={i} className="bg-muted/30 rounded-lg p-3 border border-border/50">
-                              <div className="flex items-start justify-between mb-2.5">
-                                <div>
-                                  <p className="font-bold text-sm">{pkg2.customerName || "-"}</p>
-                                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{pkg2.resiNumber || "-"}</p>
-                                </div>
-                                <span className="font-black text-base text-primary">{formatRp(pkg2.totalShipping)}</span>
-                              </div>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs border-t pt-2.5">
-                                <div>
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">No. Paket</p>
-                                  <p className="font-mono font-semibold">{pkg2.packageNumber || "-"}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Tanggal</p>
-                                  <p>{pkg2.packageDate ? new Date(pkg2.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Jenis Jastip</p>
-                                  <p className="capitalize">{pkg2.serviceType || "-"}</p>
-                                </div>
-                                <div className="col-span-2 md:col-span-1">
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Rute</p>
-                                  <p>{pkg2.deliveryRoute || "-"}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Real</p>
-                                  <p className="font-semibold">{pkg2.realWeight != null ? `${pkg2.realWeight} Kg` : "-"}</p>
-                                </div>
-                                <div>
-                                  <p className="text-muted-foreground uppercase tracking-wide font-semibold text-[10px]">Berat Digunakan</p>
-                                  <p className="font-semibold">{pkg2.usedWeight != null ? `${pkg2.usedWeight} Kg` : "-"}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ); })
-                        ) : (
-                          <div className="bg-muted/30 rounded-lg p-3 text-xs text-muted-foreground text-center">
-                            Data paket tidak tersedia
-                          </div>
-                        )}
-                        {p.paymentType === "tunai" && p.paidAmount != null && (
-                          <div className="flex justify-between text-xs text-muted-foreground bg-muted/20 rounded-md px-3 py-2">
-                            <span>Dibayar: <span className="font-semibold text-foreground">{formatRp(p.paidAmount)}</span></span>
-                            <span>Kembalian: <span className="font-semibold text-foreground">{formatRp(p.changeAmount)}</span></span>
-                          </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-base leading-snug truncate">
+                          {batch?.namaKapal || `Batch #${batchId}`}
+                        </p>
+                        {batch && (
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] flex items-center gap-1 ${batchStatusColor(batch.statusBatch)}`}
+                          >
+                            {batchStatusIcon(batch.statusBatch)}
+                            {batchStatusLabel(batch.statusBatch)}
+                          </Badge>
                         )}
                       </div>
-                    )}
+                      {batch && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {batch.kotaAsal} → {batch.tujuan} &nbsp;·&nbsp; ETD {fmtDate(batch.etd)}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">{pmts.length} transaksi</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-        {total > PAGE_SIZE && (
-          <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
-        )}
-      </Card>
 
-      {/* Dialog konfirmasi pembayaran piutang */}
-      <Dialog open={!!dialogPayment} onOpenChange={(open) => { if (!open) setDialogPayment(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-orange-500" />
-              Konfirmasi Pelunasan Piutang
-            </DialogTitle>
-            <DialogDescription>
-              Tagihan sebesar{" "}
-              <span className="font-bold text-foreground">
-                {formatRp(dialogPayment?.totalAmount)}
-              </span>{" "}
-              akan ditandai sudah dibayar. Pilih metode pembayaran:
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid grid-cols-2 gap-3 py-2">
-            <button
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={mutation.isPending}
-              onClick={() => mutation.mutate({ id: dialogPayment.id, type: "tunai" })}
-            >
-              <Banknote className="w-7 h-7 text-green-600" />
-              <span className="font-bold text-green-700 text-sm">Tunai</span>
-              <span className="text-xs text-green-600/80">Bayar cash</span>
-            </button>
-
-            <button
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:border-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={mutation.isPending}
-              onClick={() => mutation.mutate({ id: dialogPayment.id, type: "transfer" })}
-            >
-              <CreditCard className="w-7 h-7 text-blue-600" />
-              <span className="font-bold text-blue-700 text-sm">Transfer</span>
-              <span className="text-xs text-blue-600/80">Bayar transfer</span>
-            </button>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled={mutation.isPending}
-              onClick={() => setDialogPayment(null)}
-            >
-              Batal
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                  {/* Payment summary grid */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Total", value: totalAll, color: "text-primary", bg: "bg-primary/5 border-primary/20" },
+                      { label: "Tunai", value: totalTunai, color: "text-green-700", bg: "bg-green-50 border-green-200" },
+                      { label: "Transfer", value: totalTransfer, color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
+                      { label: "Piutang", value: totalPiutang, color: "text-orange-700", bg: "bg-orange-50 border-orange-200" },
+                    ].map((s) => (
+                      <div key={s.label} className={`rounded-lg border p-2.5 ${s.bg}`}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{s.label}</p>
+                        <p className={`text-sm font-black mt-0.5 leading-tight ${s.color}`}>{formatRp(s.value)}</p>
+                        {s.label === "Piutang" && piutangCount > 0 && (
+                          <p className="text-[10px] text-orange-600 mt-0.5">{piutangCount} belum lunas</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

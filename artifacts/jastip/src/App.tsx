@@ -22,6 +22,8 @@ import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
 import VerifyBatchDetail from "@/pages/admin/verify-batch-detail";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
+import RiwayatPembayaranBatch from "@/pages/admin/riwayat-pembayaran-batch";
+import RiwayatPembayaranDetail from "@/pages/admin/riwayat-pembayaran-detail";
 import AdminBatches from "@/pages/admin/batches";
 import AdminArsip from "@/pages/admin/arsip";
 import ArsipBatchDetail from "@/pages/admin/arsip-batch-detail";
@@ -146,6 +148,12 @@ function Router() {
       </Route>
       <Route path="/admin/riwayat-pembayaran">
         {(params) => <ProtectedRoute role="admin" component={AdminRiwayatPembayaran} params={params} />}
+      </Route>
+      <Route path="/admin/riwayat-pembayaran/batch/:id/detail">
+        {(params) => <ProtectedRoute role="admin" component={RiwayatPembayaranDetail} params={params} />}
+      </Route>
+      <Route path="/admin/riwayat-pembayaran/batch/:id">
+        {(params) => <ProtectedRoute role="admin" component={RiwayatPembayaranBatch} params={params} />}
       </Route>
       <Route path="/admin/arsip">
         {(params) => <ProtectedRoute role="admin" component={AdminArsip} params={params} />}
