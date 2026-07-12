@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, Printer, Download, Ship, CheckCircle2, Lock, Archive,
-  QrCode, Pencil, Search,
+  QrCode, Pencil, Search, Eye,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Pagination } from "@/components/pagination";
@@ -250,7 +250,11 @@ function GroupedBarcodeCard({
             setLocation(`${base}/barcode-group?${params.toString()}`);
           }}
         >
-          <Pencil className="w-3 h-3 mr-1" /> Edit / Kelola Paket
+          {pkgs.length > 1 ? (
+            <><Eye className="w-3 h-3 mr-1" /> Lihat Semua Paket</>
+          ) : (
+            <><Pencil className="w-3 h-3 mr-1" /> Edit / Kelola Paket</>
+          )}
         </Button>
       </CardContent>
     </Card>
