@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useListPackages, getListPackagesQueryKey } from "@workspace/api-client-react";
+import { useListPackages, getListPackagesQueryKey, useListBatches } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
@@ -66,12 +66,15 @@ interface EditForm {
   height: string;
 }
 
-function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string) {
+function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batchLabel?: string) {
   const pkgDate = pkg.packageDate
     ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
     : "-";
   const serviceType = pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-";
   const ongkir = pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-";
+  const batchRow = batchLabel
+    ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
+    : "";
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -125,6 +128,7 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string) {
           <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
           <div class="field"><div class="fl">Jenis Paking</div><div class="fv">${pkg.packagingType || "-"}</div></div>
           <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
+          ${batchRow}
         </div>
       </div>
     </div>
@@ -135,7 +139,7 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string) {
 </html>`;
 }
 
-function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string) {
+function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
   const first = pkgs[0];
   const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
   const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
@@ -194,6 +198,7 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string) 
         <div class="customer">${first?.customerName || "-"}</div>
         <div class="meta">Jenis: ${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"} &nbsp;·&nbsp; Rute: ${first?.deliveryRoute || "-"}</div>
         <div class="meta">Tanggal: ${first?.packageDate ? new Date(first.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div>
+        ${batchLabel ? `<div class="meta" style="color:#1d4ed8;font-weight:700;">📦 Batch: ${batchLabel}</div>` : ""}
         <div class="totals">
           <div class="total-item">
             <span class="total-label">Total Paket</span>
@@ -230,10 +235,12 @@ function BarcodeItem({
   pkg,
   onEdit,
   onDelete,
+  batchLabel,
 }: {
   pkg: any;
   onEdit: (pkg: any) => void;
   onDelete: (pkg: any) => void;
+  batchLabel?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -255,7 +262,7 @@ function BarcodeItem({
     } catch { return; }
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(buildSinglePrintHtml(pkg, qrDataUrl, qrValue));
+    win.document.write(buildSinglePrintHtml(pkg, qrDataUrl, qrValue, batchLabel));
     win.document.close();
   }
 
@@ -278,6 +285,9 @@ function BarcodeItem({
             <p className="text-xs text-muted-foreground">Konsumen: {pkg.customerName || "-"}</p>
             {pkg.serviceType && (
               <p className="text-xs text-muted-foreground capitalize">{pkg.serviceType}</p>
+            )}
+            {batchLabel && (
+              <p className="text-xs font-semibold text-blue-700 mt-0.5">📦 {batchLabel}</p>
             )}
           </div>
           <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
@@ -319,8 +329,10 @@ function BarcodeItem({
 
 function GroupedBarcodeItem({
   pkgs,
+  batchLabel,
 }: {
   pkgs: any[];
+  batchLabel?: string;
   onEdit?: (pkg: any) => void;
   onDelete?: (pkg: any) => void;
 }) {
@@ -350,7 +362,7 @@ function GroupedBarcodeItem({
     } catch { return; }
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(buildGroupedPrintHtml(pkgs, qrDataUrl, qrValue));
+    win.document.write(buildGroupedPrintHtml(pkgs, qrDataUrl, qrValue, batchLabel));
     win.document.close();
   }
 
@@ -372,6 +384,9 @@ function GroupedBarcodeItem({
             <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
             {first?.serviceType && (
               <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
+            )}
+            {batchLabel && (
+              <p className="text-xs font-semibold text-blue-700 mt-0.5">📦 {batchLabel}</p>
             )}
           </div>
           <Badge
@@ -424,10 +439,16 @@ export default function AdminBarcode() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { data: packages, isLoading } = useListPackages();
+  const { data: batches } = useListBatches();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
+
+  // Lookup: batchId → label name
+  const batchMap = new Map<number, string>(
+    (batches || []).map((b: any) => [b.id, b.name || `Batch #${b.id}`])
+  );
 
   const [editPkg, setEditPkg] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({
@@ -827,6 +848,7 @@ export default function AdminBarcode() {
               <GroupedBarcodeItem
                 key={`${group.customerName}|${group.serviceType}|${group.batchId ?? ""}`}
                 pkgs={group.pkgs}
+                batchLabel={group.batchId != null ? (batchMap.get(group.batchId) ?? `Batch #${group.batchId}`) : undefined}
               />
             ))}
           </div>
