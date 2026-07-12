@@ -492,7 +492,9 @@ function BatchBarcodeSection({
   onEdit: (pkg: any) => void;
   onDelete: (pkg: any) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
 
   const batchPkgs = packages.filter((p: any) => p.batchId === batch.id &&
     p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan");
@@ -506,7 +508,6 @@ function BatchBarcodeSection({
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
   );
 
-  const groups = groupPkgsByCustomer(filtered);
   const totalBatchPkgs = batchPkgs.length;
   const hasFilter = filterServiceType !== "all" || !!search;
 
@@ -592,12 +593,11 @@ function BatchBarcodeSection({
   }
 
   return (
-    <Card className={`border-2 ${batch.statusBatch === "OPEN" ? "border-blue-200" : "border-gray-200"}`}>
-      {/* Batch header — always visible, clickable */}
-      <CardHeader
-        className="pb-3 cursor-pointer select-none hover:bg-muted/30 transition-colors rounded-t-lg"
-        onClick={() => setExpanded((e) => !e)}
-      >
+    <Card
+      className={`border-2 cursor-pointer hover:shadow-md transition-shadow ${batch.statusBatch === "OPEN" ? "border-blue-200" : "border-gray-200"}`}
+      onClick={() => setLocation(`${base}/barcode/batch/${batch.id}`)}
+    >
+      <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className={`p-2 rounded-lg shrink-0 ${batch.statusBatch === "OPEN" ? "bg-blue-100" : "bg-gray-100"}`}>
@@ -634,33 +634,10 @@ function BatchBarcodeSection({
                 <Printer className="w-3.5 h-3.5" /> Cetak
               </button>
             )}
-            {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
+            <ChevronDown className="w-5 h-5 text-muted-foreground" />
           </div>
         </div>
       </CardHeader>
-
-      {/* Expanded: barcode grid */}
-      {expanded && (
-        <CardContent className="pt-0 pb-4">
-          <div className="border-t pt-4">
-            {groups.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                {hasFilter ? "Tidak ada paket yang cocok dengan filter saat ini." : "Belum ada paket dalam batch ini."}
-              </div>
-            ) : (
-              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                {groups.map((pkgs) => (
-                  <GroupedBarcodeItem
-                    key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|${pkgs[0]?.batchId ?? ""}`}
-                    pkgs={pkgs}
-                    batchLabel={batchLabel}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      )}
     </Card>
   );
 }

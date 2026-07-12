@@ -17,6 +17,7 @@ import AdminPackagesImport from "@/pages/admin/packages-import";
 import AdminPackagesDetail from "@/pages/admin/packages-detail";
 import AdminBarcode from "@/pages/admin/barcode";
 import AdminBarcodeGroupDetail from "@/pages/admin/barcode-group-detail";
+import AdminBarcodeBatchDetail from "@/pages/admin/barcode-batch-detail";
 import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
@@ -126,6 +127,9 @@ function Router() {
       <Route path="/admin/barcode">
         {(params) => <ProtectedRoute role="admin" component={AdminBarcode} params={params} />}
       </Route>
+      <Route path="/admin/barcode/batch/:id">
+        {(params) => <ProtectedRoute role="admin" component={AdminBarcodeBatchDetail} params={params} />}
+      </Route>
       <Route path="/admin/barcode-group">
         {(params) => <ProtectedRoute role="admin" component={AdminBarcodeGroupDetail} params={params} />}
       </Route>
@@ -192,6 +196,9 @@ function Router() {
       </Route>
       <Route path="/owner/barcode">
         {(params) => <ProtectedRoute role="owner" component={AdminBarcode} params={params} />}
+      </Route>
+      <Route path="/owner/barcode/batch/:id">
+        {(params) => <ProtectedRoute role="owner" component={AdminBarcodeBatchDetail} params={params} />}
       </Route>
       <Route path="/owner/barcode-group">
         {(params) => <ProtectedRoute role="owner" component={AdminBarcodeGroupDetail} params={params} />}
