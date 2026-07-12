@@ -368,19 +368,25 @@ export default function AdminPackagesImport() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  // Auto-derive route from serviceType + batch kotaAsal (no manual route input needed)
-  function deriveRoute(svcType: string, kotaAsal?: string): string {
+  // Auto-derive route from the selected Batch Pengiriman (kotaAsal → tujuan).
+  // The batch is the source of truth for the route — do not hardcode per jenis jastip,
+  // otherwise the displayed route can mismatch the batch actually selected.
+  function deriveRoute(svcType: string, batch?: { kotaAsal?: string; tujuan?: string }): string {
+    if (batch?.kotaAsal && batch?.tujuan) {
+      return `${batch.kotaAsal} → ${batch.tujuan}`;
+    }
+    // Fallback when no batch is selected yet
     if (svcType === "jastip kargo")   return "Jakarta/Surabaya → Manokwari";
     if (svcType === "jastip pesawat") return "Jakarta → Manokwari";
     if (svcType === "jastip hemat+")  return "Surabaya → Manokwari";
-    if (svcType === "jastip pelni")   return kotaAsal === "Surabaya" ? "Surabaya → Manokwari" : "Jakarta → Manokwari";
+    if (svcType === "jastip pelni")   return "Jakarta → Manokwari";
     return ROUTE_OPTIONS[svcType]?.[0]?.value ?? "";
   }
 
   function handleServiceTypeChange(val: string) {
     setServiceType(val);
     const batch = openBatches.find((b: any) => b.id === selectedBatchId);
-    setDeliveryRoute(deriveRoute(val, batch?.kotaAsal));
+    setDeliveryRoute(deriveRoute(val, batch));
   }
 
   function handleBatchChange(val: string) {
@@ -389,7 +395,7 @@ export default function AdminPackagesImport() {
     localStorage.setItem("jaj_last_batch_id", String(id));
     if (serviceType) {
       const batch = openBatches.find((b: any) => b.id === id);
-      setDeliveryRoute(deriveRoute(serviceType, batch?.kotaAsal));
+      setDeliveryRoute(deriveRoute(serviceType, batch));
     }
   }
 
