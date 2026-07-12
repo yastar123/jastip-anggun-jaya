@@ -541,7 +541,6 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
                 onClick={() => { setSelectedServiceType(svc.key); setSearch(""); setPage(1); }}
               >
                 <CardContent className="pt-5 pb-4">
-                  <div className="text-4xl mb-2">{svc.emoji}</div>
                   <p className={`text-sm font-bold leading-snug ${svc.num}`}>{svc.label}</p>
                   <div className="mt-3 space-y-1">
                     <div>
@@ -562,7 +561,7 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
             <Button variant="outline" size="sm" onClick={() => { setSelectedServiceType(null); setSearch(""); setPage(1); }}>
               <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Jenis Jastip
             </Button>
-            <span className="text-base font-bold">{selectedSvcDef?.emoji} {selectedSvcLabel}</span>
+            <span className="text-base font-bold">{selectedSvcLabel}</span>
             <Badge variant="secondary">{filtered.length} paket</Badge>
           </div>
 

@@ -381,6 +381,8 @@ export default function ArsipBatchDetail({ params }: { params: { id: string } })
       ? pendingPkgs
       : allBatchPkgs;
 
+  const effectiveFilter = selectedServiceType ?? filterServiceType;
+
   const filtered = basePkgs.filter((p: any) =>
     (effectiveFilter === "all" || (p.serviceType || "").toLowerCase() === effectiveFilter) &&
     (!search ||
@@ -414,8 +416,6 @@ export default function ArsipBatchDetail({ params }: { params: { id: string } })
     (() => { const pkgs = allBatchPkgs.filter((p: any) => !knownSvcKeys.includes((p.serviceType || "").toLowerCase())); if (!pkgs.length) return null; const dsr = pkgs.filter((p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan").length; return { key: "lainnya", label: "Lainnya", emoji: "📋", border: "border-gray-200", bg: "bg-gray-50/60", num: "text-gray-700", count: pkgs.length, diserahkan: dsr, pending: pkgs.length - dsr, ongkir: pkgs.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0) }; })(),
   ].filter(Boolean) as { key: string; label: string; emoji: string; border: string; bg: string; num: string; count: number; diserahkan: number; pending: number; ongkir: number }[];
   const selectedSvcLabel = SVC_DEFS.find(d => d.key === selectedServiceType)?.label ?? (selectedServiceType === "lainnya" ? "Lainnya" : "");
-
-  const effectiveFilter = selectedServiceType ?? filterServiceType;
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleFilter(v: string) { setFilterServiceType(v); setPage(1); }
