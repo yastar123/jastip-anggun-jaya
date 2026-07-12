@@ -441,22 +441,31 @@ export default function AdminBarcode() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [printServiceType, setPrintServiceType] = useState<string>("");
+  const [filterServiceType, setFilterServiceType] = useState<string>("all");
 
   const idsParam = new URLSearchParams(window.location.search).get("ids");
   const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
   const allPackages = packages || [];
 
+  // Hanya tampilkan paket AKTIF (belum diambil) — SUDAH_DIAMBIL masuk ke Arsip
+  const activePackages = allPackages.filter(
+    (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  );
+
   const filtered = (highlightIds
-    ? allPackages.filter((p: any) => highlightIds.includes(p.id))
-    : allPackages
+    ? activePackages.filter((p: any) => highlightIds.includes(p.id))
+    : activePackages
   ).filter(
     (p: any) =>
-      !search ||
-      (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.customerName || "").toLowerCase().includes(search.toLowerCase()),
+      (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
+      (
+        !search ||
+        (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
+        (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+        (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
+        (p.customerName || "").toLowerCase().includes(search.toLowerCase())
+      ),
   );
 
   // Group packages by customerName + serviceType + batchId
@@ -488,6 +497,10 @@ export default function AdminBarcode() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const paginatedGroups = groupedByCustomer.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const paginated: any[] = [];
+
+  const sudahDiambilCount = allPackages.filter(
+    (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
+  ).length;
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
 
@@ -738,6 +751,46 @@ export default function AdminBarcode() {
         </Card>
       )}
 
+
+      {/* Filter jenis jastip */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { value: "all", label: "Semua Jastip" },
+          { value: "jastip pesawat", label: "Pesawat" },
+          { value: "jastip hemat+", label: "Hemat+" },
+          { value: "jastip kargo", label: "Kargo" },
+          { value: "jastip pelni", label: "Pelni" },
+        ].map((opt) => {
+          const count = opt.value === "all"
+            ? activePackages.length
+            : activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === opt.value).length;
+          return (
+            <Button
+              key={opt.value}
+              size="sm"
+              variant={filterServiceType === opt.value ? "default" : "outline"}
+              onClick={() => { setFilterServiceType(opt.value); setPage(1); }}
+              className="text-xs"
+            >
+              {opt.label}
+              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${filterServiceType === opt.value ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
+                {count}
+              </span>
+            </Button>
+          );
+        })}
+        {sudahDiambilCount > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs border-green-300 text-green-700 hover:bg-green-50"
+            onClick={() => setLocation(`${base}/arsip`)}
+          >
+            <span className="mr-1">✓</span> Arsip Sudah Diambil
+            <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">{sudahDiambilCount}</span>
+          </Button>
+        )}
+      </div>
 
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">

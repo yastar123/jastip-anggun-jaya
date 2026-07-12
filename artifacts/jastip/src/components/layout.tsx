@@ -32,6 +32,7 @@ import {
   ShieldCheck,
   History,
   Ship,
+  Archive,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: any; exact?: boolean };
@@ -52,6 +53,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Input Paket", href: "/admin/packages/type", icon: FileInput, exact: true },
     { name: "Import Excel", href: "/admin/packages/import", icon: FileSpreadsheet, exact: true },
     { name: "Label Barcode", href: "/admin/barcode", icon: Barcode, exact: true },
+    { name: "Arsip Sudah Diambil", href: "/admin/arsip", icon: Archive, exact: true },
     { name: "Scan Barcode dan Pembayaran", href: "/admin/scan", icon: ScanLine, exact: true },
     { name: "Verifikasi Paket", href: "/admin/verify", icon: ShieldCheck, exact: true },
     { name: "Riwayat Pembayaran", href: "/admin/riwayat-pembayaran", icon: History, exact: true },
@@ -78,6 +80,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { name: "Input Paket", href: "/owner/packages/type", icon: FileInput, exact: true },
         { name: "Import Excel", href: "/owner/packages/import", icon: FileSpreadsheet, exact: true },
         { name: "Label Barcode", href: "/owner/barcode", icon: Barcode, exact: true },
+        { name: "Arsip Sudah Diambil", href: "/owner/arsip", icon: Archive, exact: true },
         { name: "Scan Barcode dan Pembayaran", href: "/owner/scan", icon: ScanLine, exact: true },
         { name: "Verifikasi Paket", href: "/owner/verify", icon: ShieldCheck, exact: true },
       ],

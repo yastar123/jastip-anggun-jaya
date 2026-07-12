@@ -61,6 +61,7 @@ export default function AdminVerify() {
   const [scanHistory, setScanHistory] = useState<{ barcode: string; result: VerifyResult; pkg: any | null }[]>([]);
   const [searchGroup, setSearchGroup] = useState("");
   const [groupPage, setGroupPage] = useState(1);
+  const [filterServiceType, setFilterServiceType] = useState<string>("all");
 
   const GROUP_PAGE_SIZE = 15;
 
@@ -70,8 +71,25 @@ export default function AdminVerify() {
 
   // Semua paket aktif (belum diambil), dikelompokkan per customerName+serviceType+batchId
   const allGroups = groupByNameAndService(allPackages || []);
+
+  // Live-update selectedGroup ketika data di-refetch
+  useEffect(() => {
+    if (!selectedGroup || !allPackages) return;
+    const freshPkgs = (allPackages || []).filter(
+      (p: any) =>
+        p.statusPengambilan !== "SUDAH_DIAMBIL" &&
+        p.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim() &&
+        (p.serviceType || "").toLowerCase() === selectedGroup.serviceType.toLowerCase() &&
+        p.batchId === selectedGroup.batchId
+    );
+    if (freshPkgs.length > 0) {
+      setSelectedGroup((prev) => prev ? { ...prev, packages: freshPkgs } : prev);
+    }
+  }, [allPackages]);
+
   const filteredGroups = allGroups.filter((g) =>
-    !searchGroup || g.customerName.toLowerCase().includes(searchGroup.toLowerCase())
+    (filterServiceType === "all" || (g.serviceType || "").toLowerCase() === filterServiceType) &&
+    (!searchGroup || g.customerName.toLowerCase().includes(searchGroup.toLowerCase()))
   );
   const totalGroupPages = Math.ceil(filteredGroups.length / GROUP_PAGE_SIZE);
   const paginatedGroupItems = filteredGroups.slice((groupPage - 1) * GROUP_PAGE_SIZE, groupPage * GROUP_PAGE_SIZE);
@@ -276,6 +294,34 @@ export default function AdminVerify() {
       {!selectedGroup ? (
         /* STEP 1: Select group */
         <div className="space-y-4">
+          {/* Filter jenis jastip */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "all", label: "Semua Jastip" },
+              { value: "jastip pesawat", label: "Pesawat" },
+              { value: "jastip hemat+", label: "Hemat+" },
+              { value: "jastip kargo", label: "Kargo" },
+              { value: "jastip pelni", label: "Pelni" },
+            ].map((opt) => {
+              const count = opt.value === "all"
+                ? allGroups.length
+                : allGroups.filter((g) => (g.serviceType || "").toLowerCase() === opt.value).length;
+              return (
+                <Button
+                  key={opt.value}
+                  size="sm"
+                  variant={filterServiceType === opt.value ? "default" : "outline"}
+                  onClick={() => { setFilterServiceType(opt.value); setGroupPage(1); }}
+                  className="text-xs"
+                >
+                  {opt.label}
+                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${filterServiceType === opt.value ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
+                    {count}
+                  </span>
+                </Button>
+              );
+            })}
+          </div>
           <div className="flex items-center gap-3">
             <div className="relative flex-1 max-w-sm">
               <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -286,7 +332,7 @@ export default function AdminVerify() {
                 onChange={(e) => { setSearchGroup(e.target.value); setGroupPage(1); }}
               />
             </div>
-            <Badge variant="secondary">{allGroups.length} nama</Badge>
+            <Badge variant="secondary">{filteredGroups.length} nama</Badge>
           </div>
 
           {isLoading ? (

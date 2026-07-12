@@ -21,6 +21,7 @@ import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
 import AdminBatches from "@/pages/admin/batches";
+import AdminArsip from "@/pages/admin/arsip";
 
 import OwnerDashboard from "@/pages/owner/dashboard";
 import OwnerPackages from "@/pages/owner/packages";
@@ -137,6 +138,9 @@ function Router() {
       <Route path="/admin/riwayat-pembayaran">
         {(params) => <ProtectedRoute role="admin" component={AdminRiwayatPembayaran} params={params} />}
       </Route>
+      <Route path="/admin/arsip">
+        {(params) => <ProtectedRoute role="admin" component={AdminArsip} params={params} />}
+      </Route>
       <Route path="/admin/settings">
         {(params) => <ProtectedRoute role="admin" component={OwnerSettings} params={params} />}
       </Route>
@@ -197,6 +201,9 @@ function Router() {
       </Route>
       <Route path="/owner/verify">
         {(params) => <ProtectedRoute role="owner" component={AdminVerify} params={params} />}
+      </Route>
+      <Route path="/owner/arsip">
+        {(params) => <ProtectedRoute role="owner" component={AdminArsip} params={params} />}
       </Route>
 
       <Route component={NotFound} />
