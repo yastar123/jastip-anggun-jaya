@@ -7,10 +7,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Printer, Ship, CheckCircle2, Lock, Archive,
-  QrCode, Search, Clock, Package,
+  QrCode, Search, Clock, Package, Eye,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Pagination } from "@/components/pagination";
@@ -53,7 +56,7 @@ function paymentBadge(status: string) {
   return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">Piutang</Badge>;
 }
 
-// ── SmallQR ───────────────────────────────────────────────────────────────────
+// ── SmallQR / LargeQR ────────────────────────────────────────────────────────
 
 function SmallQR({ value }: { value: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,10 +68,37 @@ function SmallQR({ value }: { value: string }) {
   return <canvas ref={canvasRef} className="rounded" />;
 }
 
+function LargeQR({ value }: { value: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (canvasRef.current && value) {
+      QRCode.toCanvas(canvasRef.current, value, { width: 200, margin: 2 }).catch(() => {});
+    }
+  }, [value]);
+  return <canvas ref={canvasRef} className="rounded" />;
+}
+
+// ── DetailRow helper ──────────────────────────────────────────────────────────
+
+function DetailRow({ label, value, mono = false, green = false }: {
+  label: string; value: any; mono?: boolean; green?: boolean;
+}) {
+  if (value == null || value === "" || value === "-") return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
+      <span className={`text-sm font-semibold ${mono ? "font-mono" : ""} ${green ? "text-green-700" : "text-foreground"}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 // ── ArsipPackageCard ──────────────────────────────────────────────────────────
 
 function ArsipPackageCard({ pkg, batchLabel }: { pkg: any; batchLabel: string }) {
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
   const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
 
   async function printSingle() {
@@ -146,49 +176,165 @@ function ArsipPackageCard({ pkg, batchLabel }: { pkg: any; batchLabel: string })
     win.document.close();
   }
 
+  const svcTypeLabel = pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : null;
+  const volWeight = (pkg.length && pkg.width && pkg.height)
+    ? ((pkg.length * pkg.width * pkg.height) / 6000).toFixed(3)
+    : null;
+
   return (
-    <Card className="hover:shadow-md transition-shadow border-green-200 bg-green-50/20">
-      <CardContent className="pt-4 pb-3">
-        {/* Top */}
-        <div className="flex items-start justify-between mb-2 gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm truncate">{pkg.customerName || "-"}</p>
-            <p className="font-mono text-xs text-muted-foreground truncate">{pkg.resiNumber || "-"}</p>
-            {pkg.serviceType && (
-              <p className="text-xs text-muted-foreground capitalize mt-0.5">{pkg.serviceType}</p>
+    <>
+      {/* ── Card ── */}
+      <Card
+        className="hover:shadow-md transition-shadow border-green-200 bg-green-50/20 cursor-pointer"
+        onClick={() => setOpen(true)}
+      >
+        <CardContent className="pt-4 pb-3">
+          {/* Top */}
+          <div className="flex items-start justify-between mb-2 gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm truncate">{pkg.customerName || "-"}</p>
+              <p className="font-mono text-xs text-muted-foreground truncate">{pkg.resiNumber || "-"}</p>
+              {pkg.serviceType && (
+                <p className="text-xs text-muted-foreground capitalize mt-0.5">{pkg.serviceType}</p>
+              )}
+            </div>
+            <Badge className="text-xs shrink-0 bg-green-600 text-white">✓ Diserahkan</Badge>
+          </div>
+
+          {/* QR */}
+          <div className="flex justify-center bg-white border border-green-100 rounded-lg p-2 mb-2">
+            <SmallQR value={qrValue} />
+          </div>
+          <p className="text-center font-mono text-[10px] text-muted-foreground mb-2 truncate">{qrValue}</p>
+
+          {/* Stats */}
+          <div className="space-y-0.5 text-xs text-muted-foreground mb-3">
+            {pkg.usedWeight != null && (
+              <p>Berat: <span className="font-semibold text-foreground">{pkg.usedWeight} Kg</span></p>
+            )}
+            {pkg.totalShipping != null && (
+              <p className="font-semibold text-green-700">{formatRp(pkg.totalShipping)}</p>
+            )}
+            {pkg.pickedUpAt && (
+              <p>Diambil: <span className="font-medium">{fmtDate(pkg.pickedUpAt)}</span></p>
+            )}
+            {pkg.statusPembayaran && (
+              <div className="mt-1">{paymentBadge(pkg.statusPembayaran)}</div>
             )}
           </div>
-          <Badge className="text-xs shrink-0 bg-green-600 text-white">✓ Diserahkan</Badge>
-        </div>
 
-        {/* QR */}
-        <div className="flex justify-center bg-white border border-green-100 rounded-lg p-2 mb-2">
-          <SmallQR value={qrValue} />
-        </div>
-        <p className="text-center font-mono text-[10px] text-muted-foreground mb-2 truncate">{qrValue}</p>
+          {/* Buttons */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button
+              size="sm" variant="outline"
+              className="text-xs"
+              onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+            >
+              <Eye className="w-3 h-3 mr-1" /> Lihat Detail
+            </Button>
+            <Button
+              size="sm" variant="outline"
+              className="text-xs border-green-300 text-green-700 hover:bg-green-50"
+              onClick={(e) => { e.stopPropagation(); printSingle(); }}
+            >
+              <Printer className="w-3 h-3 mr-1" /> Cetak
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Stats */}
-        <div className="space-y-0.5 text-xs text-muted-foreground mb-2">
-          {pkg.usedWeight != null && (
-            <p>Berat: <span className="font-semibold text-foreground">{pkg.usedWeight} Kg</span></p>
-          )}
-          {pkg.totalShipping != null && (
-            <p className="font-semibold text-green-700">{formatRp(pkg.totalShipping)}</p>
-          )}
-          {pkg.pickedUpAt && (
-            <p>Diambil: <span className="font-medium">{fmtDate(pkg.pickedUpAt)}</span></p>
-          )}
-          {pkg.statusPembayaran && (
-            <div className="mt-1">{paymentBadge(pkg.statusPembayaran)}</div>
-          )}
-        </div>
+      {/* ── Detail Dialog ── */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Archive className="w-4 h-4 text-green-600" />
+              Detail Paket — Arsip
+            </DialogTitle>
+          </DialogHeader>
 
-        {/* Print */}
-        <Button size="sm" variant="outline" className="w-full text-xs border-green-300 text-green-700 hover:bg-green-50" onClick={printSingle}>
-          <Printer className="w-3 h-3 mr-1" /> Cetak Label
-        </Button>
-      </CardContent>
-    </Card>
+          {/* QR besar + kode */}
+          <div className="flex flex-col items-center gap-2 py-3 bg-green-50 border border-green-100 rounded-xl">
+            <LargeQR value={qrValue} />
+            <p className="font-mono text-xs text-muted-foreground text-center break-all px-4">{qrValue}</p>
+            <Badge className="bg-green-600 text-white text-xs">✓ Sudah Diserahkan</Badge>
+          </div>
+
+          {/* Data paket */}
+          <div className="space-y-4">
+            {/* Identitas */}
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Identitas Paket</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailRow label="Nama Penerima" value={pkg.customerName} />
+                <DetailRow label="No. Resi" value={pkg.resiNumber} mono />
+                <DetailRow label="No. Paket" value={pkg.packageNumber} mono />
+                <DetailRow label="Barcode" value={pkg.barcode} mono />
+                <DetailRow label="Nama Barang" value={pkg.itemName} />
+                <DetailRow label="Tanggal Paket" value={pkg.packageDate ? fmtDate(pkg.packageDate) : null} />
+              </div>
+            </div>
+
+            {/* Layanan */}
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Layanan &amp; Rute</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailRow label="Jenis Jastip" value={svcTypeLabel} />
+                <DetailRow label="Rute Pengiriman" value={pkg.deliveryRoute} />
+                <DetailRow label="Jenis Paking" value={pkg.packagingType} />
+                <DetailRow label="Batch" value={batchLabel} />
+              </div>
+            </div>
+
+            {/* Berat & Dimensi */}
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Berat &amp; Dimensi</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailRow label="Berat Real" value={pkg.realWeight != null ? `${pkg.realWeight} Kg` : null} />
+                <DetailRow label="Berat Digunakan" value={pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : null} />
+                {volWeight && (
+                  <DetailRow label="Berat Volume" value={`${volWeight} Kg`} />
+                )}
+                {(pkg.length || pkg.width || pkg.height) && (
+                  <DetailRow
+                    label="Dimensi (P×L×T)"
+                    value={`${pkg.length ?? "?"} × ${pkg.width ?? "?"} × ${pkg.height ?? "?"} cm`}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Pembayaran */}
+            <div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Pembayaran &amp; Pengambilan</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailRow
+                  label="Total Ongkir"
+                  value={pkg.totalShipping != null ? formatRp(pkg.totalShipping) : null}
+                  green
+                />
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Status Pembayaran</span>
+                  {pkg.statusPembayaran ? paymentBadge(pkg.statusPembayaran) : <span className="text-sm text-muted-foreground">-</span>}
+                </div>
+                <DetailRow label="Tanggal Diserahkan" value={pkg.pickedUpAt ? fmtDate(pkg.pickedUpAt) : null} green />
+                <DetailRow label="Catatan" value={pkg.notes} />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer actions */}
+          <div className="flex gap-2 pt-2 border-t">
+            <Button
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2"
+              onClick={() => { printSingle(); }}
+            >
+              <Printer className="w-4 h-4" /> Cetak Label
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
