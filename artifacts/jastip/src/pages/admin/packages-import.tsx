@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Upload, FileSpreadsheet, Download,
   CheckCircle, XCircle, File, X, ChevronRight, QrCode, AlertCircle, Ship,
+  Plus, Loader2, ChevronDown,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -198,6 +199,50 @@ export default function AdminPackagesImport() {
     return stored ? Number(stored) : null;
   });
   const [openBatches, setOpenBatches] = useState<any[]>([]);
+
+  // ── Buat Batch Baru ──────────────────────────────────────────────────────────
+  const [showCreateBatch, setShowCreateBatch] = useState(false);
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false);
+  const [newBatch, setNewBatch] = useState({
+    namaKapal: "",
+    etd: "",
+    periodeClosingMulai: "",
+    periodeClosingSelesai: "",
+    kotaAsal: "Jakarta",
+    tujuan: "Manokwari",
+  });
+
+  async function handleCreateBatch() {
+    const { namaKapal, etd, periodeClosingMulai, periodeClosingSelesai, kotaAsal } = newBatch;
+    if (!namaKapal || !etd || !periodeClosingMulai || !periodeClosingSelesai || !kotaAsal) {
+      toast({ variant: "destructive", title: "Lengkapi Data Batch", description: "Semua kolom wajib diisi." });
+      return;
+    }
+    setIsCreatingBatch(true);
+    try {
+      const token = localStorage.getItem("jaj_token");
+      const res = await fetch("/api/batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(newBatch),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Gagal membuat batch");
+      }
+      const created = await res.json();
+      setOpenBatches((prev) => [created, ...prev]);
+      setSelectedBatchId(created.id);
+      localStorage.setItem("jaj_last_batch_id", String(created.id));
+      setShowCreateBatch(false);
+      setNewBatch({ namaKapal: "", etd: "", periodeClosingMulai: "", periodeClosingSelesai: "", kotaAsal: "Jakarta", tujuan: "Manokwari" });
+      toast({ title: "Batch Dibuat", description: `Batch "${created.namaKapal}" berhasil dibuat dan dipilih.` });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Gagal Membuat Batch", description: err.message });
+    } finally {
+      setIsCreatingBatch(false);
+    }
+  }
 
   // Derived
   const templateType: TemplateType | null = serviceType === "jastip kargo" ? "kargo" : (serviceType ? "standard" : null);
@@ -585,32 +630,117 @@ export default function AdminPackagesImport() {
                 <div className="space-y-4">
                   {/* Batch Pengiriman */}
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Batch Pengiriman *</label>
-                    {openBatches.length === 0 ? (
-                      <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground">
-                        Tidak ada batch aktif — buat batch di menu Batch
-                      </div>
-                    ) : (
-                      <Select
-                        value={selectedBatchId ? String(selectedBatchId) : ""}
-                        onValueChange={handleBatchChange}
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Batch Pengiriman *</label>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                        onClick={() => setShowCreateBatch((v) => !v)}
                       >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih batch pengiriman" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {openBatches.map((b: any) => (
-                            <SelectItem key={b.id} value={String(b.id)}>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{b.namaKapal || `Batch #${b.id}`}</span>
-                                {(b.kotaAsal || b.tujuan) && (
-                                  <span className="text-xs text-muted-foreground">{b.kotaAsal} → {b.tujuan}</span>
-                                )}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        {showCreateBatch ? <ChevronDown className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                        {showCreateBatch ? "Batal" : "Buat Batch Baru"}
+                      </button>
+                    </div>
+
+                    {/* Inline form buat batch baru */}
+                    {showCreateBatch && (
+                      <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Form Batch Baru</p>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Nama Kapal / Batch *</label>
+                            <Input
+                              placeholder="cth: Dobonsolo"
+                              value={newBatch.namaKapal}
+                              onChange={(e) => setNewBatch((p) => ({ ...p, namaKapal: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">ETD (Tanggal Berangkat) *</label>
+                            <Input
+                              type="date"
+                              value={newBatch.etd}
+                              onChange={(e) => setNewBatch((p) => ({ ...p, etd: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Closing Mulai *</label>
+                            <Input
+                              type="date"
+                              value={newBatch.periodeClosingMulai}
+                              onChange={(e) => setNewBatch((p) => ({ ...p, periodeClosingMulai: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Closing Selesai *</label>
+                            <Input
+                              type="date"
+                              value={newBatch.periodeClosingSelesai}
+                              onChange={(e) => setNewBatch((p) => ({ ...p, periodeClosingSelesai: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Kota Asal *</label>
+                            <Select
+                              value={newBatch.kotaAsal}
+                              onValueChange={(v) => setNewBatch((p) => ({ ...p, kotaAsal: v }))}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Jakarta">Jakarta</SelectItem>
+                                <SelectItem value="Surabaya">Surabaya</SelectItem>
+                                <SelectItem value="Makassar">Makassar</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Tujuan</label>
+                            <Input
+                              value={newBatch.tujuan}
+                              onChange={(e) => setNewBatch((p) => ({ ...p, tujuan: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handleCreateBatch}
+                          disabled={isCreatingBatch}
+                          size="sm"
+                          className="w-full gap-2"
+                        >
+                          {isCreatingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                          {isCreatingBatch ? "Membuat Batch..." : "Buat & Pilih Batch Ini"}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Selector batch yang sudah ada */}
+                    {!showCreateBatch && (
+                      openBatches.length === 0 ? (
+                        <div className="flex items-center gap-2 h-10 px-3 rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 text-sm text-muted-foreground">
+                          Belum ada batch aktif — klik "Buat Batch Baru" di atas
+                        </div>
+                      ) : (
+                        <Select
+                          value={selectedBatchId ? String(selectedBatchId) : ""}
+                          onValueChange={handleBatchChange}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih batch pengiriman" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {openBatches.map((b: any) => (
+                              <SelectItem key={b.id} value={String(b.id)}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{b.namaKapal || `Batch #${b.id}`}</span>
+                                  {(b.kotaAsal || b.tujuan) && (
+                                    <span className="text-xs text-muted-foreground">{b.kotaAsal} → {b.tujuan}</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )
                     )}
                   </div>
 
@@ -665,7 +795,7 @@ export default function AdminPackagesImport() {
 
                   <Button
                     onClick={goToUpload}
-                    disabled={!selectedBatchId || !serviceType || !deliveryRoute || openBatches.length === 0}
+                    disabled={!selectedBatchId || !serviceType || !deliveryRoute}
                     className="w-full gap-2"
                   >
                     <ChevronRight className="w-4 h-4" />
