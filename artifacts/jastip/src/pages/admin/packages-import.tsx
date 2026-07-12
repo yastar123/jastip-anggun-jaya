@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Upload, FileSpreadsheet, Download,
-  CheckCircle, XCircle, File, X, ChevronRight, QrCode, AlertCircle,
+  CheckCircle, XCircle, File, X, ChevronRight, QrCode, AlertCircle, Ship,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -157,7 +157,7 @@ function downloadKargoTemplate() {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Step = "upload" | "config" | "preview";
+type Step = "setup" | "upload" | "preview";
 
 interface ParsedRow {
   customerName:  string;
@@ -184,11 +184,9 @@ export default function AdminPackagesImport() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const standardFileRef = useRef<HTMLInputElement>(null);
-  const kargoFileRef    = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [step, setStep] = useState<Step>("upload");
-  const [templateType, setTemplateType] = useState<TemplateType | null>(null);
+  const [step, setStep] = useState<Step>("setup");
   const [file, setFile] = useState<File | null>(null);
   const [rawRows, setRawRows] = useState<ParsedRow[]>([]);
 
@@ -201,6 +199,10 @@ export default function AdminPackagesImport() {
   });
   const [openBatches, setOpenBatches] = useState<any[]>([]);
 
+  // Derived
+  const templateType: TemplateType | null = serviceType === "jastip kargo" ? "kargo" : (serviceType ? "standard" : null);
+  const isKargo = templateType === "kargo";
+
   // Load open batches on mount
   useEffect(() => {
     const token = localStorage.getItem("jaj_token");
@@ -208,7 +210,6 @@ export default function AdminPackagesImport() {
       .then((r) => r.ok ? r.json() : [])
       .then((batches: any[]) => {
         setOpenBatches(batches);
-        // Auto-select first if current selection is gone
         if (batches.length > 0) {
           const stored = localStorage.getItem("jaj_last_batch_id");
           const storedId = stored ? Number(stored) : null;
@@ -287,38 +288,31 @@ export default function AdminPackagesImport() {
       });
 
       setRawRows(parsed);
-      setStep("config");
+      setStep("preview");
     };
     reader.readAsArrayBuffer(f);
   }
 
-  function handleFileUpload(f: File, tplType: TemplateType) {
+  function handleFileUpload(f: File) {
+    if (!templateType) return;
     if (!f.name.match(/\.(xlsx|xls|csv)$/i)) {
       toast({ variant: "destructive", title: "Format Tidak Didukung", description: "Gunakan .xlsx, .xls, atau .csv" });
       return;
     }
     setFile(f);
-    setTemplateType(tplType);
     setImportResult(null);
-    setServiceType(tplType === "kargo" ? "jastip kargo" : "");
-    setDeliveryRoute(tplType === "kargo" ? "Jakarta/Surabaya → Manokwari" : "");
-    parseExcel(f, tplType);
+    parseExcel(f, templateType);
   }
 
-  function handleStandardChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    if (f) handleFileUpload(f, "standard");
+    if (f) handleFileUpload(f);
   }
 
-  function handleKargoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) handleFileUpload(f, "kargo");
-  }
-
-  function handleDrop(e: React.DragEvent, tplType: TemplateType) {
+  function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
-    if (f) handleFileUpload(f, tplType);
+    if (f) handleFileUpload(f);
   }
 
   function clearFile() {
@@ -326,11 +320,7 @@ export default function AdminPackagesImport() {
     setRawRows([]);
     setStep("upload");
     setImportResult(null);
-    setTemplateType(null);
-    setServiceType("");
-    setDeliveryRoute("");
-    if (standardFileRef.current) standardFileRef.current.value = "";
-    if (kargoFileRef.current)    kargoFileRef.current.value    = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function handleServiceTypeChange(val: string) {
@@ -339,12 +329,27 @@ export default function AdminPackagesImport() {
     setDeliveryRoute(routes[0]?.value ?? "");
   }
 
-  function goToPreview() {
-    if (!serviceType || !deliveryRoute) {
-      toast({ variant: "destructive", title: "Pilih Jenis Jastip & Rute", description: "Kedua field wajib dipilih." });
+  function handleBatchChange(val: string) {
+    const id = Number(val);
+    setSelectedBatchId(id);
+    localStorage.setItem("jaj_last_batch_id", String(id));
+  }
+
+  // Step 1 → Step 2
+  function goToUpload() {
+    if (!selectedBatchId) {
+      toast({ variant: "destructive", title: "Pilih Batch Pengiriman", description: "Silakan pilih batch pengiriman terlebih dahulu." });
       return;
     }
-    setStep("preview");
+    if (!serviceType) {
+      toast({ variant: "destructive", title: "Pilih Jenis Jastip", description: "Silakan pilih jenis jastip terlebih dahulu." });
+      return;
+    }
+    if (!deliveryRoute) {
+      toast({ variant: "destructive", title: "Pilih Rute", description: "Silakan pilih rute pengiriman." });
+      return;
+    }
+    setStep("upload");
   }
 
   // ── Hitung nilai per baris ───────────────────────────────────────────────────
@@ -445,7 +450,16 @@ export default function AdminPackagesImport() {
   const validCount = rawRows.filter((r) => !r.error).length;
   const errorCount = rawRows.filter((r) => !!r.error).length;
   const routeOpts  = ROUTE_OPTIONS[serviceType] ?? [];
-  const isKargo    = templateType === "kargo";
+
+  const selectedBatch = openBatches.find((b: any) => b.id === selectedBatchId);
+
+  // Step indicator
+  const STEPS: { key: Step; label: string }[] = [
+    { key: "setup",   label: "1. Batch & Jenis Jastip" },
+    { key: "upload",  label: "2. Upload File" },
+    { key: "preview", label: "3. Preview & Import" },
+  ];
+  const stepOrder: Step[] = ["setup", "upload", "preview"];
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -463,15 +477,14 @@ export default function AdminPackagesImport() {
 
       {/* Steps indicator */}
       <div className="flex items-center gap-2 text-sm font-medium">
-        {(["upload", "config", "preview"] as Step[]).map((s, i) => {
-          const labels = ["1. Upload File", "2. Pilih Jenis Jastip", "3. Preview & Import"];
-          const active = step === s;
-          const done   = (step === "config" && s === "upload") || (step === "preview" && (s === "upload" || s === "config"));
+        {STEPS.map((s, i) => {
+          const active = step === s.key;
+          const done   = stepOrder.indexOf(step) > i;
           return (
-            <div key={s} className="flex items-center gap-2">
+            <div key={s.key} className="flex items-center gap-2">
               {i > 0 && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
               <span className={`px-3 py-1 rounded-full text-xs transition-colors ${active ? "bg-primary text-primary-foreground" : done ? "bg-green-100 text-green-800" : "bg-muted text-muted-foreground"}`}>
-                {done ? "✓ " : ""}{labels[i]}
+                {done ? "✓ " : ""}{s.label}
               </span>
             </div>
           );
@@ -480,12 +493,12 @@ export default function AdminPackagesImport() {
 
       <div className="grid gap-6 lg:grid-cols-4">
 
-        {/* ── Sidebar: 2 template download ── */}
+        {/* ── Sidebar ── */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Template 1: Standard */}
-          <Card className="border-dashed border-2 border-blue-300 bg-blue-50/50 h-fit">
+          {/* Template Standard */}
+          <Card className={`border-dashed border-2 h-fit transition-all ${isKargo ? "border-gray-200 bg-gray-50/30 opacity-60" : "border-blue-300 bg-blue-50/50"}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2 text-blue-700">
+              <CardTitle className={`text-sm flex items-center gap-2 ${isKargo ? "text-gray-500" : "text-blue-700"}`}>
                 <FileSpreadsheet className="w-4 h-4" />Template 1 — Standard
               </CardTitle>
               <CardDescription className="text-xs">Hemat+, Pesawat, Pelni</CardDescription>
@@ -499,7 +512,7 @@ export default function AdminPackagesImport() {
                     {c.required && <span className="text-red-500 text-[10px]">*</span>}
                   </div>
                 ))}
-                <p className="text-[10px] text-muted-foreground/70 pt-1 border-t">Jenis Jastip, Rute & Tanggal dipilih saat import</p>
+                <p className="text-[10px] text-muted-foreground/70 pt-1 border-t">Rute & Tanggal dipilih di step 1</p>
               </div>
               <Button onClick={downloadStandardTemplate} className="w-full" variant="outline" size="sm">
                 <Download className="w-3.5 h-3.5 mr-1.5" />Unduh Template 1
@@ -507,10 +520,10 @@ export default function AdminPackagesImport() {
             </CardContent>
           </Card>
 
-          {/* Template 2: Kargo */}
-          <Card className="border-dashed border-2 border-orange-300 bg-orange-50/50 h-fit">
+          {/* Template Kargo */}
+          <Card className={`border-dashed border-2 h-fit transition-all ${!isKargo && serviceType ? "border-gray-200 bg-gray-50/30 opacity-60" : "border-orange-300 bg-orange-50/50"}`}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2 text-orange-700">
+              <CardTitle className={`text-sm flex items-center gap-2 ${!isKargo && serviceType ? "text-gray-500" : "text-orange-700"}`}>
                 <FileSpreadsheet className="w-4 h-4" />Template 2 — Kargo
               </CardTitle>
               <CardDescription className="text-xs">Jastip Kargo saja</CardDescription>
@@ -524,7 +537,7 @@ export default function AdminPackagesImport() {
                     {c.required && <span className="text-red-500 text-[10px]">*</span>}
                   </div>
                 ))}
-                <p className="text-[10px] text-muted-foreground/70 pt-1 border-t">Harga Kubikasi per baris; Rute & Tanggal dipilih saat import</p>
+                <p className="text-[10px] text-muted-foreground/70 pt-1 border-t">Harga Kubikasi per baris; Rute dipilih di step 1</p>
               </div>
               <Button onClick={downloadKargoTemplate} className="w-full" variant="outline" size="sm">
                 <Download className="w-3.5 h-3.5 mr-1.5" />Unduh Template 2
@@ -536,89 +549,76 @@ export default function AdminPackagesImport() {
         {/* ── Main content ── */}
         <div className="lg:col-span-3 space-y-4">
 
-          {/* Step 1: Upload — dua zona */}
-          <Card>
+          {/* ── Step 1: Pilih Batch & Jenis Jastip ── */}
+          <Card className={step === "setup" ? "border-primary/50 shadow-md" : ""}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Upload className="w-4 h-4" />Upload File Excel
+                <Ship className="w-4 h-4" />
+                Pilih Batch &amp; Jenis Jastip
               </CardTitle>
-              <CardDescription>Upload salah satu template sesuai jenis jastip yang akan diimport</CardDescription>
+              <CardDescription>
+                Tentukan batch pengiriman dan jenis layanan sebelum mengupload file Excel.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              {!file ? (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {/* Zona 1 — Standard */}
-                  <div
-                    onDrop={(e) => handleDrop(e, "standard")}
-                    onDragOver={(e) => e.preventDefault()}
-                    className="border-2 border-dashed border-blue-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/40 transition-colors"
-                    onClick={() => standardFileRef.current?.click()}
-                  >
-                    <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-blue-400" />
-                    <p className="font-semibold text-sm text-blue-700">Template 1 — Standard</p>
-                    <p className="text-xs text-muted-foreground mt-1">Hemat+, Pesawat, Pelni</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-2">.xlsx / .xls / .csv</p>
-                    <input ref={standardFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleStandardChange} />
+            <CardContent className="space-y-4">
+              {step !== "setup" ? (
+                /* Summary mode */
+                <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/40 rounded-lg">
+                  <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-foreground">
+                      {selectedBatch ? (selectedBatch.namaKapal || `Batch #${selectedBatch.id}`) : "-"}
+                    </span>
+                    {" · "}
+                    <span className="font-medium text-foreground">{SERVICE_LABELS[serviceType] ?? serviceType}</span>
+                    {" · "}{deliveryRoute}
+                    {" · "}{new Date(packageDate + "T00:00:00").toLocaleDateString("id-ID")}
                   </div>
-
-                  {/* Zona 2 — Kargo */}
-                  <div
-                    onDrop={(e) => handleDrop(e, "kargo")}
-                    onDragOver={(e) => e.preventDefault()}
-                    className="border-2 border-dashed border-orange-300 rounded-xl p-6 text-center cursor-pointer hover:border-orange-500 hover:bg-orange-50/40 transition-colors"
-                    onClick={() => kargoFileRef.current?.click()}
-                  >
-                    <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-orange-400" />
-                    <p className="font-semibold text-sm text-orange-700">Template 2 — Kargo</p>
-                    <p className="text-xs text-muted-foreground mt-1">Jastip Kargo</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-2">.xlsx / .xls / .csv</p>
-                    <input ref={kargoFileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleKargoChange} />
-                  </div>
+                  {step === "upload" && (
+                    <Button variant="ghost" size="sm" className="ml-auto h-7 shrink-0" onClick={() => setStep("setup")}>
+                      Ubah
+                    </Button>
+                  )}
                 </div>
               ) : (
-                <div className={`flex items-center gap-3 p-3 rounded-lg border ${isKargo ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
-                  <File className={`w-8 h-8 shrink-0 ${isKargo ? "text-orange-500" : "text-blue-500"}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{file.name}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      <Badge variant="secondary" className={`text-xs ${isKargo ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
-                        {isKargo ? "Template Kargo" : "Template Standard"}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">{rawRows.length} baris</Badge>
-                      {validCount > 0 && <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">{validCount} valid</Badge>}
-                      {errorCount > 0 && <Badge variant="destructive" className="text-xs">{errorCount} error</Badge>}
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={clearFile}><X className="w-4 h-4" /></Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Step 2: Config */}
-          {step !== "upload" && (
-            <Card className={step === "config" ? "border-primary/50 shadow-md" : ""}>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  {isKargo ? "Konfigurasi Import Kargo" : "Pilih Jenis Jastip"}
-                </CardTitle>
-                <CardDescription>
-                  {isKargo
-                    ? "Rute dan tanggal akan diterapkan ke seluruh data. Harga Kubikasi diambil per baris dari Excel."
-                    : "Jenis jastip, rute, dan tanggal ini akan diterapkan ke seluruh data Excel."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid sm:grid-cols-3 gap-4">
-                  {/* Jenis Jastip */}
+                /* Edit mode */
+                <div className="space-y-4">
+                  {/* Batch Pengiriman */}
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Jenis Jastip *</label>
-                    {isKargo ? (
-                      <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm font-medium text-orange-700">
-                        Jastip Kargo
+                    <label className="text-sm font-medium">Batch Pengiriman *</label>
+                    {openBatches.length === 0 ? (
+                      <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground">
+                        Tidak ada batch aktif — buat batch di menu Batch
                       </div>
                     ) : (
-                      <Select value={serviceType} onValueChange={handleServiceTypeChange} disabled={step === "preview"}>
+                      <Select
+                        value={selectedBatchId ? String(selectedBatchId) : ""}
+                        onValueChange={handleBatchChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih batch pengiriman" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {openBatches.map((b: any) => (
+                            <SelectItem key={b.id} value={String(b.id)}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{b.namaKapal || `Batch #${b.id}`}</span>
+                                {(b.kotaAsal || b.tujuan) && (
+                                  <span className="text-xs text-muted-foreground">{b.kotaAsal} → {b.tujuan}</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-4">
+                    {/* Jenis Jastip */}
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Jenis Jastip *</label>
+                      <Select value={serviceType} onValueChange={handleServiceTypeChange}>
                         <SelectTrigger>
                           <SelectValue placeholder="Pilih jenis jastip" />
                         </SelectTrigger>
@@ -626,72 +626,116 @@ export default function AdminPackagesImport() {
                           <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
                           <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
                           <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
+                          <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
                         </SelectContent>
                       </Select>
-                    )}
+                    </div>
+
+                    {/* Rute */}
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Rute Pengiriman *</label>
+                      {!serviceType || routeOpts.length <= 1 ? (
+                        <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm">
+                          {deliveryRoute || <span className="text-muted-foreground">Pilih jenis jastip dulu</span>}
+                        </div>
+                      ) : (
+                        <Select value={deliveryRoute} onValueChange={setDeliveryRoute}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Pilih rute" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {routeOpts.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+
+                    {/* Tanggal */}
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Tanggal Paket</label>
+                      <Input
+                        type="date"
+                        value={packageDate}
+                        onChange={(e) => setPackageDate(e.target.value)}
+                      />
+                    </div>
                   </div>
 
-                  {/* Rute */}
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Rute Pengiriman *</label>
-                    {isKargo || routeOpts.length <= 1 ? (
-                      <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm">
-                        {deliveryRoute || "-"}
-                      </div>
-                    ) : (
-                      <Select value={deliveryRoute} onValueChange={setDeliveryRoute} disabled={step === "preview"}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih rute" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {routeOpts.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-
-                  {/* Tanggal */}
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Tanggal Paket</label>
-                    <Input
-                      type="date"
-                      value={packageDate}
-                      onChange={(e) => setPackageDate(e.target.value)}
-                      disabled={step === "preview"}
-                    />
-                  </div>
-                </div>
-
-                {step === "config" && (
                   <Button
-                    onClick={goToPreview}
-                    disabled={!serviceType || !deliveryRoute}
+                    onClick={goToUpload}
+                    disabled={!selectedBatchId || !serviceType || !deliveryRoute || openBatches.length === 0}
                     className="w-full gap-2"
                   >
                     <ChevronRight className="w-4 h-4" />
-                    Lanjut ke Preview
+                    Lanjut Upload File
                   </Button>
-                )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-                {step === "preview" && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 bg-muted/40 rounded-lg">
-                    <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-                    <span>
-                      <span className="font-medium text-foreground">{SERVICE_LABELS[serviceType]}</span>
-                      {" · "}{deliveryRoute}{" · "}{new Date(packageDate + "T00:00:00").toLocaleDateString("id-ID")}
-                    </span>
-                    <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={() => setStep("config")}>
-                      Ubah
-                    </Button>
+          {/* ── Step 2: Upload File ── */}
+          {step !== "setup" && (
+            <Card className={step === "upload" ? "border-primary/50 shadow-md" : ""}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Upload className="w-4 h-4" />Upload File Excel
+                </CardTitle>
+                <CardDescription>
+                  {templateType === "kargo"
+                    ? "Upload file menggunakan Template 2 (Kargo)"
+                    : "Upload file menggunakan Template 1 (Standard)"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!file ? (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={(e) => e.preventDefault()}
+                    className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+                      isKargo
+                        ? "border-orange-300 hover:border-orange-500 hover:bg-orange-50/40"
+                        : "border-blue-300 hover:border-blue-500 hover:bg-blue-50/40"
+                    }`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FileSpreadsheet className={`w-10 h-10 mx-auto mb-3 ${isKargo ? "text-orange-400" : "text-blue-400"}`} />
+                    <p className={`font-semibold text-sm ${isKargo ? "text-orange-700" : "text-blue-700"}`}>
+                      {isKargo ? "Upload Template Kargo (.xlsx / .xls / .csv)" : "Upload Template Standard (.xlsx / .xls / .csv)"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Klik atau drag &amp; drop file di sini</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                  </div>
+                ) : (
+                  <div className={`flex items-center gap-3 p-3 rounded-lg border ${isKargo ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"}`}>
+                    <File className={`w-8 h-8 shrink-0 ${isKargo ? "text-orange-500" : "text-blue-500"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{file.name}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        <Badge variant="secondary" className={`text-xs ${isKargo ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"}`}>
+                          {isKargo ? "Template Kargo" : "Template Standard"}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">{rawRows.length} baris</Badge>
+                        {validCount > 0 && <Badge className="text-xs bg-green-100 text-green-800 hover:bg-green-100">{validCount} valid</Badge>}
+                        {errorCount > 0 && <Badge variant="destructive" className="text-xs">{errorCount} error</Badge>}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={clearFile}><X className="w-4 h-4" /></Button>
                   </div>
                 )}
               </CardContent>
             </Card>
           )}
 
-          {/* Step 3: Preview */}
+          {/* ── Step 3: Preview ── */}
           {step === "preview" && (
             <Card>
               <CardHeader className="pb-3">
