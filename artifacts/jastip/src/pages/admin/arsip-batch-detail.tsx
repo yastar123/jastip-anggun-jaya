@@ -7,9 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Printer, Ship, CheckCircle2, Lock, Archive,
@@ -48,18 +45,6 @@ function batchStatusLabel(status: string) {
   if (status === "OPEN") return "Aktif";
   if (status === "CLOSED") return "Ditutup";
   return "Arsip";
-}
-
-// ── LargeQR ───────────────────────────────────────────────────────────────────
-
-function LargeQR({ value }: { value: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (canvasRef.current && value) {
-      QRCode.toCanvas(canvasRef.current, value, { width: 200, margin: 2 }).catch(() => {});
-    }
-  }, [value]);
-  return <canvas ref={canvasRef} className="rounded" />;
 }
 
 // ── grouping helper ───────────────────────────────────────────────────────────
@@ -171,9 +156,9 @@ function buildGroupedArsipPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: str
 
 // ── GroupedArsipCard ──────────────────────────────────────────────────────────
 
-function GroupedArsipCard({ pkgs, batchLabel }: { pkgs: any[]; batchLabel: string }) {
+function GroupedArsipCard({ pkgs, batchLabel, base }: { pkgs: any[]; batchLabel: string; base: string }) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const first = pkgs[0];
   const qrValue = first?.barcode || first?.resiNumber || String(first?.id ?? "");
@@ -190,7 +175,17 @@ function GroupedArsipCard({ pkgs, batchLabel }: { pkgs: any[]; batchLabel: strin
     }
   }, [qrValue]);
 
-  async function printGroup() {
+  function goToGroupDetail() {
+    const params = new URLSearchParams({
+      name: first?.customerName || "",
+      serviceType: first?.serviceType || "",
+      batchId: String(first?.batchId ?? ""),
+    });
+    setLocation(`${base}/barcode-group?${params.toString()}`);
+  }
+
+  async function printGroup(e?: React.MouseEvent) {
+    e?.stopPropagation();
     let qrDataUrl = "";
     try {
       qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3 });
@@ -202,118 +197,59 @@ function GroupedArsipCard({ pkgs, batchLabel }: { pkgs: any[]; batchLabel: strin
   }
 
   return (
-    <>
-      <Card
-        className="hover:shadow-md transition-shadow border-green-200 bg-green-50/20 cursor-pointer"
-        onClick={() => setOpen(true)}
-      >
-        <CardContent className="pt-4 pb-3">
-          <div className="flex items-start justify-between mb-2 gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm truncate">{first?.customerName || "-"}</p>
-              <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
-              {first?.serviceType && (
-                <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
-              )}
+    <Card
+      className="hover:shadow-md transition-shadow border-green-200 bg-green-50/20 cursor-pointer"
+      onClick={goToGroupDetail}
+    >
+      <CardContent className="pt-4 pb-3">
+        <div className="flex items-start justify-between mb-2 gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm truncate">{first?.customerName || "-"}</p>
+            <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
+            {first?.serviceType && (
+              <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
+            )}
+          </div>
+          <Badge
+            className={`text-xs shrink-0 ${allDone ? "bg-green-600 text-white" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
+            variant={allDone ? undefined : "outline"}
+          >
+            {allDone ? "✓ Diserahkan" : allPending ? "Pending" : `${doneCount}/${pkgs.length} Diserahkan`}
+          </Badge>
+        </div>
+
+        <div className="flex justify-center bg-white border border-green-100 rounded-lg p-2 mb-2">
+          <canvas ref={canvasRef} />
+        </div>
+
+        <div className="mb-2 space-y-0.5">
+          {pkgs.map((p, i) => (
+            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-mono truncate max-w-[110px]">#{i + 1} {p.resiNumber || "-"}</span>
+              <span className={isDone(p) ? "text-green-700 font-medium" : ""}>{isDone(p) ? "✓" : "⏳"} {p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</span>
             </div>
-            <Badge
-              className={`text-xs shrink-0 ${allDone ? "bg-green-600 text-white" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
-              variant={allDone ? undefined : "outline"}
-            >
-              {allDone ? "✓ Diserahkan" : allPending ? "Pending" : `${doneCount}/${pkgs.length} Diserahkan`}
-            </Badge>
-          </div>
+          ))}
+        </div>
 
-          <div className="flex justify-center bg-white border border-green-100 rounded-lg p-2 mb-2">
-            <canvas ref={canvasRef} />
-          </div>
+        <div className="text-xs font-semibold text-green-700 mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
 
-          <div className="mb-2 space-y-0.5">
-            {pkgs.map((p, i) => (
-              <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="font-mono truncate max-w-[110px]">#{i + 1} {p.resiNumber || "-"}</span>
-                <span className={isDone(p) ? "text-green-700 font-medium" : ""}>{isDone(p) ? "✓" : "⏳"} {p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-xs font-semibold text-green-700 mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
-
-          <div className="grid grid-cols-2 gap-1.5">
-            <Button
-              size="sm" variant="outline" className="text-xs"
-              onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-            >
-              <Eye className="w-3 h-3 mr-1" /> Lihat Semua Paket
-            </Button>
-            <Button
-              size="sm" variant="outline"
-              className="text-xs border-green-300 text-green-700 hover:bg-green-50"
-              onClick={(e) => { e.stopPropagation(); printGroup(); }}
-            >
-              <Printer className="w-3 h-3 mr-1" /> Cetak
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Detail Dialog: list of packages in this group ── */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Archive className="w-4 h-4 text-green-600" />
-              {first?.customerName || "-"} — {pkgs.length} Paket
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex flex-col items-center gap-2 py-3 bg-green-50 border border-green-100 rounded-xl">
-            <LargeQR value={qrValue} />
-            <p className="font-mono text-xs text-muted-foreground text-center break-all px-4">{qrValue}</p>
-            <Badge className={allDone ? "bg-green-600 text-white text-xs" : "bg-amber-100 text-amber-800 border-amber-300 text-xs"} variant={allDone ? undefined : "outline"}>
-              {allDone ? "✓ Semua Sudah Diserahkan" : `${doneCount}/${pkgs.length} Diserahkan`}
-            </Badge>
-          </div>
-
-          <div className="space-y-2">
-            {pkgs.map((p, i) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold font-mono truncate">#{i + 1} {p.resiNumber || "-"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.usedWeight != null ? `${p.usedWeight} Kg` : "-"}
-                    {p.pickedUpAt ? ` · Diambil ${fmtDate(p.pickedUpAt)}` : ""}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-semibold text-green-700">{formatRp(p.totalShipping)}</p>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] mt-0.5 ${isDone(p) ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
-                  >
-                    {isDone(p) ? "Diserahkan" : "Pending"}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex justify-between items-center pt-2 border-t text-sm">
-            <span className="text-muted-foreground">Total Ongkir</span>
-            <span className="font-bold text-green-700">{formatRp(totalShipping)}</span>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2"
-              onClick={printGroup}
-            >
-              <Printer className="w-4 h-4" /> Cetak Label Grup
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        <div className="grid grid-cols-2 gap-1.5">
+          <Button
+            size="sm" variant="outline" className="text-xs"
+            onClick={(e) => { e.stopPropagation(); goToGroupDetail(); }}
+          >
+            <Eye className="w-3 h-3 mr-1" /> Lihat Semua Paket
+          </Button>
+          <Button
+            size="sm" variant="outline"
+            className="text-xs border-green-300 text-green-700 hover:bg-green-50"
+            onClick={printGroup}
+          >
+            <Printer className="w-3 h-3 mr-1" /> Cetak
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -634,7 +570,7 @@ export default function ArsipBatchDetail({ params }: { params: { id: string } })
             <>
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {paginatedGroups.map((pkgs: any[]) => (
-                  <GroupedArsipCard key={pkgs[0].id} pkgs={pkgs} batchLabel={batchLabel} />
+                  <GroupedArsipCard key={pkgs[0].id} pkgs={pkgs} batchLabel={batchLabel} base={base} />
                 ))}
               </div>
               <Pagination
