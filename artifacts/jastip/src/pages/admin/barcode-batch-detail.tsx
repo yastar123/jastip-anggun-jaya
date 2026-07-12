@@ -1,24 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { useListPackages, useListBatches, getListPackagesQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useListPackages, useListBatches } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Printer, Download, Ship, CheckCircle2, Lock, Archive,
-  QrCode, Pencil, Trash2, Search,
+  QrCode, Pencil, Search,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Pagination } from "@/components/pagination";
@@ -55,189 +45,213 @@ function batchStatusLabel(status: string) {
   return "Arsip";
 }
 
-const deliveryRouteOptions: Record<string, { value: string; label: string }[]> = {
-  "jastip pesawat": [{ value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" }],
-  "jastip hemat+": [{ value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" }],
-  "jastip kargo": [{ value: "Jakarta/Surabaya → Manokwari", label: "Jakarta/Surabaya → Manokwari" }],
-  "jastip pelni": [
-    { value: "Jakarta → Manokwari", label: "Jakarta → Manokwari" },
-    { value: "Surabaya → Manokwari", label: "Surabaya → Manokwari" },
-  ],
-};
+// ── grouping helper ───────────────────────────────────────────────────────────
 
-interface EditForm {
-  resiNumber: string;
-  packageNumber: string;
-  customerName: string;
-  itemName: string;
-  serviceType: string;
-  deliveryRoute: string;
-  packagingType: string;
-  packageDate: string;
-  realWeight: string;
-  length: string;
-  width: string;
-  height: string;
+function groupPkgsByCustomer(pkgs: any[]) {
+  const map = new Map<string, any[]>();
+  for (const p of pkgs) {
+    const key = [
+      (p.customerName || "").trim().toLowerCase(),
+      (p.serviceType || "").toLowerCase(),
+      String(p.batchId ?? ""),
+    ].join("|");
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(p);
+  }
+  return [...map.values()];
 }
 
-// ── SmallQR ───────────────────────────────────────────────────────────────────
+function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
+  const first = pkgs[0];
+  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const pkgRows = pkgs.map((p, i) => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:5px 8px;font-size:11px;font-weight:700;">${i + 1}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.resiNumber || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.packageNumber || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;">${p.packagingType || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#c00;font-weight:700;">${p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-"}</td>
+    </tr>`).join("");
 
-function SmallQR({ value }: { value: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (canvasRef.current && value) {
-      QRCode.toCanvas(canvasRef.current, value, { width: 96, margin: 2 }).catch(() => {});
-    }
-  }, [value]);
-  return <canvas ref={canvasRef} className="rounded" />;
-}
-
-// ── PackageBarcodeCard ────────────────────────────────────────────────────────
-
-function PackageBarcodeCard({
-  pkg,
-  batchLabel,
-  onEdit,
-  onDelete,
-}: {
-  pkg: any;
-  batchLabel: string;
-  onEdit: (pkg: any) => void;
-  onDelete: (pkg: any) => void;
-}) {
-  const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
-
-  async function printSingle() {
-    let qrDataUrl = "";
-    try {
-      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3 });
-    } catch { return; }
-    const pkgDate = pkg.packageDate
-      ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
-      : "-";
-    const svcType = pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-";
-    const ongkir = pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-";
-    const html = `<!DOCTYPE html>
-<html><head>
-  <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Label Grup - ${first?.customerName}</title>
   <style>
-    @page { size: 100mm 100mm; margin: 0; }
+    @page { size: A4 portrait; margin: 12mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
-    .h-title { font-size: 13pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
-    .h-sub { font-size: 4.5pt; opacity: 0.9; margin-top: 0.8mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 31mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 3mm 2mm 2mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 5.5pt; font-weight: 900; padding: 1mm 2.5mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2.5mm; }
-    .qr-img { width: 23mm; height: 23mm; display: block; }
-    .qr-txt { font-size: 3.2pt; color: #888; font-family: monospace; text-align: center; margin-top: 2mm; word-break: break-all; max-width: 27mm; line-height: 1.3; }
-    .right { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 2.5mm; }
-    .field { display: flex; flex-direction: column; gap: 0.3mm; }
-    .full { grid-column: 1 / -1; }
-    .fl { font-size: 4pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; }
-    .fv { font-size: 7pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.mono { font-family: monospace; font-size: 6.5pt; }
-    .fv.red { color: #cc0000; font-size: 8.5pt; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1mm 3mm; font-size: 3.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    body { font-family: 'Arial', sans-serif; background: #fff; }
+    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .header { background: #c00; color: #fff; padding: 14px 20px; }
+    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .top-wrap { display: flex; flex-direction: row; align-items: stretch; }
+    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; border-right: 2px dashed #ddd; min-width: 160px; }
+    .qr-wrap img { width: 130px; height: 130px; display: block; }
+    .qr-label { font-size: 7px; color: #999; margin-top: 5px; font-family: monospace; text-align:center; word-break:break-all; max-width:130px; }
+    .info-section { flex: 1; padding: 14px 18px; }
+    .customer { font-size: 22px; font-weight: 900; color: #111; margin-bottom: 6px; }
+    .meta { font-size: 11px; color: #666; margin-bottom: 4px; }
+    .totals { display: flex; gap: 24px; margin-top: 10px; }
+    .total-item { display: flex; flex-direction: column; }
+    .total-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; }
+    .total-value { font-size: 15px; font-weight: 900; color: #c00; }
+    .pkgs-section { padding: 0 0 0 0; border-top: 2px solid #eee; }
+    .pkgs-title { font-size: 9px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 18px 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; padding: 4px 8px; text-align: left; background: #f8f8f8; }
+    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 7px 20px; font-size: 9px; color: #aaa; text-align: center; }
   </style>
-</head><body>
-  <div class="wrap">
+</head>
+<body>
+  <div class="label">
     <div class="header">
-      <div class="h-title">JASTIP ANGGUN JAYA</div>
-      <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+      <div class="brand-name">JASTIP ANGGUN JAYA</div>
+      <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
     </div>
-    <div class="body">
-      <div class="left">
-        <div class="scan-label">SCAN RESI</div>
-        <img class="qr-img" src="${qrDataUrl}" />
-        <div class="qr-txt">${qrValue}</div>
+    <div class="top-wrap">
+      <div class="qr-wrap">
+        <img src="${qrDataUrl}" alt="QR Code" />
+        <div class="qr-label">${qrValue}</div>
       </div>
-      <div class="right">
-        <div class="cust">${pkg.customerName || "-"}</div>
-        <div class="grid">
-          <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-          <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-          <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
-          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
-          <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
-          <div class="field"><div class="fl">Berat Real</div><div class="fv">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</div></div>
-          <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-          <div class="field full"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
+      <div class="info-section">
+        <div class="customer">${first?.customerName || "-"}</div>
+        <div class="meta">Jenis: ${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"} &nbsp;·&nbsp; Rute: ${first?.deliveryRoute || "-"}</div>
+        <div class="meta">Tanggal: ${first?.packageDate ? new Date(first.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div>
+        ${batchLabel ? `<div class="meta" style="color:#1d4ed8;font-weight:700;">📦 Batch: ${batchLabel}</div>` : ""}
+        <div class="totals">
+          <div class="total-item">
+            <span class="total-label">Total Paket</span>
+            <span class="total-value" style="color:#111;">${pkgs.length} pkt</span>
+          </div>
+          <div class="total-item">
+            <span class="total-label">Total Berat</span>
+            <span class="total-value" style="color:#111;">${totalWeight.toFixed(3)} Kg</span>
+          </div>
+          <div class="total-item">
+            <span class="total-label">Total Ongkir</span>
+            <span class="total-value">Rp ${totalShipping.toLocaleString("id-ID")}</span>
+          </div>
         </div>
       </div>
+    </div>
+    <div class="pkgs-section">
+      <div class="pkgs-title">Daftar Paket (${pkgs.length} item)</div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>No. Resi</th><th>No. Paket</th><th>Berat</th><th>Paking</th><th>Ongkir</th>
+        </tr></thead>
+        <tbody>${pkgRows}</tbody>
+      </table>
     </div>
     <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
   </div>
   <script>window.onload = () => { window.print(); window.close(); }<\/script>
-</body></html>`;
+</body>
+</html>`;
+}
+
+// ── GroupedBarcodeCard ────────────────────────────────────────────────────────
+
+function GroupedBarcodeCard({
+  pkgs,
+  batchLabel,
+}: {
+  pkgs: any[];
+  batchLabel?: string;
+}) {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const first = pkgs[0];
+  const qrValue = first?.barcode || first?.resiNumber || first?.id?.toString() || "";
+  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const allPending = pkgs.every((p) => p.status !== "diserahkan");
+  const allDone = pkgs.every((p) => p.status === "diserahkan");
+
+  useEffect(() => {
+    if (canvasRef.current && qrValue) {
+      QRCode.toCanvas(canvasRef.current, qrValue, {
+        width: 160, margin: 2, color: { dark: "#000000", light: "#ffffff" },
+      }).catch(() => {});
+    }
+  }, [qrValue]);
+
+  async function printBarcode() {
+    let qrDataUrl = "";
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+    } catch { return; }
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(html);
+    win.document.write(buildGroupedPrintHtml(pkgs, qrDataUrl, qrValue, batchLabel));
     win.document.close();
   }
 
+  function downloadBarcode() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.download = `qr-grup-${first?.customerName || first?.id}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  }
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow border-blue-200">
       <CardContent className="pt-4 pb-3">
-        {/* Top: name + status */}
-        <div className="flex items-start justify-between mb-2 gap-2">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm truncate">{pkg.customerName || "-"}</p>
-            <p className="font-mono text-xs text-muted-foreground truncate">{pkg.resiNumber || "-"}</p>
-            {pkg.serviceType && (
-              <p className="text-xs text-muted-foreground capitalize mt-0.5">{pkg.serviceType}</p>
+            <p className="font-bold text-sm truncate">{first?.customerName || "-"}</p>
+            <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
+            {first?.serviceType && (
+              <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
             )}
           </div>
           <Badge
             variant="outline"
-            className={`text-xs shrink-0 ${
-              pkg.status === "diserahkan"
-                ? "bg-green-100 text-green-800 border-green-300"
-                : "bg-amber-100 text-amber-800 border-amber-300"
-            }`}
+            className={`text-xs ml-2 shrink-0 ${allDone ? "bg-green-100 text-green-800 border-green-300" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
           >
-            {pkg.status === "diserahkan" ? "Diserahkan" : "Pending"}
+            {allDone ? "Diserahkan" : allPending ? "Pending" : "Sebagian"}
           </Badge>
         </div>
-
-        {/* QR Code */}
         <div className="flex justify-center bg-white border rounded-lg p-2 mb-2">
-          <SmallQR value={qrValue} />
+          <canvas ref={canvasRef} />
         </div>
-        <p className="text-center font-mono text-[10px] text-muted-foreground mb-2 truncate">{qrValue}</p>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-muted-foreground mb-2">
-          {pkg.usedWeight != null && <span>Berat: <span className="font-semibold text-foreground">{pkg.usedWeight} Kg</span></span>}
-          {pkg.totalShipping != null && <span className="col-span-2 font-semibold text-primary">{formatRp(pkg.totalShipping)}</span>}
+        <div className="mb-2 space-y-0.5">
+          {pkgs.map((p, i) => (
+            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="font-mono truncate max-w-[120px]">#{i + 1} {p.resiNumber || "-"}</span>
+              <span>{p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</span>
+            </div>
+          ))}
         </div>
-
-        {/* Actions */}
+        <div className="text-xs font-semibold text-primary mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
         <div className="flex gap-1.5 mb-1.5">
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={printSingle}>
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={printBarcode}>
             <Printer className="w-3 h-3 mr-1" /> Cetak
           </Button>
-        </div>
-        <div className="flex gap-1.5">
-          <Button
-            size="sm" variant="outline"
-            className="flex-1 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
-            onClick={() => onEdit(pkg)}
-          >
-            <Pencil className="w-3 h-3 mr-1" /> Edit
-          </Button>
-          <Button
-            size="sm" variant="outline"
-            className="flex-1 text-xs border-red-300 text-red-600 hover:bg-red-50"
-            onClick={() => onDelete(pkg)}
-          >
-            <Trash2 className="w-3 h-3 mr-1" /> Hapus
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={downloadBarcode}>
+            <Download className="w-3 h-3 mr-1" /> Unduh
           </Button>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+          onClick={() => {
+            const params = new URLSearchParams({ name: first?.customerName || "" });
+            if (first?.serviceType) params.set("serviceType", first.serviceType);
+            if (first?.batchId != null) params.set("batchId", String(first.batchId));
+            setLocation(`${base}/barcode-group?${params.toString()}`);
+          }}
+        >
+          <Pencil className="w-3 h-3 mr-1" /> Edit / Kelola Paket
+        </Button>
       </CardContent>
     </Card>
   );
@@ -248,9 +262,7 @@ function PackageBarcodeCard({
 export default function BarcodeBatchDetail({ params }: { params: { id: string } }) {
   const batchId = Number(params?.id);
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
   const [search, setSearch] = useState("");
@@ -302,98 +314,16 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
   );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const groupedFiltered = groupPkgsByCustomer(filtered);
+  const totalPages = Math.max(1, Math.ceil(groupedFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginatedGroups = groupedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const totalWeight = batchPkgs.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0);
   const totalShipping = batchPkgs.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleFilter(v: string) { setFilterServiceType(v); setPage(1); }
-
-  // ── Edit state ──────────────────────────────────────────────────────────────
-  const [editPkg, setEditPkg] = useState<any | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>({
-    resiNumber: "", packageNumber: "", customerName: "", itemName: "",
-    serviceType: "", deliveryRoute: "", packagingType: "", packageDate: "",
-    realWeight: "", length: "", width: "", height: "",
-  });
-  const [isEditSaving, setIsEditSaving] = useState(false);
-  const [deletePkg, setDeletePkg] = useState<any | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  function openEdit(pkg: any) {
-    setEditPkg(pkg);
-    setEditForm({
-      resiNumber: pkg.resiNumber || "",
-      packageNumber: pkg.packageNumber || "",
-      customerName: pkg.customerName || "",
-      itemName: pkg.itemName || "",
-      serviceType: pkg.serviceType || "",
-      deliveryRoute: pkg.deliveryRoute || "",
-      packagingType: pkg.packagingType || "",
-      packageDate: pkg.packageDate ? pkg.packageDate.split("T")[0] : "",
-      realWeight: pkg.realWeight != null ? String(pkg.realWeight) : "",
-      length: pkg.length != null ? String(pkg.length) : "",
-      width: pkg.width != null ? String(pkg.width) : "",
-      height: pkg.height != null ? String(pkg.height) : "",
-    });
-  }
-
-  async function saveEdit() {
-    if (!editPkg) return;
-    setIsEditSaving(true);
-    try {
-      const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${editPkg.id}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          resiNumber: editForm.resiNumber,
-          packageNumber: editForm.packageNumber || null,
-          customerName: editForm.customerName,
-          itemName: editForm.itemName || null,
-          serviceType: editForm.serviceType || null,
-          deliveryRoute: editForm.deliveryRoute || null,
-          packagingType: editForm.packagingType || null,
-          packageDate: editForm.packageDate || null,
-          realWeight: editForm.realWeight ? Number(editForm.realWeight) : null,
-          length: editForm.length ? Number(editForm.length) : null,
-          width: editForm.width ? Number(editForm.width) : null,
-          height: editForm.height ? Number(editForm.height) : null,
-        }),
-      });
-      if (!r.ok) throw new Error("Gagal menyimpan perubahan");
-      await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({ title: "Berhasil", description: "Data paket berhasil diperbarui." });
-      setEditPkg(null);
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal", description: err.message });
-    } finally {
-      setIsEditSaving(false);
-    }
-  }
-
-  async function confirmDelete() {
-    if (!deletePkg) return;
-    setIsDeleting(true);
-    try {
-      const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/${deletePkg.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!r.ok) throw new Error("Gagal menghapus paket");
-      await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({ title: "Berhasil", description: `Paket ${deletePkg.resiNumber} dihapus.` });
-      setDeletePkg(null);
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal", description: err.message });
-    } finally {
-      setIsDeleting(false);
-    }
-  }
 
   // ── Print All ────────────────────────────────────────────────────────────────
   async function printAll() {
@@ -479,8 +409,6 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
     win.document.write(html);
     win.document.close();
   }
-
-  const editRouteOpts = deliveryRouteOptions[editForm.serviceType] || [];
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -588,20 +516,18 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
           ) : (
             <>
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {paginated.map((pkg: any) => (
-                  <PackageBarcodeCard
-                    key={pkg.id}
-                    pkg={pkg}
+                {paginatedGroups.map((pkgs: any[]) => (
+                  <GroupedBarcodeCard
+                    key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|${pkgs[0]?.batchId}`}
+                    pkgs={pkgs}
                     batchLabel={batchLabel}
-                    onEdit={openEdit}
-                    onDelete={setDeletePkg}
                   />
                 ))}
               </div>
               <Pagination
                 page={safePage}
                 totalPages={totalPages}
-                total={filtered.length}
+                total={groupedFiltered.length}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
               />
@@ -610,113 +536,6 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
         </>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editPkg} onOpenChange={(o) => { if (!o) setEditPkg(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Paket — {editPkg?.barcode || editPkg?.resiNumber}</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">No Resi *</label>
-              <Input value={editForm.resiNumber} onChange={e => setEditForm(f => ({ ...f, resiNumber: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">No Paket</label>
-              <Input value={editForm.packageNumber} onChange={e => setEditForm(f => ({ ...f, packageNumber: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Nama Konsumen *</label>
-              <Input value={editForm.customerName} onChange={e => setEditForm(f => ({ ...f, customerName: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Tanggal</label>
-              <Input type="date" value={editForm.packageDate} onChange={e => setEditForm(f => ({ ...f, packageDate: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Jenis Jastip</label>
-              <Select value={editForm.serviceType} onValueChange={v => setEditForm(f => ({
-                ...f, serviceType: v,
-                deliveryRoute: deliveryRouteOptions[v]?.[0]?.value || "",
-              }))}>
-                <SelectTrigger><SelectValue placeholder="Pilih jenis" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-                  <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
-                  <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
-                  <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Rute Pengiriman</label>
-              {editRouteOpts.length <= 1 ? (
-                <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm">
-                  {editForm.deliveryRoute || "-"}
-                </div>
-              ) : (
-                <Select value={editForm.deliveryRoute} onValueChange={v => setEditForm(f => ({ ...f, deliveryRoute: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Pilih rute" /></SelectTrigger>
-                  <SelectContent>
-                    {editRouteOpts.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            {(editForm.serviceType === "jastip kargo" || editForm.serviceType === "jastip pelni") && (
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-medium">Nama Barang</label>
-                <Input value={editForm.itemName} onChange={e => setEditForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Contoh: Pakaian, Elektronik..." />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Berat Real (Kg)</label>
-              <Input type="number" step="0.001" value={editForm.realWeight} onChange={e => setEditForm(f => ({ ...f, realWeight: e.target.value }))} placeholder="0.000" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Panjang (cm)</label>
-              <Input type="number" step="0.1" value={editForm.length} onChange={e => setEditForm(f => ({ ...f, length: e.target.value }))} placeholder="0" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Lebar (cm)</label>
-              <Input type="number" step="0.1" value={editForm.width} onChange={e => setEditForm(f => ({ ...f, width: e.target.value }))} placeholder="0" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Tinggi (cm)</label>
-              <Input type="number" step="0.1" value={editForm.height} onChange={e => setEditForm(f => ({ ...f, height: e.target.value }))} placeholder="0" />
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">Berat volume, berat digunakan, tarif, dan total ongkir akan dihitung ulang otomatis.</p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditPkg(null)}>Batal</Button>
-            <Button onClick={saveEdit} disabled={isEditSaving || !editForm.resiNumber || !editForm.customerName}>
-              {isEditSaving ? "Menyimpan..." : "Simpan Perubahan"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deletePkg} onOpenChange={(o) => { if (!o) setDeletePkg(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Paket?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Paket <strong>{deletePkg?.resiNumber}</strong> akan dihapus permanen.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? "Menghapus..." : "Ya, Hapus"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
