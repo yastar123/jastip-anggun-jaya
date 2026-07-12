@@ -99,6 +99,7 @@ export default function RiwayatPembayaranDetail({ params }: { params: { id: stri
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [dialogPayment, setDialogPayment] = useState<any | null>(null);
+  const [filterType, setFilterType] = useState<"semua" | "tunai" | "transfer" | "piutang">("semua");
 
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["payments"],
@@ -137,8 +138,14 @@ export default function RiwayatPembayaranDetail({ params }: { params: { id: stri
   const totalTransfer = filtered.filter(p => p.paymentType === "transfer").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
   const totalPiutang = filtered.filter(p => p.paymentType === "piutang").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Apply payment-type filter
+  const displayed = useMemo(() => {
+    if (filterType === "semua") return filtered;
+    return filtered.filter((p) => p.paymentType === filterType);
+  }, [filtered, filterType]);
+
+  const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
+  const paginated = displayed.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const mutation = useMutation({
     mutationFn: ({ id, type }: { id: number; type: "tunai" | "transfer" }) => bayarPiutang(id, type),
@@ -206,6 +213,33 @@ export default function RiwayatPembayaranDetail({ params }: { params: { id: stri
               <p className={`text-xl font-black mt-1 ${s.color}`}>{formatRp(s.value)}</p>
             </CardContent>
           </Card>
+        ))}
+      </div>
+
+      {/* Filter jenis pembayaran */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: "semua",    label: "Semua",    count: filtered.length,                                          active: "bg-primary text-primary-foreground border-primary" },
+          { key: "tunai",    label: "Tunai",    count: filtered.filter(p => p.paymentType === "tunai").length,    active: "bg-green-600 text-white border-green-600" },
+          { key: "transfer", label: "Transfer", count: filtered.filter(p => p.paymentType === "transfer").length, active: "bg-blue-600 text-white border-blue-600" },
+          { key: "piutang",  label: "Piutang",  count: filtered.filter(p => p.paymentType === "piutang").length,  active: "bg-orange-500 text-white border-orange-500" },
+        ].map((f) => (
+          <button
+            key={f.key}
+            onClick={() => { setFilterType(f.key as any); setPage(1); }}
+            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-sm font-semibold transition-all ${
+              filterType === f.key
+                ? f.active
+                : "bg-background text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
+            }`}
+          >
+            {f.label}
+            <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold leading-none ${
+              filterType === f.key ? "bg-white/20" : "bg-muted"
+            }`}>
+              {f.count}
+            </span>
+          </button>
         ))}
       </div>
 
