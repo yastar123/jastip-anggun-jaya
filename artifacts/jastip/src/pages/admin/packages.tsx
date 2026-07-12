@@ -1,4 +1,4 @@
-import { useListPackages, PackageStatus } from "@workspace/api-client-react";
+import { useListPackages, useListBatches, PackageStatus } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,7 @@ export default function AdminPackages() {
   const [, setLocation] = useLocation();
 
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfBatchId, setPdfBatchId] = useState<string>("");
   const [pdfJenis, setPdfJenis] = useState<string>("all");
   const [pdfDateFrom, setPdfDateFrom] = useState("");
   const [pdfDateTo, setPdfDateTo] = useState("");
@@ -78,6 +79,23 @@ export default function AdminPackages() {
     search: search || undefined,
     status: status === "all" ? undefined : (status as any),
   });
+
+  const { data: batches } = useListBatches();
+  const sortedBatches = [...(batches || [])].sort(
+    (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const selectedPdfBatch = sortedBatches.find((b: any) => String(b.id) === pdfBatchId);
+
+  function handlePdfOpenChange(open: boolean) {
+    setPdfOpen(open);
+    if (open) {
+      setPdfBatchId("");
+      setPdfJenis("all");
+      setPdfDateFrom("");
+      setPdfDateTo("");
+      setPdfNamaKapal("");
+    }
+  }
 
   function applyTableFilters(data: any[]): any[] {
     let filtered = [...data];
@@ -114,6 +132,9 @@ export default function AdminPackages() {
   function getFilteredPackages() {
     if (!packages) return [];
     let filtered = [...packages] as any[];
+    if (pdfBatchId) {
+      filtered = filtered.filter((p) => String(p.batchId) === pdfBatchId);
+    }
     if (pdfJenis !== "all") {
       filtered = filtered.filter((p) =>
         (p.serviceType || "").toLowerCase() === pdfJenis.toLowerCase()
@@ -138,6 +159,7 @@ export default function AdminPackages() {
 
   function exportPdf() {
     if (!packages || packages.length === 0) return;
+    if (!pdfBatchId) return;
     if (isGroupedExport()) {
       exportPdfGrouped();
     } else {
@@ -172,16 +194,13 @@ export default function AdminPackages() {
       "jastip hemat+": "JASTIP HEMAT+",
       "jastip pesawat": "JASTIP PESAWAT",
     };
-    const ruteDefault: Record<string, string> = {
-      "jastip pesawat": "JAKARTA - MANOKWARI",
-      "jastip hemat+": "SURABAYA - MANOKWARI",
-      "jastip pelni": "JAKARTA - MANOKWARI",
-    };
-
     const jenisKey = pdfJenis.toLowerCase();
     const titleText = (serviceUpper[jenisKey] || pdfJenis.toUpperCase()) +
       (pdfNamaKapal ? " " + pdfNamaKapal.toUpperCase() : "");
-    const rute = ruteDefault[jenisKey] || "-";
+    // Rute selalu diambil dari batch pengiriman yang dipilih, bukan tabel per jenis jastip
+    const rute = selectedPdfBatch
+      ? `${selectedPdfBatch.kotaAsal} - ${selectedPdfBatch.tujuan}`.toUpperCase()
+      : "-";
     // ── Header halaman ──────────────────────────────────────────────────────
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
@@ -288,7 +307,8 @@ export default function AdminPackages() {
 
     const safeJenis = pdfJenis.replace(/\+/g, "plus").replace(/\s+/g, "-").toLowerCase();
     const safeKapal = pdfNamaKapal ? `-${pdfNamaKapal.replace(/\s+/g, "-")}` : "";
-    doc.save(`laporan-${safeJenis}${safeKapal}-${pdfDateFrom || "awal"}-${pdfDateTo || "akhir"}.pdf`);
+    const safeBatch = selectedPdfBatch ? `-${selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase()}` : "";
+    doc.save(`laporan-${safeJenis}${safeBatch}${safeKapal}-${pdfDateFrom || "awal"}-${pdfDateTo || "akhir"}.pdf`);
     setPdfOpen(false);
   }
 
@@ -300,16 +320,20 @@ export default function AdminPackages() {
     const judul = pdfJenis !== "all" ? pdfJenis : "Semua Jenis Jastip";
     const periodeFrom = pdfDateFrom ? new Date(pdfDateFrom).toLocaleDateString("id-ID") : "-";
     const periodeTo = pdfDateTo ? new Date(pdfDateTo).toLocaleDateString("id-ID") : "-";
+    const batchLabel = selectedPdfBatch
+      ? `${selectedPdfBatch.namaKapal} (${selectedPdfBatch.kotaAsal} → ${selectedPdfBatch.tujuan})`
+      : "-";
 
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Jastip Anggun Jaya — Laporan Paket", 14, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Jenis Jastip : ${judul}`, 14, 21);
-    doc.text(`Periode      : ${periodeFrom} s/d ${periodeTo}`, 14, 26);
-    doc.text(`Dicetak      : ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, 14, 31);
-    doc.text(`Total Paket  : ${filtered.length} paket`, 14, 36);
+    doc.text(`Batch Pengiriman : ${batchLabel}`, 14, 21);
+    doc.text(`Jenis Jastip     : ${judul}`, 14, 26);
+    doc.text(`Periode          : ${periodeFrom} s/d ${periodeTo}`, 14, 31);
+    doc.text(`Dicetak          : ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, 14, 36);
+    doc.text(`Total Paket      : ${filtered.length} paket`, 14, 41);
 
     const rows = filtered.map((p: any, i: number) => [
       i + 1,
@@ -327,7 +351,7 @@ export default function AdminPackages() {
     ]);
 
     autoTable(doc, {
-      startY: 40,
+      startY: 45,
       head: [["No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen", "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan", "Total Berat", "Total Ongkir", "Status"]],
       body: rows,
       styles: { fontSize: 7, cellPadding: 1.5 },
@@ -347,13 +371,20 @@ export default function AdminPackages() {
       margin: { left: 14, right: 14 },
     });
 
-    const namaFile = ["laporan-paket", pdfJenis !== "all" ? pdfJenis.replace(/\s+/g, "-").toLowerCase() : "semua", pdfDateFrom || "awal", pdfDateTo || "akhir"].join("_") + ".pdf";
+    const namaFile = [
+      "laporan-paket",
+      selectedPdfBatch ? selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase() : "batch",
+      pdfJenis !== "all" ? pdfJenis.replace(/\s+/g, "-").toLowerCase() : "semua",
+      pdfDateFrom || "awal",
+      pdfDateTo || "akhir",
+    ].join("_") + ".pdf";
     doc.save(namaFile);
     setPdfOpen(false);
   }
 
   const showGroupedFields = isGroupedExport();
   const showNamaKapal = pdfJenis.toLowerCase() === "jastip pelni";
+  const canExport = !!pdfBatchId && !!packages && packages.length > 0;
 
   return (
     <div className="space-y-6">
@@ -365,7 +396,7 @@ export default function AdminPackages() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setPdfOpen(true)}
+          onClick={() => handlePdfOpenChange(true)}
           disabled={!packages || packages.length === 0}
         >
           <FileDown className="w-4 h-4 mr-2" />
@@ -532,7 +563,7 @@ export default function AdminPackages() {
         <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
 
-      <Dialog open={pdfOpen} onOpenChange={setPdfOpen}>
+      <Dialog open={pdfOpen} onOpenChange={handlePdfOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -542,8 +573,29 @@ export default function AdminPackages() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
+              <Label>Batch Pengiriman</Label>
+              <Select value={pdfBatchId} onValueChange={(v) => { setPdfBatchId(v); setPdfJenis("all"); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih batch pengiriman" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sortedBatches.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Belum ada batch pengiriman.</div>
+                  )}
+                  {sortedBatches.map((b: any) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.namaKapal} · {b.kotaAsal} → {b.tujuan}
+                      {b.statusBatch === "OPEN" ? " (Aktif)" : b.statusBatch === "CLOSED" ? " (Ditutup)" : " (Arsip)"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Pilih batch pengiriman terlebih dahulu untuk melanjutkan.</p>
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Jenis Jastip</Label>
-              <Select value={pdfJenis} onValueChange={setPdfJenis}>
+              <Select value={pdfJenis} onValueChange={setPdfJenis} disabled={!pdfBatchId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih jenis jastip" />
                 </SelectTrigger>
@@ -582,10 +634,10 @@ export default function AdminPackages() {
               </div>
             </div>
 
-            {(pdfJenis !== "all" || pdfDateFrom || pdfDateTo || pdfNamaKapal) && (
+            {(pdfBatchId || pdfJenis !== "all" || pdfDateFrom || pdfDateTo || pdfNamaKapal) && (
               <button
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => { setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); setPdfNamaKapal(""); }}
+                onClick={() => { setPdfBatchId(""); setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); setPdfNamaKapal(""); }}
               >
                 <X className="w-3 h-3 inline mr-1" />
                 Reset filter
@@ -594,7 +646,7 @@ export default function AdminPackages() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPdfOpen(false)}>Batal</Button>
-            <Button onClick={exportPdf} disabled={!packages || packages.length === 0}>
+            <Button onClick={exportPdf} disabled={!canExport}>
               <FileDown className="w-4 h-4 mr-2" />
               Download PDF
             </Button>
