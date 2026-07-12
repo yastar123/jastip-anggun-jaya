@@ -368,16 +368,29 @@ export default function AdminPackagesImport() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  // Auto-derive route from serviceType + batch kotaAsal (no manual route input needed)
+  function deriveRoute(svcType: string, kotaAsal?: string): string {
+    if (svcType === "jastip kargo")   return "Jakarta/Surabaya → Manokwari";
+    if (svcType === "jastip pesawat") return "Jakarta → Manokwari";
+    if (svcType === "jastip hemat+")  return "Surabaya → Manokwari";
+    if (svcType === "jastip pelni")   return kotaAsal === "Surabaya" ? "Surabaya → Manokwari" : "Jakarta → Manokwari";
+    return ROUTE_OPTIONS[svcType]?.[0]?.value ?? "";
+  }
+
   function handleServiceTypeChange(val: string) {
     setServiceType(val);
-    const routes = ROUTE_OPTIONS[val] ?? [];
-    setDeliveryRoute(routes[0]?.value ?? "");
+    const batch = openBatches.find((b: any) => b.id === selectedBatchId);
+    setDeliveryRoute(deriveRoute(val, batch?.kotaAsal));
   }
 
   function handleBatchChange(val: string) {
     const id = Number(val);
     setSelectedBatchId(id);
     localStorage.setItem("jaj_last_batch_id", String(id));
+    if (serviceType) {
+      const batch = openBatches.find((b: any) => b.id === id);
+      setDeliveryRoute(deriveRoute(serviceType, batch?.kotaAsal));
+    }
   }
 
   // Step 1 → Step 2
@@ -388,10 +401,6 @@ export default function AdminPackagesImport() {
     }
     if (!serviceType) {
       toast({ variant: "destructive", title: "Pilih Jenis Jastip", description: "Silakan pilih jenis jastip terlebih dahulu." });
-      return;
-    }
-    if (!deliveryRoute) {
-      toast({ variant: "destructive", title: "Pilih Rute", description: "Silakan pilih rute pengiriman." });
       return;
     }
     setStep("upload");
@@ -616,8 +625,7 @@ export default function AdminPackagesImport() {
                     </span>
                     {" · "}
                     <span className="font-medium text-foreground">{SERVICE_LABELS[serviceType] ?? serviceType}</span>
-                    {" · "}{deliveryRoute}
-                    {" · "}{new Date(packageDate + "T00:00:00").toLocaleDateString("id-ID")}
+                    {deliveryRoute && <>{" · "}{deliveryRoute}</>}
                   </div>
                   {step === "upload" && (
                     <Button variant="ghost" size="sm" className="ml-auto h-7 shrink-0" onClick={() => setStep("setup")}>
@@ -742,60 +750,62 @@ export default function AdminPackagesImport() {
                         </Select>
                       )
                     )}
+
+                    {/* Info detail batch yang dipilih */}
+                    {selectedBatch && !showCreateBatch && (
+                      <div className="rounded-lg border bg-muted/20 p-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute</p>
+                          <p className="font-semibold text-foreground mt-0.5">{selectedBatch.kotaAsal} → {selectedBatch.tujuan || "Manokwari"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">ETD</p>
+                          <p className="font-semibold text-foreground mt-0.5">
+                            {new Date(selectedBatch.etd).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Periode Closing</p>
+                          <p className="font-semibold text-foreground mt-0.5">
+                            {new Date(selectedBatch.periodeClosingMulai).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                            {" – "}
+                            {new Date(selectedBatch.periodeClosingSelesai).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Status</p>
+                          <p className="font-semibold text-green-700 mt-0.5">{selectedBatch.statusBatch}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Paket Masuk</p>
+                          <p className="font-semibold text-foreground mt-0.5">{selectedBatch.packageCount ?? 0} paket</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid sm:grid-cols-3 gap-4">
-                    {/* Jenis Jastip */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Jenis Jastip *</label>
-                      <Select value={serviceType} onValueChange={handleServiceTypeChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Pilih jenis jastip" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-                          <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
-                          <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
-                          <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Rute */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Rute Pengiriman *</label>
-                      {!serviceType || routeOpts.length <= 1 ? (
-                        <div className="flex items-center h-10 px-3 rounded-md border border-input bg-muted/40 text-sm">
-                          {deliveryRoute || <span className="text-muted-foreground">Pilih jenis jastip dulu</span>}
-                        </div>
-                      ) : (
-                        <Select value={deliveryRoute} onValueChange={setDeliveryRoute}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Pilih rute" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {routeOpts.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
-
-                    {/* Tanggal */}
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium">Tanggal Paket</label>
-                      <Input
-                        type="date"
-                        value={packageDate}
-                        onChange={(e) => setPackageDate(e.target.value)}
-                      />
-                    </div>
+                  {/* Jenis Jastip */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Jenis Jastip *</label>
+                    <Select value={serviceType} onValueChange={handleServiceTypeChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih jenis jastip" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
+                        <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
+                        <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
+                        <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {serviceType && deliveryRoute && (
+                      <p className="text-xs text-muted-foreground">Rute otomatis: <span className="font-medium text-foreground">{deliveryRoute}</span></p>
+                    )}
                   </div>
 
                   <Button
                     onClick={goToUpload}
-                    disabled={!selectedBatchId || !serviceType || !deliveryRoute}
+                    disabled={!selectedBatchId || !serviceType}
                     className="w-full gap-2"
                   >
                     <ChevronRight className="w-4 h-4" />
