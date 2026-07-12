@@ -58,6 +58,8 @@ export interface Package {
   /** @nullable */
   serviceType?: string | null;
   /** @nullable */
+  deliveryRoute?: string | null;
+  /** @nullable */
   customerId: number | null;
   customerName: string;
   /** @nullable */

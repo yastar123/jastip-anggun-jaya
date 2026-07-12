@@ -45,3 +45,16 @@ Packages MUST be grouped by `customerName + serviceType + batchId` in ALL views:
 - "admin utama" role for susulan after CLOSED = Owner role (not a separate role)
 
 **Why:** Architecture bug — grouping by name only caused cross-batch and cross-service data mixing. Composite key is the fix.
+
+## Re-import / fresh-DB setup order (critical)
+After `pnpm install` + `pnpm --filter @workspace/db run push` + `seed-demo`, you MUST also run
+`npx tsx scripts/migrate-batch-legacy.ts` — otherwise `service_types` stays empty and package creation
+with a serviceType silently gets `serviceTypeId: null` (no error, but batch grouping/reports break).
+
+## OpenAPI spec must match actual DB/route fields
+`lib/api-spec/openapi.yaml` is the source of truth for generated types in `lib/api-zod` and
+`lib/api-client-react` (via `pnpm run codegen` in `lib/api-spec`). It had drifted from the real API:
+Package schema was missing `deliveryRoute` (routes/packages.ts returns it, DB has the column) — caused
+TS2339 in arsip-batch-detail.tsx / barcode-batch-detail.tsx. Batch schema never had a `name` field (only
+`namaKapal` + computed `label`); a `batch.name || batch.namaKapal` fallback was dead code. Run typecheck
+after any schema/route change to catch this class of drift early.

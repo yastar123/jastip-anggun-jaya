@@ -262,7 +262,7 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   const { data: packages, isLoading } = useListPackages();
 
   const batch = (batches || []).find((b: any) => b.id === batchId);
-  const batchLabel = batch ? (batch.name || batch.namaKapal || `Batch #${batchId}`) : `Batch #${batchId}`;
+  const batchLabel = batch ? (batch.namaKapal || `Batch #${batchId}`) : `Batch #${batchId}`;
 
   const batchPkgs = (packages || []).filter(
     (p: any) =>

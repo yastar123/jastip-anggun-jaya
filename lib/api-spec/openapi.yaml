@@ -786,6 +786,8 @@ components:
           type: ["integer", "null"]
         serviceType:
           type: ["string", "null"]
+        deliveryRoute:
+          type: ["string", "null"]
         customerId:
           type: ["integer", "null"]
         customerName:
