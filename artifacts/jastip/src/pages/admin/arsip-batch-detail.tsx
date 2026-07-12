@@ -50,23 +50,7 @@ function batchStatusLabel(status: string) {
   return "Arsip";
 }
 
-function paymentBadge(status: string) {
-  if (status === "SUDAH_DIBAYAR") return <Badge className="text-xs bg-green-600 text-white">Lunas</Badge>;
-  if (status === "DP") return <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">DP</Badge>;
-  return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">Piutang</Badge>;
-}
-
-// ── SmallQR / LargeQR ────────────────────────────────────────────────────────
-
-function SmallQR({ value }: { value: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (canvasRef.current && value) {
-      QRCode.toCanvas(canvasRef.current, value, { width: 96, margin: 2 }).catch(() => {});
-    }
-  }, [value]);
-  return <canvas ref={canvasRef} className="rounded" />;
-}
+// ── LargeQR ───────────────────────────────────────────────────────────────────
 
 function LargeQR({ value }: { value: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,164 +62,194 @@ function LargeQR({ value }: { value: string }) {
   return <canvas ref={canvasRef} className="rounded" />;
 }
 
-// ── DetailRow helper ──────────────────────────────────────────────────────────
+// ── grouping helper ───────────────────────────────────────────────────────────
 
-function DetailRow({ label, value, mono = false, green = false }: {
-  label: string; value: any; mono?: boolean; green?: boolean;
-}) {
-  if (value == null || value === "" || value === "-") return null;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
-      <span className={`text-sm font-semibold ${mono ? "font-mono" : ""} ${green ? "text-green-700" : "text-foreground"}`}>
-        {value}
-      </span>
-    </div>
-  );
+function groupPkgsByCustomer(pkgs: any[]) {
+  const map = new Map<string, any[]>();
+  for (const p of pkgs) {
+    const key = [
+      (p.customerName || "").trim().toLowerCase(),
+      (p.serviceType || "").toLowerCase(),
+      String(p.batchId ?? ""),
+    ].join("|");
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(p);
+  }
+  return [...map.values()];
 }
 
-// ── ArsipPackageCard ──────────────────────────────────────────────────────────
+function buildGroupedArsipPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
+  const first = pkgs[0];
+  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const pkgRows = pkgs.map((p, i) => `
+    <tr style="border-bottom:1px solid #eee;">
+      <td style="padding:5px 8px;font-size:11px;font-weight:700;">${i + 1}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.resiNumber || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.packageNumber || "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</td>
+      <td style="padding:5px 8px;font-size:11px;">${(p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") ? "Diserahkan" : "Pending"}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#16a34a;font-weight:700;">${p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-"}</td>
+    </tr>`).join("");
 
-function ArsipPackageCard({ pkg, batchLabel }: { pkg: any; batchLabel: string }) {
-  const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
-
-  async function printSingle() {
-    let qrDataUrl = "";
-    try {
-      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3 });
-    } catch { return; }
-    const pkgDate = pkg.packageDate
-      ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
-      : "-";
-    const svcType = pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-";
-    const ongkir = pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-";
-    const pickedAt = pkg.pickedUpAt
-      ? new Date(pkg.pickedUpAt).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
-      : "-";
-    const html = `<!DOCTYPE html>
-<html><head>
-  <title>Label Arsip - ${pkg.resiNumber || pkg.barcode}</title>
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Label Arsip Grup - ${first?.customerName}</title>
   <style>
-    @page { size: 100mm 100mm; margin: 0; }
+    @page { size: A4 portrait; margin: 12mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #16a34a; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
-    .h-title { font-size: 13pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
-    .h-sub { font-size: 4.5pt; opacity: 0.9; margin-top: 0.8mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 31mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 3mm 2mm 2mm; flex-shrink: 0; }
-    .scan-label { background: #16a34a; color: #fff; font-size: 5.5pt; font-weight: 900; padding: 1mm 2.5mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2.5mm; }
-    .qr-img { width: 23mm; height: 23mm; display: block; }
-    .qr-txt { font-size: 3.2pt; color: #888; font-family: monospace; text-align: center; margin-top: 2mm; word-break: break-all; max-width: 27mm; line-height: 1.3; }
-    .right { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 2.5mm; }
-    .field { display: flex; flex-direction: column; gap: 0.3mm; }
-    .full { grid-column: 1 / -1; }
-    .fl { font-size: 4pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; }
-    .fv { font-size: 7pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.mono { font-family: monospace; font-size: 6.5pt; }
-    .fv.green { color: #16a34a; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1mm 3mm; font-size: 3.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    body { font-family: 'Arial', sans-serif; background: #fff; }
+    .label { border: 3px solid #16a34a; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .header { background: #16a34a; color: #fff; padding: 14px 20px; }
+    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .top-wrap { display: flex; flex-direction: row; align-items: stretch; }
+    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; border-right: 2px dashed #ddd; min-width: 160px; }
+    .qr-wrap img { width: 130px; height: 130px; display: block; }
+    .qr-label { font-size: 7px; color: #999; margin-top: 5px; font-family: monospace; text-align:center; word-break:break-all; max-width:130px; }
+    .info-section { flex: 1; padding: 14px 18px; }
+    .customer { font-size: 22px; font-weight: 900; color: #111; margin-bottom: 6px; }
+    .meta { font-size: 11px; color: #666; margin-bottom: 4px; }
+    .totals { display: flex; gap: 24px; margin-top: 10px; }
+    .total-item { display: flex; flex-direction: column; }
+    .total-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; }
+    .total-value { font-size: 15px; font-weight: 900; color: #16a34a; }
+    .pkgs-section { padding: 0 0 0 0; border-top: 2px solid #eee; }
+    .pkgs-title { font-size: 9px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 18px 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; padding: 4px 8px; text-align: left; background: #f8f8f8; }
+    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 7px 20px; font-size: 9px; color: #aaa; text-align: center; }
   </style>
-</head><body>
-  <div class="wrap">
+</head>
+<body>
+  <div class="label">
     <div class="header">
-      <div class="h-title">JASTIP ANGGUN JAYA — ARSIP</div>
-      <div class="h-sub">Paket sudah diserahkan ke konsumen · ${batchLabel}</div>
+      <div class="brand-name">JASTIP ANGGUN JAYA — ARSIP</div>
+      <div class="brand-sub">Paket sudah diserahkan ke konsumen ${batchLabel ? `· ${batchLabel}` : ""}</div>
     </div>
-    <div class="body">
-      <div class="left">
-        <div class="scan-label">SCAN RESI</div>
-        <img class="qr-img" src="${qrDataUrl}" />
-        <div class="qr-txt">${qrValue}</div>
+    <div class="top-wrap">
+      <div class="qr-wrap">
+        <img src="${qrDataUrl}" alt="QR Code" />
+        <div class="qr-label">${qrValue}</div>
       </div>
-      <div class="right">
-        <div class="cust">${pkg.customerName || "-"}</div>
-        <div class="grid">
-          <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-          <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-          <div class="field"><div class="fl">Tanggal Paket</div><div class="fv">${pkgDate}</div></div>
-          <div class="field"><div class="fl">Tanggal Diambil</div><div class="fv green">${pickedAt}</div></div>
-          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
-          <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-          <div class="field full"><div class="fl">Total Ongkir</div><div class="fv green">${ongkir}</div></div>
+      <div class="info-section">
+        <div class="customer">${first?.customerName || "-"}</div>
+        <div class="meta">Jenis: ${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div>
+        ${batchLabel ? `<div class="meta" style="color:#16a34a;font-weight:700;">📦 Batch: ${batchLabel}</div>` : ""}
+        <div class="totals">
+          <div class="total-item">
+            <span class="total-label">Total Paket</span>
+            <span class="total-value" style="color:#111;">${pkgs.length} pkt</span>
+          </div>
+          <div class="total-item">
+            <span class="total-label">Total Berat</span>
+            <span class="total-value" style="color:#111;">${totalWeight.toFixed(3)} Kg</span>
+          </div>
+          <div class="total-item">
+            <span class="total-label">Total Ongkir</span>
+            <span class="total-value">Rp ${totalShipping.toLocaleString("id-ID")}</span>
+          </div>
         </div>
       </div>
+    </div>
+    <div class="pkgs-section">
+      <div class="pkgs-title">Daftar Paket (${pkgs.length} item)</div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>No. Resi</th><th>No. Paket</th><th>Berat</th><th>Status</th><th>Ongkir</th>
+        </tr></thead>
+        <tbody>${pkgRows}</tbody>
+      </table>
     </div>
     <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
   </div>
   <script>window.onload = () => { window.print(); window.close(); }<\/script>
-</body></html>`;
+</body>
+</html>`;
+}
+
+// ── GroupedArsipCard ──────────────────────────────────────────────────────────
+
+function GroupedArsipCard({ pkgs, batchLabel }: { pkgs: any[]; batchLabel: string }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const first = pkgs[0];
+  const qrValue = first?.barcode || first?.resiNumber || String(first?.id ?? "");
+  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
+  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const isDone = (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan";
+  const allDone = pkgs.every(isDone);
+  const allPending = pkgs.every((p) => !isDone(p));
+  const doneCount = pkgs.filter(isDone).length;
+
+  useEffect(() => {
+    if (canvasRef.current && qrValue) {
+      QRCode.toCanvas(canvasRef.current, qrValue, { width: 96, margin: 2 }).catch(() => {});
+    }
+  }, [qrValue]);
+
+  async function printGroup() {
+    let qrDataUrl = "";
+    try {
+      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3 });
+    } catch { return; }
     const win = window.open("", "_blank");
     if (!win) { toast({ variant: "destructive", title: "Popup diblokir", description: "Izinkan popup untuk mencetak." }); return; }
-    win.document.write(html);
+    win.document.write(buildGroupedArsipPrintHtml(pkgs, qrDataUrl, qrValue, batchLabel));
     win.document.close();
   }
 
-  const svcTypeLabel = pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : null;
-  const volWeight = (pkg.length && pkg.width && pkg.height)
-    ? ((pkg.length * pkg.width * pkg.height) / 6000).toFixed(3)
-    : null;
-
   return (
     <>
-      {/* ── Card ── */}
       <Card
         className="hover:shadow-md transition-shadow border-green-200 bg-green-50/20 cursor-pointer"
         onClick={() => setOpen(true)}
       >
         <CardContent className="pt-4 pb-3">
-          {/* Top */}
           <div className="flex items-start justify-between mb-2 gap-2">
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm truncate">{pkg.customerName || "-"}</p>
-              <p className="font-mono text-xs text-muted-foreground truncate">{pkg.resiNumber || "-"}</p>
-              {pkg.serviceType && (
-                <p className="text-xs text-muted-foreground capitalize mt-0.5">{pkg.serviceType}</p>
+              <p className="font-bold text-sm truncate">{first?.customerName || "-"}</p>
+              <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
+              {first?.serviceType && (
+                <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
               )}
             </div>
-            <Badge className="text-xs shrink-0 bg-green-600 text-white">✓ Diserahkan</Badge>
+            <Badge
+              className={`text-xs shrink-0 ${allDone ? "bg-green-600 text-white" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
+              variant={allDone ? undefined : "outline"}
+            >
+              {allDone ? "✓ Diserahkan" : allPending ? "Pending" : `${doneCount}/${pkgs.length} Diserahkan`}
+            </Badge>
           </div>
 
-          {/* QR */}
           <div className="flex justify-center bg-white border border-green-100 rounded-lg p-2 mb-2">
-            <SmallQR value={qrValue} />
-          </div>
-          <p className="text-center font-mono text-[10px] text-muted-foreground mb-2 truncate">{qrValue}</p>
-
-          {/* Stats */}
-          <div className="space-y-0.5 text-xs text-muted-foreground mb-3">
-            {pkg.usedWeight != null && (
-              <p>Berat: <span className="font-semibold text-foreground">{pkg.usedWeight} Kg</span></p>
-            )}
-            {pkg.totalShipping != null && (
-              <p className="font-semibold text-green-700">{formatRp(pkg.totalShipping)}</p>
-            )}
-            {pkg.pickedUpAt && (
-              <p>Diambil: <span className="font-medium">{fmtDate(pkg.pickedUpAt)}</span></p>
-            )}
-            {pkg.statusPembayaran && (
-              <div className="mt-1">{paymentBadge(pkg.statusPembayaran)}</div>
-            )}
+            <canvas ref={canvasRef} />
           </div>
 
-          {/* Buttons */}
+          <div className="mb-2 space-y-0.5">
+            {pkgs.map((p, i) => (
+              <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="font-mono truncate max-w-[110px]">#{i + 1} {p.resiNumber || "-"}</span>
+                <span className={isDone(p) ? "text-green-700 font-medium" : ""}>{isDone(p) ? "✓" : "⏳"} {p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-xs font-semibold text-green-700 mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
+
           <div className="grid grid-cols-2 gap-1.5">
             <Button
-              size="sm" variant="outline"
-              className="text-xs"
+              size="sm" variant="outline" className="text-xs"
               onClick={(e) => { e.stopPropagation(); setOpen(true); }}
             >
-              <Eye className="w-3 h-3 mr-1" /> Lihat Detail
+              <Eye className="w-3 h-3 mr-1" /> Lihat Semua Paket
             </Button>
             <Button
               size="sm" variant="outline"
               className="text-xs border-green-300 text-green-700 hover:bg-green-50"
-              onClick={(e) => { e.stopPropagation(); printSingle(); }}
+              onClick={(e) => { e.stopPropagation(); printGroup(); }}
             >
               <Printer className="w-3 h-3 mr-1" /> Cetak
             </Button>
@@ -243,93 +257,58 @@ function ArsipPackageCard({ pkg, batchLabel }: { pkg: any; batchLabel: string })
         </CardContent>
       </Card>
 
-      {/* ── Detail Dialog ── */}
+      {/* ── Detail Dialog: list of packages in this group ── */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Archive className="w-4 h-4 text-green-600" />
-              Detail Paket — Arsip
+              {first?.customerName || "-"} — {pkgs.length} Paket
             </DialogTitle>
           </DialogHeader>
 
-          {/* QR besar + kode */}
           <div className="flex flex-col items-center gap-2 py-3 bg-green-50 border border-green-100 rounded-xl">
             <LargeQR value={qrValue} />
             <p className="font-mono text-xs text-muted-foreground text-center break-all px-4">{qrValue}</p>
-            <Badge className="bg-green-600 text-white text-xs">✓ Sudah Diserahkan</Badge>
+            <Badge className={allDone ? "bg-green-600 text-white text-xs" : "bg-amber-100 text-amber-800 border-amber-300 text-xs"} variant={allDone ? undefined : "outline"}>
+              {allDone ? "✓ Semua Sudah Diserahkan" : `${doneCount}/${pkgs.length} Diserahkan`}
+            </Badge>
           </div>
 
-          {/* Data paket */}
-          <div className="space-y-4">
-            {/* Identitas */}
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Identitas Paket</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <DetailRow label="Nama Penerima" value={pkg.customerName} />
-                <DetailRow label="No. Resi" value={pkg.resiNumber} mono />
-                <DetailRow label="No. Paket" value={pkg.packageNumber} mono />
-                <DetailRow label="Barcode" value={pkg.barcode} mono />
-                <DetailRow label="Nama Barang" value={pkg.itemName} />
-                <DetailRow label="Tanggal Paket" value={pkg.packageDate ? fmtDate(pkg.packageDate) : null} />
-              </div>
-            </div>
-
-            {/* Layanan */}
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Layanan &amp; Rute</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <DetailRow label="Jenis Jastip" value={svcTypeLabel} />
-                <DetailRow label="Rute Pengiriman" value={pkg.deliveryRoute} />
-                <DetailRow label="Jenis Paking" value={pkg.packagingType} />
-                <DetailRow label="Batch" value={batchLabel} />
-              </div>
-            </div>
-
-            {/* Berat & Dimensi */}
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Berat &amp; Dimensi</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <DetailRow label="Berat Real" value={pkg.realWeight != null ? `${pkg.realWeight} Kg` : null} />
-                <DetailRow label="Berat Digunakan" value={pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : null} />
-                {volWeight && (
-                  <DetailRow label="Berat Volume" value={`${volWeight} Kg`} />
-                )}
-                {(pkg.length || pkg.width || pkg.height) && (
-                  <DetailRow
-                    label="Dimensi (P×L×T)"
-                    value={`${pkg.length ?? "?"} × ${pkg.width ?? "?"} × ${pkg.height ?? "?"} cm`}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Pembayaran */}
-            <div>
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b pb-1">Pembayaran &amp; Pengambilan</p>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <DetailRow
-                  label="Total Ongkir"
-                  value={pkg.totalShipping != null ? formatRp(pkg.totalShipping) : null}
-                  green
-                />
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Status Pembayaran</span>
-                  {pkg.statusPembayaran ? paymentBadge(pkg.statusPembayaran) : <span className="text-sm text-muted-foreground">-</span>}
+          <div className="space-y-2">
+            {pkgs.map((p, i) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold font-mono truncate">#{i + 1} {p.resiNumber || "-"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.usedWeight != null ? `${p.usedWeight} Kg` : "-"}
+                    {p.pickedUpAt ? ` · Diambil ${fmtDate(p.pickedUpAt)}` : ""}
+                  </p>
                 </div>
-                <DetailRow label="Tanggal Diserahkan" value={pkg.pickedUpAt ? fmtDate(pkg.pickedUpAt) : null} green />
-                <DetailRow label="Catatan" value={pkg.notes} />
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-semibold text-green-700">{formatRp(p.totalShipping)}</p>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] mt-0.5 ${isDone(p) ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
+                  >
+                    {isDone(p) ? "Diserahkan" : "Pending"}
+                  </Badge>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
 
-          {/* Footer actions */}
-          <div className="flex gap-2 pt-2 border-t">
+          <div className="flex justify-between items-center pt-2 border-t text-sm">
+            <span className="text-muted-foreground">Total Ongkir</span>
+            <span className="font-bold text-green-700">{formatRp(totalShipping)}</span>
+          </div>
+
+          <div className="flex gap-2 pt-2">
             <Button
               className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2"
-              onClick={() => { printSingle(); }}
+              onClick={printGroup}
             >
-              <Printer className="w-4 h-4" /> Cetak Label
+              <Printer className="w-4 h-4" /> Cetak Label Grup
             </Button>
           </div>
         </DialogContent>
@@ -392,9 +371,10 @@ export default function ArsipBatchDetail({ params }: { params: { id: string } })
       (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
   );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const groupedFiltered = groupPkgsByCustomer(filtered);
+  const totalPages = Math.max(1, Math.ceil(groupedFiltered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginatedGroups = groupedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const totalOngkir = diserahkanPkgs.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
 
@@ -611,7 +591,7 @@ export default function ArsipBatchDetail({ params }: { params: { id: string } })
               <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Jenis Jastip
             </Button>
             <span className="text-base font-bold">{svcStats.find(s => s.key === selectedServiceType)?.emoji} {selectedSvcLabel}</span>
-            <Badge variant="secondary">{filtered.length} paket</Badge>
+            <Badge variant="secondary">{filtered.length} paket · {groupedFiltered.length} pemilik</Badge>
           </div>
 
           {/* Filters */}
@@ -653,14 +633,14 @@ export default function ArsipBatchDetail({ params }: { params: { id: string } })
           ) : (
             <>
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {paginated.map((pkg: any) => (
-                  <ArsipPackageCard key={pkg.id} pkg={pkg} batchLabel={batchLabel} />
+                {paginatedGroups.map((pkgs: any[]) => (
+                  <GroupedArsipCard key={pkgs[0].id} pkgs={pkgs} batchLabel={batchLabel} />
                 ))}
               </div>
               <Pagination
                 page={safePage}
                 totalPages={totalPages}
-                total={filtered.length}
+                total={groupedFiltered.length}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
               />
