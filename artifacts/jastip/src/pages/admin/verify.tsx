@@ -1,238 +1,103 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { Html5Qrcode } from "html5-qrcode";
-import { useListPackages, useVerifyPackage } from "@workspace/api-client-react";
+import { useState } from "react";
+import { useListPackages, useListBatches } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
-import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import {
-  Camera, Upload, ScanLine, X, CheckCircle2, XCircle,
-  Users, Package, Hash, ShieldCheck, RotateCcw, Download,
+  ShieldCheck, Ship, CheckCircle2, Lock, Archive,
+  Search, Download, Package, ChevronRight, Clock,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
+const PAGE_SIZE = 10;
 
-interface PkgGroup {
-  customerName: string;
-  serviceType: string;
-  batchId: number | null;
-  packages: any[];
+function formatTgl(val: any) {
+  if (!val) return "";
+  try { return new Date(val).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }); }
+  catch { return String(val); }
 }
 
-// Group by customerName + serviceType + batchId
-// Fixes: konsumen yang punya paket di Hemat+ DAN Pelni tidak lagi digabung dalam satu grup
-function groupByNameAndService(packages: any[]): PkgGroup[] {
-  const map: Record<string, any[]> = {};
-  for (const p of packages) {
-    if (!p.customerName) continue;
-    // Filter: jangan tampilkan paket yang sudah dikunci (SUDAH_DIAMBIL)
-    if (p.statusPengambilan === "SUDAH_DIAMBIL") continue;
-    const key = [
-      p.customerName.trim().toLowerCase(),
-      (p.serviceType || "").toLowerCase(),
-      String(p.batchId ?? ""),
-    ].join("|");
-    if (!map[key]) map[key] = [];
-    map[key].push(p);
-  }
-  return Object.entries(map).map(([, pkgs]) => ({
-    customerName: pkgs[0].customerName,
-    serviceType: pkgs[0].serviceType || "",
-    batchId: pkgs[0].batchId ?? null,
-    packages: pkgs,
-  }));
+function batchStatusColor(status: string) {
+  if (status === "OPEN") return "bg-green-100 text-green-800 border-green-200";
+  if (status === "CLOSED") return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  return "bg-gray-100 text-gray-600 border-gray-200";
 }
-
-type VerifyResult = "match" | "mismatch" | null;
+function batchStatusIcon(status: string) {
+  if (status === "OPEN") return <CheckCircle2 className="w-3 h-3" />;
+  if (status === "CLOSED") return <Lock className="w-3 h-3" />;
+  return <Archive className="w-3 h-3" />;
+}
+function batchStatusLabel(status: string) {
+  if (status === "OPEN") return "Aktif";
+  if (status === "CLOSED") return "Ditutup";
+  return "Arsip";
+}
 
 export default function AdminVerify() {
-  const { toast } = useToast();
-  const { data: allPackages, isLoading, refetch: refetchPackages } = useListPackages();
-  const verifyPackageMutation = useVerifyPackage();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
 
-  const [selectedGroup, setSelectedGroup] = useState<PkgGroup | null>(null);
-  const [scanMode, setScanMode] = useState<"idle" | "camera" | "manual">("idle");
-  const [verifyResult, setVerifyResult] = useState<VerifyResult>(null);
-  const [resultPkg, setResultPkg] = useState<any | null>(null);
-  const [manualInput, setManualInput] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [scanHistory, setScanHistory] = useState<{ barcode: string; result: VerifyResult; pkg: any | null }[]>([]);
-  const [searchGroup, setSearchGroup] = useState("");
-  const [groupPage, setGroupPage] = useState(1);
-  const [filterServiceType, setFilterServiceType] = useState<string>("all");
+  const { data: packages, isLoading: pkgLoading } = useListPackages();
+  const { data: batches, isLoading: batchLoading } = useListBatches();
+  const isLoading = pkgLoading || batchLoading;
 
-  const GROUP_PAGE_SIZE = 15;
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const SCANNER_ID = "verify-qr-scanner";
+  const allPackages = packages || [];
+  const allBatches = batches || [];
 
-  // Semua paket aktif (belum diambil), dikelompokkan per customerName+serviceType+batchId
-  const allGroups = groupByNameAndService(allPackages || []);
+  // Per batch: hitung verified / unverified / total (hanya paket aktif, belum diambil)
+  type BatchStat = {
+    batch: any;
+    total: number;
+    verified: number;
+    unverified: number;
+  };
 
-  // Live-update selectedGroup ketika data di-refetch
-  useEffect(() => {
-    if (!selectedGroup || !allPackages) return;
-    const freshPkgs = (allPackages || []).filter(
-      (p: any) =>
-        p.statusPengambilan !== "SUDAH_DIAMBIL" &&
-        p.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim() &&
-        (p.serviceType || "").toLowerCase() === selectedGroup.serviceType.toLowerCase() &&
-        p.batchId === selectedGroup.batchId
-    );
-    if (freshPkgs.length > 0) {
-      setSelectedGroup((prev) => prev ? { ...prev, packages: freshPkgs } : prev);
-    }
-  }, [allPackages]);
-
-  const filteredGroups = allGroups.filter((g) =>
-    (filterServiceType === "all" || (g.serviceType || "").toLowerCase() === filterServiceType) &&
-    (!searchGroup || g.customerName.toLowerCase().includes(searchGroup.toLowerCase()))
-  );
-  const totalGroupPages = Math.ceil(filteredGroups.length / GROUP_PAGE_SIZE);
-  const paginatedGroupItems = filteredGroups.slice((groupPage - 1) * GROUP_PAGE_SIZE, groupPage * GROUP_PAGE_SIZE);
-
-  async function lookupAndVerify(code: string) {
-    if (!selectedGroup) return;
-    setIsSearching(true);
-    setVerifyResult(null);
-    setResultPkg(null);
-    try {
-      const token = localStorage.getItem("jaj_token");
-      // Try scan endpoint first
-      const r = await fetch(`/api/packages/scan/${encodeURIComponent(code)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await r.json();
-      let pkg = data.package || null;
-
-      if (!pkg) {
-        const r2 = await fetch(`/api/packages?search=${encodeURIComponent(code)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const list = await r2.json();
-        if (Array.isArray(list) && list.length > 0) pkg = list[0];
-      }
-
-      if (!pkg) {
-        setVerifyResult("mismatch");
-        setResultPkg(null);
-        setScanHistory((h) => [{ barcode: code, result: "mismatch", pkg: null }, ...h]);
-        return;
-      }
-
-      // Cocokkan berdasarkan customerName + serviceType + batchId (bukan nama saja)
-      const isMatch =
-        pkg.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim() &&
-        (pkg.serviceType || "").toLowerCase() === selectedGroup.serviceType.toLowerCase() &&
-        pkg.batchId === selectedGroup.batchId;
-
-      if (isMatch && pkg.statusVerifikasi !== "SUDAH_DIVERIFIKASI") {
-        try {
-          const verified = await verifyPackageMutation.mutateAsync({ id: pkg.id });
-          pkg = verified;
-        } catch {
-          toast({ variant: "destructive", title: "Gagal menyimpan status verifikasi" });
-        }
-        refetchPackages();
-      }
-
-      setVerifyResult(isMatch ? "match" : "mismatch");
-      setResultPkg(pkg);
-      setScanHistory((h) => [{ barcode: code, result: isMatch ? "match" : "mismatch", pkg }, ...h]);
-    } catch {
-      toast({ variant: "destructive", title: "Gagal mencari paket" });
-    } finally {
-      setIsSearching(false);
-    }
-  }
-
-  const handleScanSuccess = useCallback(async (code: string) => {
-    await stopCamera();
-    await lookupAndVerify(code);
-  }, [selectedGroup]);
-
-  async function startCamera() {
-    setScanMode("camera");
-    try {
-      const devices = await Html5Qrcode.getCameras();
-      if (!devices.length) {
-        toast({ variant: "destructive", title: "Kamera tidak tersedia" });
-        setScanMode("idle"); return;
-      }
-      const scanner = new Html5Qrcode(SCANNER_ID);
-      scannerRef.current = scanner;
-      await scanner.start(
-        devices[devices.length - 1].id,
-        { fps: 10, qrbox: { width: 260, height: 120 } },
-        handleScanSuccess, undefined
+  const batchStats: BatchStat[] = allBatches
+    .map((batch: any) => {
+      const bPkgs = allPackages.filter(
+        (p: any) => p.batchId === batch.id && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
       );
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Gagal akses kamera", description: err?.message });
-      setScanMode("idle");
-    }
-  }
+      const verified = bPkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
+      return {
+        batch,
+        total: bPkgs.length,
+        verified,
+        unverified: bPkgs.length - verified,
+      };
+    })
+    .filter((s: BatchStat) => s.total > 0);
 
-  async function stopCamera() {
-    if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
-      scannerRef.current = null;
-    }
-    setScanMode("idle");
-  }
+  // Paket aktif tanpa batch
+  const noBatchPkgs = allPackages.filter(
+    (p: any) => p.batchId == null && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  );
+  const noBatchVerified = noBatchPkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
 
-  useEffect(() => () => { stopCamera(); }, []);
+  const filteredStats = batchStats.filter((s: BatchStat) =>
+    !search ||
+    (s.batch.namaKapal || "").toLowerCase().includes(search.toLowerCase()) ||
+    (s.batch.kotaAsal || "").toLowerCase().includes(search.toLowerCase()) ||
+    (s.batch.tujuan || "").toLowerCase().includes(search.toLowerCase())
+  );
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    const tempId = "verify-qr-temp-" + Date.now();
-    const tempDiv = document.createElement("div");
-    tempDiv.id = tempId; tempDiv.style.display = "none";
-    document.body.appendChild(tempDiv);
-    const scanner = new Html5Qrcode(tempId);
-    scanner.scanFile(file, false)
-      .then(async (code) => {
-        scanner.clear(); document.body.removeChild(tempDiv);
-        await lookupAndVerify(code);
-      })
-      .catch(() => {
-        scanner.clear(); document.body.removeChild(tempDiv);
-        toast({ variant: "destructive", title: "Gagal membaca barcode" });
-      });
-  }
+  const totalPages = Math.max(1, Math.ceil(filteredStats.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filteredStats.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  async function handleManualSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!manualInput.trim()) return;
-    await lookupAndVerify(manualInput.trim());
-    setManualInput("");
-  }
-
-  function resetResult() {
-    setVerifyResult(null);
-    setResultPkg(null);
-  }
-
-  function changeGroup() {
-    stopCamera();
-    setSelectedGroup(null);
-    setScanHistory([]);
-    setVerifyResult(null);
-    setResultPkg(null);
-    setScanMode("idle");
-  }
-
-  const matchCount = scanHistory.filter((h) => h.result === "match").length;
-  const mismatchCount = scanHistory.filter((h) => h.result === "mismatch").length;
-
-  function formatTgl(val: any) {
-    if (!val) return "";
-    try { return new Date(val).toLocaleDateString("id-ID"); } catch { return String(val); }
-  }
+  const totalActive = allPackages.filter(
+    (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  ).length;
+  const totalVerified = allPackages.filter(
+    (p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI"
+  ).length;
 
   function exportExcel() {
     const rows = (allPackages || []).map((p: any, i: number) => ({
@@ -242,25 +107,13 @@ export default function AdminVerify() {
       "No Resi": p.resiNumber || "",
       "No Paket": p.packageNumber || "",
       Barcode: p.barcode || "",
-      "Nama Barang": p.itemName || "",
-      "Mode Paket": p.packageMode || "",
       "Jenis Jastip": p.serviceType || "",
       "Rute Pengiriman": p.deliveryRoute || "",
       "Berat Real (Kg)": p.realWeight ?? "",
-      "Panjang (cm)": p.length ?? "",
-      "Lebar (cm)": p.width ?? "",
-      "Tinggi (cm)": p.height ?? "",
-      "Berat Volume (Kg)": p.volumeWeight ?? "",
       "Berat Terpakai (Kg)": p.usedWeight ?? "",
-      "Total Berat (Kg)": p.totalWeight ?? "",
-      "Ongkir/Kg (Rp)": p.shippingRate ?? "",
       "Total Ongkir (Rp)": p.totalShipping ?? "",
-      "Jenis Paking": p.packagingType || "",
-      "Harga Barang (Rp)": p.price ?? "",
       Status: p.statusPengambilan === "SUDAH_DIAMBIL" ? "Diserahkan" : "Pending",
-      Verifikasi: p.statusVerifikasi === "SUDAH_DIVERIFIKASI" ? "Sudah Diverifikasi" : "Belum Diverifikasi",
-      Catatan: p.notes || "",
-      "Tanggal Dibuat": formatTgl(p.createdAt),
+      Verifikasi: p.statusVerifikasi === "SUDAH_DIVERIFIKASI" ? "Sudah" : "Belum",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -269,326 +122,193 @@ export default function AdminVerify() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <ShieldCheck className="h-7 w-7 text-primary" /> Verifikasi Paket
           </h1>
           <p className="text-muted-foreground mt-1">
-            Pilih nama penerima, lalu scan barcode paket satu per satu untuk memverifikasi kepemilikan.
+            Pilih batch pengiriman, lalu pilih nama penerima untuk scan dan verifikasi paket.
           </p>
         </div>
-        <div className="flex shrink-0">
-          <Button
-            variant="outline"
-            onClick={exportExcel}
-            disabled={!allPackages || allPackages.length === 0}
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" /> Export Excel
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={exportExcel}
+          disabled={allPackages.length === 0}
+          className="flex items-center gap-2 shrink-0"
+        >
+          <Download className="h-4 w-4" /> Export Excel
+        </Button>
       </div>
 
-      {!selectedGroup ? (
-        /* STEP 1: Select group */
-        <div className="space-y-4">
-          {/* Filter jenis jastip */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: "all", label: "Semua Jastip" },
-              { value: "jastip pesawat", label: "Pesawat" },
-              { value: "jastip hemat+", label: "Hemat+" },
-              { value: "jastip kargo", label: "Kargo" },
-              { value: "jastip pelni", label: "Pelni" },
-            ].map((opt) => {
-              const count = opt.value === "all"
-                ? allGroups.length
-                : allGroups.filter((g) => (g.serviceType || "").toLowerCase() === opt.value).length;
-              return (
-                <Button
-                  key={opt.value}
-                  size="sm"
-                  variant={filterServiceType === opt.value ? "default" : "outline"}
-                  onClick={() => { setFilterServiceType(opt.value); setGroupPage(1); }}
-                  className="text-xs"
-                >
-                  {opt.label}
-                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${filterServiceType === opt.value ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
-                    {count}
-                  </span>
-                </Button>
-              );
-            })}
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari nama penerima..."
-                className="pl-9"
-                value={searchGroup}
-                onChange={(e) => { setSearchGroup(e.target.value); setGroupPage(1); }}
-              />
-            </div>
-            <Badge variant="secondary">{filteredGroups.length} nama</Badge>
-          </div>
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Total Batch</p>
+            <p className="text-xl font-bold mt-0.5 text-blue-600">{allBatches.length}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Paket Aktif</p>
+            <p className="text-xl font-bold mt-0.5 text-foreground">{totalActive}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Sudah Diverifikasi</p>
+            <p className="text-xl font-bold mt-0.5 text-green-600">{totalVerified}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground font-medium">Belum Diverifikasi</p>
+            <p className="text-xl font-bold mt-0.5 text-amber-600">{totalActive - totalVerified}</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {Array.from({ length: 10 }).map((_, i) => (
-                <Card key={i} className="animate-pulse"><CardContent className="h-20 pt-4 bg-muted/20" /></Card>
-              ))}
-            </div>
-          ) : filteredGroups.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
-              <p className="font-medium">Belum ada data penerima</p>
-              <p className="text-sm mt-1">Input paket terlebih dahulu untuk mulai verifikasi</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                {paginatedGroupItems.map((group) => {
-                  const belumVerifikasi = group.packages.filter((p) => p.statusVerifikasi !== "SUDAH_DIVERIFIKASI").length;
-                  const sudahVerifikasi = group.packages.filter((p) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
-                  return (
-                    <Card
-                      key={`${group.customerName}|${group.serviceType}|${group.batchId ?? ""}`}
-                      className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
-                      onClick={() => setSelectedGroup(group)}
-                    >
-                      <CardContent className="pt-4 pb-3">
-                        <div className="flex flex-col gap-1.5">
-                          <p className="font-semibold text-sm leading-tight">{group.customerName}</p>
-                          {group.serviceType && (
-                            <Badge variant="outline" className="text-xs w-fit capitalize">{group.serviceType.replace("jastip ", "")}</Badge>
-                          )}
-                          <p className="text-xs text-muted-foreground">{group.packages.length} paket</p>
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {belumVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">{belumVerifikasi} belum</Badge>}
-                            {sudahVerifikasi > 0 && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">{sudahVerifikasi} ✓</Badge>}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-              {totalGroupPages > 1 && (
-                <div className="border rounded-lg">
-                  <Pagination
-                    page={groupPage}
-                    totalPages={totalGroupPages}
-                    total={filteredGroups.length}
-                    pageSize={GROUP_PAGE_SIZE}
-                    onPageChange={setGroupPage}
-                  />
-                </div>
-              )}
-            </>
-          )}
+      {/* Search */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari nama batch, kota..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        />
+      </div>
+
+      {/* Batch list */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="h-28 pt-4 bg-muted/20" />
+            </Card>
+          ))}
+        </div>
+      ) : filteredStats.length === 0 && noBatchPkgs.length === 0 ? (
+        <div className="text-center py-20 text-muted-foreground">
+          <ShieldCheck className="w-16 h-16 mx-auto mb-4 opacity-20" />
+          <p className="text-lg font-medium">
+            {allBatches.length === 0 ? "Belum ada batch" : "Tidak ada batch yang cocok"}
+          </p>
+          <p className="text-sm mt-1">
+            {allBatches.length === 0 ? "Buat batch pengiriman terlebih dahulu" : "Coba ubah kata kunci pencarian"}
+          </p>
         </div>
       ) : (
-        /* STEP 2: Scan & Verify */
-        <div className="space-y-4">
-          {/* Selected group header */}
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                  <Users className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-base">{selectedGroup.customerName}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedGroup.packages.length} paket · {selectedGroup.serviceType ? selectedGroup.serviceType.replace("jastip ", "Jastip ") + " · " : ""}Scan barcode untuk verifikasi
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {scanHistory.length > 0 && (
-                    <>
-                      <Badge className="bg-green-600 text-white text-xs">{matchCount} ✓</Badge>
-                      {mismatchCount > 0 && <Badge variant="destructive" className="text-xs">{mismatchCount} ✗</Badge>}
-                    </>
-                  )}
-                  <Button variant="outline" size="sm" onClick={changeGroup}>Ganti</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <>
+          <div className="space-y-3">
+            {paginated.map(({ batch, total, verified, unverified }) => {
+              const pct = total > 0 ? Math.round((verified / total) * 100) : 0;
+              return (
+                <Card
+                  key={batch.id}
+                  className="border-2 cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
+                  onClick={() => setLocation(`${base}/verify/batch/${batch.id}`)}
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${batch.statusBatch === "OPEN" ? "bg-blue-100" : "bg-gray-100"}`}>
+                        <Ship className={`w-5 h-5 ${batch.statusBatch === "OPEN" ? "text-blue-700" : "text-gray-500"}`} />
+                      </div>
 
-          {/* Scan area */}
-          <div id={SCANNER_ID} className={scanMode === "camera" ? "w-full rounded-xl overflow-hidden border" : "hidden"} />
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-base">{batch.namaKapal}</span>
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${batchStatusColor(batch.statusBatch)}`}>
+                            {batchStatusIcon(batch.statusBatch)}
+                            {batchStatusLabel(batch.statusBatch)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {batch.kotaAsal} → {batch.tujuan}
+                          &nbsp;·&nbsp; ETD: {formatTgl(batch.etd)}
+                          &nbsp;·&nbsp; Closing: {formatTgl(batch.periodeClosingMulai)} – {formatTgl(batch.periodeClosingSelesai)}
+                        </p>
 
-          {/* Verify Result */}
-          {verifyResult && !isSearching && (
-            <Card className={`border-2 ${verifyResult === "match" ? "border-green-500 bg-green-50" : "border-red-400 bg-red-50"}`}>
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-start gap-3">
-                  {verifyResult === "match" ? (
-                    <CheckCircle2 className="w-7 h-7 text-green-600 shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="w-7 h-7 text-red-500 shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1">
-                    {verifyResult === "match" ? (
-                      <>
-                        <p className="font-bold text-green-800 text-lg">✓ COCOK — Paket milik {selectedGroup.customerName}</p>
-                        {resultPkg && (
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 mt-2 text-sm text-green-700">
-                            <span>Resi: <strong className="font-mono">{resultPkg.resiNumber}</strong></span>
-                            <span>Berat: {resultPkg.realWeight != null ? resultPkg.realWeight + " Kg" : "-"}</span>
-                            <span>Jastip: {resultPkg.serviceType || "-"}</span>
-                            <span>Status: {resultPkg.status === "diserahkan" ? "Diserahkan" : "Pending"}</span>
+                        {/* Verification counts */}
+                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 className="w-3 h-3" />
+                            {verified} terverifikasi
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            <Clock className="w-3 h-3" />
+                            {unverified} belum
+                          </span>
+                          <span className="text-xs text-muted-foreground">{total} total paket</span>
+                        </div>
+
+                        {/* Progress bar */}
+                        {total > 0 && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-green-500 rounded-full transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0">{pct}% selesai</span>
                           </div>
                         )}
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-bold text-red-700 text-lg">✗ TIDAK COCOK</p>
-                        {resultPkg ? (
-                          <p className="text-sm text-red-600 mt-1">
-                            Paket ini milik <strong>{resultPkg.customerName || "tidak diketahui"}</strong>, bukan milik {selectedGroup.customerName}.
-                          </p>
-                        ) : (
-                          <p className="text-sm text-red-600 mt-1">Barcode tidak ditemukan dalam sistem.</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={resetResult} className="shrink-0">
-                    <RotateCcw className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                      </div>
 
-          {isSearching && (
-            <Card><CardContent className="flex items-center justify-center py-8 text-muted-foreground gap-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-              Memverifikasi paket...
-            </CardContent></Card>
-          )}
+                      <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
 
-          {/* Scan controls */}
-          <div className="grid sm:grid-cols-2 gap-3">
-            {scanMode !== "camera" ? (
-              <Card className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all" onClick={startCamera}>
-                <CardContent className="flex items-center gap-3 py-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Camera className="w-5 h-5 text-primary" />
+            {/* Tanpa batch */}
+            {noBatchPkgs.length > 0 && !search && (
+              <Card
+                className="border-2 border-dashed border-gray-300 cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
+                onClick={() => setLocation(`${base}/verify/batch/no-batch`)}
+              >
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-start gap-4">
+                    <div className="p-2 rounded-lg bg-gray-100 shrink-0 mt-0.5">
+                      <Package className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-base">Paket Tanpa Batch</span>
+                        <Badge variant="outline" className="text-xs">Tidak ada batch</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" /> {noBatchVerified} terverifikasi
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                          <Clock className="w-3 h-3" /> {noBatchPkgs.length - noBatchVerified} belum
+                        </span>
+                        <span className="text-xs text-muted-foreground">{noBatchPkgs.length} total</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
                   </div>
-                  <div>
-                    <p className="font-semibold text-sm">Scan Kamera</p>
-                    <p className="text-xs text-muted-foreground">Arahkan ke barcode</p>
-                  </div>
-                  <Button size="sm" className="ml-auto">Buka</Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-primary/50">
-                <CardContent className="flex items-center gap-3 py-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Camera className="w-5 h-5 text-primary animate-pulse" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-primary">Kamera Aktif</p>
-                    <p className="text-xs text-muted-foreground">Arahkan ke barcode paket</p>
-                  </div>
-                  <Button size="sm" variant="outline" className="ml-auto" onClick={stopCamera}>
-                    <X className="w-3 h-3 mr-1" /> Tutup
-                  </Button>
                 </CardContent>
               </Card>
             )}
-
-            <Card>
-              <CardContent className="flex items-center gap-3 py-4">
-                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-                  <Upload className="w-5 h-5 text-secondary" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">Upload Gambar</p>
-                  <p className="text-xs text-muted-foreground">Foto barcode dari galeri</p>
-                </div>
-                <Button size="sm" className="ml-auto bg-secondary hover:bg-secondary/90" onClick={() => fileInputRef.current?.click()}>Pilih</Button>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Manual input */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2"><Hash className="h-4 w-4" />Input Manual</CardTitle>
-              <CardDescription className="text-xs">Ketik nomor resi atau barcode secara manual</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleManualSubmit} className="flex gap-2">
-                <Input
-                  value={manualInput}
-                  onChange={(e) => setManualInput(e.target.value)}
-                  placeholder="Contoh: JAJ-ABC123 atau JNE123456789"
-                  className="font-mono"
-                />
-                <Button type="submit" disabled={!manualInput.trim() || isSearching}>Verifikasi</Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Scan history */}
-          {scanHistory.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                <ScanLine className="h-4 w-4" /> Riwayat Scan — {scanHistory.length} item
-                <Button variant="ghost" size="sm" className="ml-auto text-xs h-6" onClick={() => setScanHistory([])}>Hapus</Button>
-              </p>
-              <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                {scanHistory.map((h, i) => (
-                  <div key={i} className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-sm ${h.result === "match" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                    {h.result === "match" ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-                    )}
-                    <span className="font-mono flex-1 truncate">{h.pkg?.barcode || h.pkg?.resiNumber || h.barcode}</span>
-                    {h.result === "match" ? (
-                      <Badge className="bg-green-600 text-white text-xs shrink-0">✓ Cocok</Badge>
-                    ) : (
-                      <Badge variant="destructive" className="text-xs shrink-0">
-                        {h.pkg ? `Milik ${h.pkg.customerName}` : "Tidak ditemukan"}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Package list for selected group */}
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-              <Package className="h-4 w-4" /> Daftar Paket — {selectedGroup.customerName}
-            </p>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {selectedGroup.packages.map((p: any) => {
-                const isVerified = p.statusVerifikasi === "SUDAH_DIVERIFIKASI";
-                return (
-                  <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${isVerified ? "bg-green-50 border-green-200" : "bg-muted/30"}`}>
-                    {isVerified ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" /> : <Package className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                    <span className="font-mono flex-1 truncate">{p.resiNumber || p.barcode}</span>
-                    <Badge variant="outline" className={`text-xs shrink-0 ${isVerified ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}>
-                      {isVerified ? "Sudah Diverifikasi" : "Belum Diverifikasi"}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            total={filteredStats.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );

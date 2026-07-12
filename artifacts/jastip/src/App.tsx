@@ -20,6 +20,7 @@ import AdminBarcodeGroupDetail from "@/pages/admin/barcode-group-detail";
 import AdminBarcodeBatchDetail from "@/pages/admin/barcode-batch-detail";
 import AdminScan from "@/pages/admin/scan";
 import AdminVerify from "@/pages/admin/verify";
+import VerifyBatchDetail from "@/pages/admin/verify-batch-detail";
 import AdminRiwayatPembayaran from "@/pages/admin/riwayat-pembayaran";
 import AdminBatches from "@/pages/admin/batches";
 import AdminArsip from "@/pages/admin/arsip";
@@ -140,6 +141,9 @@ function Router() {
       <Route path="/admin/verify">
         {(params) => <ProtectedRoute role="admin" component={AdminVerify} params={params} />}
       </Route>
+      <Route path="/admin/verify/batch/:id">
+        {(params) => <ProtectedRoute role="admin" component={VerifyBatchDetail} params={params} />}
+      </Route>
       <Route path="/admin/riwayat-pembayaran">
         {(params) => <ProtectedRoute role="admin" component={AdminRiwayatPembayaran} params={params} />}
       </Route>
@@ -212,6 +216,9 @@ function Router() {
       </Route>
       <Route path="/owner/verify">
         {(params) => <ProtectedRoute role="owner" component={AdminVerify} params={params} />}
+      </Route>
+      <Route path="/owner/verify/batch/:id">
+        {(params) => <ProtectedRoute role="owner" component={VerifyBatchDetail} params={params} />}
       </Route>
       <Route path="/owner/arsip">
         {(params) => <ProtectedRoute role="owner" component={AdminArsip} params={params} />}
