@@ -259,7 +259,7 @@ export default function RiwayatPembayaranDetail({ params }: { params: { id: stri
                 const meta = PAYMENT_META[pmt.paymentType] || PAYMENT_META.tunai;
                 const Icon = meta.icon;
                 const isExpanded = expandedId === pmt.id;
-                const pkgSummary: any[] = pmt.packageSummary || [];
+                const pkgSummary: any[] = Array.isArray(pmt.packageSummary) ? pmt.packageSummary : [];
                 const pkgCount = Array.isArray(pmt.packageIds) ? pmt.packageIds.length : pkgSummary.length;
                 const isPiutang = pmt.paymentType === "piutang";
 
