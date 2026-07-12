@@ -71,8 +71,6 @@ export default function AdminPackages() {
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfBatchId, setPdfBatchId] = useState<string>("");
   const [pdfJenis, setPdfJenis] = useState<string>("all");
-  const [pdfDateFrom, setPdfDateFrom] = useState("");
-  const [pdfDateTo, setPdfDateTo] = useState("");
   const [pdfNamaKapal, setPdfNamaKapal] = useState("");
 
   const { data: packages, isLoading } = useListPackages({
@@ -91,8 +89,6 @@ export default function AdminPackages() {
     if (open) {
       setPdfBatchId("");
       setPdfJenis("all");
-      setPdfDateFrom("");
-      setPdfDateTo("");
       setPdfNamaKapal("");
     }
   }
@@ -139,16 +135,6 @@ export default function AdminPackages() {
       filtered = filtered.filter((p) =>
         (p.serviceType || "").toLowerCase() === pdfJenis.toLowerCase()
       );
-    }
-    if (pdfDateFrom) {
-      const from = new Date(pdfDateFrom);
-      from.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((p) => new Date(p.packageDate || p.createdAt) >= from);
-    }
-    if (pdfDateTo) {
-      const to = new Date(pdfDateTo);
-      to.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((p) => new Date(p.packageDate || p.createdAt) <= to);
     }
     return filtered;
   }
@@ -308,7 +294,7 @@ export default function AdminPackages() {
     const safeJenis = pdfJenis.replace(/\+/g, "plus").replace(/\s+/g, "-").toLowerCase();
     const safeKapal = pdfNamaKapal ? `-${pdfNamaKapal.replace(/\s+/g, "-")}` : "";
     const safeBatch = selectedPdfBatch ? `-${selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase()}` : "";
-    doc.save(`laporan-${safeJenis}${safeBatch}${safeKapal}-${pdfDateFrom || "awal"}-${pdfDateTo || "akhir"}.pdf`);
+    doc.save(`laporan-${safeJenis}${safeBatch}${safeKapal}.pdf`);
     setPdfOpen(false);
   }
 
@@ -318,8 +304,6 @@ export default function AdminPackages() {
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const judul = pdfJenis !== "all" ? pdfJenis : "Semua Jenis Jastip";
-    const periodeFrom = pdfDateFrom ? new Date(pdfDateFrom).toLocaleDateString("id-ID") : "-";
-    const periodeTo = pdfDateTo ? new Date(pdfDateTo).toLocaleDateString("id-ID") : "-";
     const batchLabel = selectedPdfBatch
       ? `${selectedPdfBatch.namaKapal} (${selectedPdfBatch.kotaAsal} → ${selectedPdfBatch.tujuan})`
       : "-";
@@ -331,9 +315,8 @@ export default function AdminPackages() {
     doc.setFont("helvetica", "normal");
     doc.text(`Batch Pengiriman : ${batchLabel}`, 14, 21);
     doc.text(`Jenis Jastip     : ${judul}`, 14, 26);
-    doc.text(`Periode          : ${periodeFrom} s/d ${periodeTo}`, 14, 31);
-    doc.text(`Dicetak          : ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, 14, 36);
-    doc.text(`Total Paket      : ${filtered.length} paket`, 14, 41);
+    doc.text(`Dicetak          : ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, 14, 31);
+    doc.text(`Total Paket      : ${filtered.length} paket`, 14, 36);
 
     const rows = filtered.map((p: any, i: number) => [
       i + 1,
@@ -351,7 +334,7 @@ export default function AdminPackages() {
     ]);
 
     autoTable(doc, {
-      startY: 45,
+      startY: 40,
       head: [["No", "Tanggal", "No Resi", "No Paket", "Nama Konsumen", "Jenis Jastip", "Jenis Barang", "Berat Real", "Berat Digunakan", "Total Berat", "Total Ongkir", "Status"]],
       body: rows,
       styles: { fontSize: 7, cellPadding: 1.5 },
@@ -375,8 +358,6 @@ export default function AdminPackages() {
       "laporan-paket",
       selectedPdfBatch ? selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase() : "batch",
       pdfJenis !== "all" ? pdfJenis.replace(/\s+/g, "-").toLowerCase() : "semua",
-      pdfDateFrom || "awal",
-      pdfDateTo || "akhir",
     ].join("_") + ".pdf";
     doc.save(namaFile);
     setPdfOpen(false);
@@ -623,21 +604,10 @@ export default function AdminPackages() {
               </>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Tanggal Dari</Label>
-                <Input type="date" value={pdfDateFrom} onChange={(e) => setPdfDateFrom(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tanggal Sampai</Label>
-                <Input type="date" value={pdfDateTo} onChange={(e) => setPdfDateTo(e.target.value)} />
-              </div>
-            </div>
-
-            {(pdfBatchId || pdfJenis !== "all" || pdfDateFrom || pdfDateTo || pdfNamaKapal) && (
+            {(pdfBatchId || pdfJenis !== "all" || pdfNamaKapal) && (
               <button
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                onClick={() => { setPdfBatchId(""); setPdfJenis("all"); setPdfDateFrom(""); setPdfDateTo(""); setPdfNamaKapal(""); }}
+                onClick={() => { setPdfBatchId(""); setPdfJenis("all"); setPdfNamaKapal(""); }}
               >
                 <X className="w-3 h-3 inline mr-1" />
                 Reset filter
