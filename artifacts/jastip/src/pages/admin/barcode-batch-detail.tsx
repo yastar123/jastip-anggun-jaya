@@ -256,6 +256,7 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   const [search, setSearch] = useState("");
   const [filterServiceType, setFilterServiceType] = useState("all");
   const [page, setPage] = useState(1);
+  const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
 
   const { data: batches } = useListBatches();
   const { data: packages, isLoading } = useListPackages();
@@ -270,8 +271,30 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
       p.status !== "diserahkan"
   );
 
+  // ── Service type stats ────────────────────────────────────────────────────────
+  const SVC_DEFS = [
+    { key: "jastip pesawat", label: "Jastip Pesawat", emoji: "✈️", border: "border-blue-200", bg: "bg-blue-50/60", num: "text-blue-700" },
+    { key: "jastip hemat+",  label: "Jastip Hemat+",  emoji: "📦", border: "border-emerald-200", bg: "bg-emerald-50/60", num: "text-emerald-700" },
+    { key: "jastip kargo",   label: "Jastip Kargo",   emoji: "🚛", border: "border-orange-200", bg: "bg-orange-50/60", num: "text-orange-700" },
+    { key: "jastip pelni",   label: "Jastip Pelni",   emoji: "🚢", border: "border-indigo-200", bg: "bg-indigo-50/60", num: "text-indigo-700" },
+  ];
+  const knownSvcKeys = SVC_DEFS.map(d => d.key);
+  const svcStats = [
+    ...SVC_DEFS.map(def => {
+      const pkgs = batchPkgs.filter((p: any) => (p.serviceType || "").toLowerCase() === def.key);
+      if (!pkgs.length) return null;
+      return { ...def, count: pkgs.length, weight: pkgs.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0), ongkir: pkgs.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0) };
+    }).filter(Boolean),
+    (() => { const pkgs = batchPkgs.filter((p: any) => !knownSvcKeys.includes((p.serviceType || "").toLowerCase())); return pkgs.length ? { key: "lainnya", label: "Lainnya", emoji: "📋", border: "border-gray-200", bg: "bg-gray-50/60", num: "text-gray-700", count: pkgs.length, weight: pkgs.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0), ongkir: pkgs.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0) } : null; })(),
+  ].filter(Boolean) as { key: string; label: string; emoji: string; border: string; bg: string; num: string; count: number; weight: number; ongkir: number }[];
+
+  const selectedSvcDef = SVC_DEFS.find(d => d.key === selectedServiceType);
+  const selectedSvcLabel = selectedSvcDef?.label ?? (selectedServiceType === "lainnya" ? "Lainnya" : "");
+
+  const effectiveFilter = selectedServiceType ?? filterServiceType;
+
   const filtered = batchPkgs.filter((p: any) =>
-    (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
+    (effectiveFilter === "all" || (p.serviceType || "").toLowerCase() === effectiveFilter) &&
     (!search ||
       (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
       (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -498,75 +521,93 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
         </Button>
       </div>
 
-      {/* Search + Filter */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari resi, barcode, nama..."
-            className="pl-9"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        </div>
-        <Select value={filterServiceType} onValueChange={handleFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Semua Jenis Jastip" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Jenis Jastip</SelectItem>
-            <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-            <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
-            <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
-            <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
-          </SelectContent>
-        </Select>
-        {(search || filterServiceType !== "all") && (
-          <p className="text-sm text-muted-foreground">
-            {filtered.length} dari {batchPkgs.length} paket
-          </p>
-        )}
-      </div>
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="h-64 pt-4 bg-muted/20" />
-            </Card>
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
-          <QrCode className="w-14 h-14 mx-auto mb-4 opacity-20" />
-          <p className="font-semibold text-base">
-            {batchPkgs.length === 0 ? "Belum ada paket dalam batch ini" : "Tidak ada paket yang cocok"}
-          </p>
-          {(search || filterServiceType !== "all") && (
-            <p className="text-sm mt-1">Coba ubah filter atau kata kunci pencarian</p>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {paginated.map((pkg: any) => (
-              <PackageBarcodeCard
-                key={pkg.id}
-                pkg={pkg}
-                batchLabel={batchLabel}
-                onEdit={openEdit}
-                onDelete={setDeletePkg}
-              />
+      {!selectedServiceType ? (
+        /* ── Pilih Jenis Jastip ───────────────────────────────────────────────── */
+        isLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Card key={i} className="animate-pulse"><CardContent className="h-40 pt-4 bg-muted/20" /></Card>)}
+          </div>
+        ) : svcStats.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <QrCode className="w-14 h-14 mx-auto mb-4 opacity-20" />
+            <p className="font-semibold">Belum ada paket dalam batch ini</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {svcStats.map(svc => (
+              <Card
+                key={svc.key}
+                className={`cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all border-2 ${svc.border} ${svc.bg}`}
+                onClick={() => { setSelectedServiceType(svc.key); setSearch(""); setPage(1); }}
+              >
+                <CardContent className="pt-5 pb-4">
+                  <div className="text-4xl mb-2">{svc.emoji}</div>
+                  <p className={`text-sm font-bold leading-snug ${svc.num}`}>{svc.label}</p>
+                  <div className="mt-3 space-y-1">
+                    <div>
+                      <span className={`text-3xl font-black ${svc.num}`}>{svc.count}</span>
+                      <span className="text-sm text-muted-foreground ml-1">paket</span>
+                    </div>
+                    {svc.ongkir > 0 && <p className="text-xs font-semibold text-primary">{formatRp(svc.ongkir)}</p>}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
-          <Pagination
-            page={safePage}
-            totalPages={totalPages}
-            total={filtered.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
+        )
+      ) : (
+        /* ── Barcode grid (per jenis jastip) ─────────────────────────────────── */
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => { setSelectedServiceType(null); setSearch(""); setPage(1); }}>
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Jenis Jastip
+            </Button>
+            <span className="text-base font-bold">{selectedSvcDef?.emoji} {selectedSvcLabel}</span>
+            <Badge variant="secondary">{filtered.length} paket</Badge>
+          </div>
+
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari resi, barcode, nama..."
+              className="pl-9"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+            />
+          </div>
+
+          {isLoading ? (
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {[1,2,3,4,5].map(i => <Card key={i} className="animate-pulse"><CardContent className="h-64 pt-4 bg-muted/20" /></Card>)}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <QrCode className="w-14 h-14 mx-auto mb-4 opacity-20" />
+              <p className="font-semibold text-base">Tidak ada paket yang cocok</p>
+              {search && <p className="text-sm mt-1">Coba ubah kata kunci pencarian</p>}
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {paginated.map((pkg: any) => (
+                  <PackageBarcodeCard
+                    key={pkg.id}
+                    pkg={pkg}
+                    batchLabel={batchLabel}
+                    onEdit={openEdit}
+                    onDelete={setDeletePkg}
+                  />
+                ))}
+              </div>
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                total={filtered.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+              />
+            </>
+          )}
         </>
       )}
 

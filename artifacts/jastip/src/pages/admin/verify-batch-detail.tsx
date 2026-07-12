@@ -82,6 +82,9 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
   const { data: batches } = useListBatches();
   const verifyMutation = useVerifyPackage();
 
+  // ── Step 0: service type selector ────────────────────────────────────────────
+  const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
+
   // ── Filters (Step 1) ────────────────────────────────────────────────────────
   const [searchGroup, setSearchGroup] = useState("");
   const [filterServiceType, setFilterServiceType] = useState("all");
@@ -113,10 +116,31 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
   const allGroups = groupPackages(batchPkgs);
 
   // Counts for summary
-  const totalPkgs = batchPkgs.filter(
+  const activePkgs = batchPkgs.filter(
     (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
-  ).length;
+  );
+  const totalPkgs = activePkgs.length;
   const totalVerified = batchPkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
+
+  // ── Service type stats ────────────────────────────────────────────────────────
+  const SVC_DEFS = [
+    { key: "jastip pesawat", label: "Jastip Pesawat", emoji: "✈️", border: "border-blue-200", bg: "bg-blue-50/60", num: "text-blue-700" },
+    { key: "jastip hemat+",  label: "Jastip Hemat+",  emoji: "📦", border: "border-emerald-200", bg: "bg-emerald-50/60", num: "text-emerald-700" },
+    { key: "jastip kargo",   label: "Jastip Kargo",   emoji: "🚛", border: "border-orange-200", bg: "bg-orange-50/60", num: "text-orange-700" },
+    { key: "jastip pelni",   label: "Jastip Pelni",   emoji: "🚢", border: "border-indigo-200", bg: "bg-indigo-50/60", num: "text-indigo-700" },
+  ];
+  const knownSvcKeys = SVC_DEFS.map(d => d.key);
+  const svcStats = [
+    ...SVC_DEFS.map(def => {
+      const pkgs = activePkgs.filter((p: any) => (p.serviceType || "").toLowerCase() === def.key);
+      if (!pkgs.length) return null;
+      const verified = pkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
+      return { ...def, count: pkgs.length, verified, unverified: pkgs.length - verified };
+    }).filter(Boolean),
+    (() => { const pkgs = activePkgs.filter((p: any) => !knownSvcKeys.includes((p.serviceType || "").toLowerCase())); if (!pkgs.length) return null; const verified = pkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length; return { key: "lainnya", label: "Lainnya", emoji: "📋", border: "border-gray-200", bg: "bg-gray-50/60", num: "text-gray-700", count: pkgs.length, verified, unverified: pkgs.length - verified }; })(),
+  ].filter(Boolean) as { key: string; label: string; emoji: string; border: string; bg: string; num: string; count: number; verified: number; unverified: number }[];
+  const selectedSvcLabel = SVC_DEFS.find(d => d.key === selectedServiceType)?.label ?? (selectedServiceType === "lainnya" ? "Lainnya" : "");
+  const selectedSvcEmoji = SVC_DEFS.find(d => d.key === selectedServiceType)?.emoji ?? "📋";
 
   // Live-update selectedGroup when data refetches
   useEffect(() => {
@@ -327,6 +351,66 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
           </div>
         </div>
       </div>
+
+      {/* ── STEP 0: pilih jenis jastip ──────────────────────────────────────────── */}
+      {!selectedServiceType ? (
+        pkgLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <Card key={i} className="animate-pulse"><CardContent className="h-40 pt-4 bg-muted/20"/></Card>)}
+          </div>
+        ) : svcStats.length === 0 ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <ShieldCheck className="w-14 h-14 mx-auto mb-4 opacity-20" />
+            <p className="font-semibold">Tidak ada paket aktif dalam batch ini</p>
+            <p className="text-sm mt-1">Paket mungkin sudah diserahkan semua</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {svcStats.map(svc => (
+              <Card
+                key={svc.key}
+                className={`cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all border-2 ${svc.border} ${svc.bg}`}
+                onClick={() => { setSelectedServiceType(svc.key); setFilterServiceType(svc.key); setGroupPage(1); }}
+              >
+                <CardContent className="pt-5 pb-4">
+                  <div className="text-4xl mb-2">{svc.emoji}</div>
+                  <p className={`text-sm font-bold leading-snug ${svc.num}`}>{svc.label}</p>
+                  <div className="mt-3 space-y-1.5">
+                    <div>
+                      <span className={`text-3xl font-black ${svc.num}`}>{svc.count}</span>
+                      <span className="text-sm text-muted-foreground ml-1">paket</span>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700 font-semibold">
+                        <CheckCircle2 className="w-3 h-3" /> {svc.verified} ✓
+                      </span>
+                      {svc.unverified > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                          <Clock className="w-3 h-3" /> {svc.unverified} belum
+                        </span>
+                      )}
+                    </div>
+                    {svc.count > 0 && (
+                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.round((svc.verified / svc.count) * 100)}%` }} />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+      /* ── STEP 1 + 2 (setelah jenis jastip dipilih) ───────────────────────── */
+      <>
+        {/* Breadcrumb back */}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => { changeGroup(); setSelectedServiceType(null); setFilterServiceType("all"); }}>
+            <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Jenis Jastip
+          </Button>
+          <span className="text-base font-bold">{selectedSvcEmoji} {selectedSvcLabel}</span>
+        </div>
 
       {/* ── STEP 1: pilih penerima ─────────────────────────────────────────────── */}
       {!selectedGroup ? (
@@ -653,6 +737,8 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
