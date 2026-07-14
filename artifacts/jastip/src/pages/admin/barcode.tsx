@@ -80,28 +80,28 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batc
 <head>
   <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
   <style>
-    @page { size: 150mm 150mm; margin: 0; }
+    @page { size: 200mm 200mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 150mm; height: 150mm; overflow: hidden; background: #fff; }
-    .wrap { width: 150mm; height: 150mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
+    body { font-family: Arial, sans-serif; width: 200mm; height: 200mm; overflow: hidden; background: #fff; margin:0; padding:0; }
+    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
+    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
+    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
     .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.mono { font-family: monospace; font-size: 5pt; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
+    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
+    .qr-img { width: 55mm; height: 55mm; display: block; }
+    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
+    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
+    .field { display: flex; flex-direction: column; gap: 0.5mm; }
+    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
+    .fv.mono { font-family: monospace; font-size: 10pt; }
+    .fv.red { color: #cc0000; font-size: 13pt; }
     .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -152,27 +152,27 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
 <head>
   <title>Label Grup - ${first?.customerName}</title>
   <style>
-    @page { size: 150mm 150mm; margin: 0; }
+    @page { size: 200mm 200mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 150mm; height: 150mm; overflow: hidden; background: #fff; }
-    .wrap { width: 150mm; height: 150mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
+    body { font-family: Arial, sans-serif; width: 200mm; height: 200mm; overflow: hidden; background: #fff; margin:0; padding:0; }
+    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
+    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
+    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
     .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
+    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
+    .qr-img { width: 55mm; height: 55mm; display: block; }
+    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
+    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
+    .field { display: flex; flex-direction: column; gap: 0.5mm; }
+    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
+    .fv.red { color: #cc0000; font-size: 13pt; }
     .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -534,30 +534,30 @@ function BatchBarcodeSection({
 <html><head>
   <title>Print Barcode — ${batchLabel}</title>
   <style>
-    @page { size: 150mm 150mm; margin: 0; }
+    @page { size: 200mm 200mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 150mm; height: 150mm; overflow: hidden; page-break-after: always; break-after: page; }
+    body { font-family: Arial, sans-serif; background: #fff; margin:0; padding:0; }
+    .page { width: 200mm; height: 200mm; overflow: hidden; page-break-after: always; break-after: page; }
     .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 150mm; height: 150mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
+    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
+    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
+    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
     .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.mono { font-family: monospace; font-size: 5pt; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
+    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
+    .qr-img { width: 55mm; height: 55mm; display: block; }
+    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
+    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
+    .field { display: flex; flex-direction: column; gap: 0.5mm; }
+    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
+    .fv.mono { font-family: monospace; font-size: 10pt; }
+    .fv.red { color: #cc0000; font-size: 13pt; }
     .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head><body>
   ${pages.join("")}
@@ -713,7 +713,6 @@ export default function AdminBarcode() {
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
-  // Lookup: batchId → label name
   const batchMap = new Map<number, string>(
     (batches || []).map((b: any) => [b.id, b.name || `Batch #${b.id}`])
   );
@@ -737,7 +736,6 @@ export default function AdminBarcode() {
   const allPackages = packages || [];
   const allBatches = batches || [];
 
-  // Hanya tampilkan paket AKTIF (belum diambil)
   const activePackages = allPackages.filter(
     (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
   );
@@ -746,7 +744,6 @@ export default function AdminBarcode() {
     (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
   ).length;
 
-  // Paket tanpa batch (batchId null)
   const noBatchPkgs = activePackages.filter((p: any) => p.batchId == null);
 
   const totalActive = activePackages.length;
@@ -872,31 +869,31 @@ export default function AdminBarcode() {
 <head>
   <title>${title}</title>
   <style>
-    @page { size: 150mm 150mm; margin: 0; }
+    @page { size: 200mm 200mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 150mm; height: 150mm; overflow: hidden; page-break-after: always; break-after: page; }
+    body { font-family: Arial, sans-serif; background: #fff; margin:0; padding:0; }
+    .page { width: 200mm; height: 200mm; overflow: hidden; page-break-after: always; break-after: page; }
     .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 150mm; height: 150mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
+    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
+    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
+    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
     .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.mono { font-family: monospace; font-size: 5pt; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
+    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
+    .qr-img { width: 55mm; height: 55mm; display: block; }
+    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
+    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
+    .field { display: flex; flex-direction: column; gap: 0.5mm; }
+    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
+    .fv.mono { font-family: monospace; font-size: 10pt; }
+    .fv.red { color: #cc0000; font-size: 13pt; }
     .full { grid-column: 1 / -1; }
-    .status { display: inline-block; padding: 0.3mm 1.5mm; border-radius: 3mm; font-size: 4.5pt; font-weight: 700; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    .status { display: inline-block; padding: 0.8mm 2.5mm; border-radius: 3mm; font-size: 8pt; font-weight: 700; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -1028,7 +1025,6 @@ export default function AdminBarcode() {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Batch sections */}
           {allBatches.map((batch: any) => {
             const label = batch.namaKapal || `Batch #${batch.id}`;
             return (
@@ -1045,7 +1041,6 @@ export default function AdminBarcode() {
             );
           })}
 
-          {/* Paket tanpa batch */}
           {noBatchPkgs.length > 0 && (
             <NoBatchSection
               packages={allPackages}
@@ -1170,7 +1165,6 @@ export default function AdminBarcode() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
