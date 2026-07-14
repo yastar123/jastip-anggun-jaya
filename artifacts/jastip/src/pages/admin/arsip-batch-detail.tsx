@@ -235,17 +235,17 @@ function GroupedArsipCard({ pkgs, batchLabel, base }: { pkgs: any[]; batchLabel:
 
         <div className="grid grid-cols-2 gap-1.5">
           <Button
-            size="sm" variant="outline" className="text-xs"
+            size="sm" variant="outline" className="min-w-0 px-2 text-xs"
             onClick={(e) => { e.stopPropagation(); goToGroupDetail(); }}
           >
-            <Eye className="w-3 h-3 mr-1" /> Lihat Semua Paket
+            <Eye className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Lihat Semua Paket</span>
           </Button>
           <Button
             size="sm" variant="outline"
-            className="text-xs border-green-300 text-green-700 hover:bg-green-50"
+            className="min-w-0 px-2 text-xs border-green-300 text-green-700 hover:bg-green-50"
             onClick={printGroup}
           >
-            <Printer className="w-3 h-3 mr-1" /> Cetak
+            <Printer className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Cetak</span>
           </Button>
         </div>
       </CardContent>
