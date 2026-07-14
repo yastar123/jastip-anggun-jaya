@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useListPackages, getListPackagesQueryKey, useListBatches } from "@workspace/api-client-react";
+import { useListPackages, getListPackagesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pagination } from "@/components/pagination";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -15,19 +13,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2, Ship, ChevronDown, ChevronUp, Lock, Archive, Clock } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Printer, Package, QrCode, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-
-const PAGE_SIZE = 15;
-
-const SERVICE_TYPES = [
-  { value: "jastip pesawat", label: "Jastip Pesawat" },
-  { value: "jastip hemat+", label: "Jastip Hemat+" },
-  { value: "jastip kargo", label: "Jastip Kargo" },
-  { value: "jastip pelni", label: "Jastip Pelni" },
-];
 
 function formatRp(n: any) {
   if (n == null) return "-";
@@ -58,7 +48,7 @@ interface EditForm {
   itemName: string;
   serviceType: string;
   deliveryRoute: string;
-  packagingType: string;
+
   packageDate: string;
   realWeight: string;
   length: string;
@@ -66,692 +56,54 @@ interface EditForm {
   height: string;
 }
 
-function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batchLabel?: string) {
-  const pkgDate = pkg.packageDate
-    ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
-    : "-";
-  const serviceType = pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-";
-  const ongkir = pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-";
-  const batchRow = batchLabel
-    ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
-    : "";
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
-  <style>
-    @page { size: 100mm 100mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.mono { font-family: monospace; font-size: 5pt; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
-    .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div class="h-title">JASTIP ANGGUN JAYA</div>
-      <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-    </div>
-    <div class="body">
-      <div class="left">
-        <div class="scan-label">SCAN RESI</div>
-        <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-        <div class="qr-txt">${qrValue}</div>
-      </div>
-      <div class="right">
-        <div class="cust">${pkg.customerName || "-"}</div>
-        <div class="grid">
-          <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-          <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-          <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
-          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${serviceType}</div></div>
-          <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-          <div class="field"><div class="fl">Berat Real</div><div class="fv">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</div></div>
-          <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-          <div class="field"><div class="fl">Jenis Paking</div><div class="fv">${pkg.packagingType || "-"}</div></div>
-          <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
-          ${batchRow}
-        </div>
-      </div>
-    </div>
-    <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-  </div>
-  <script>window.onload = () => { window.print(); window.close(); }</script>
-</body>
-</html>`;
-}
-
-function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
-  const first = pkgs[0];
-  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
-  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
-  const batchRow = batchLabel
-    ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <title>Label Grup - ${first?.customerName}</title>
-  <style>
-    @page { size: 100mm 100mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
-    .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div class="h-title">JASTIP ANGGUN JAYA</div>
-      <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-    </div>
-    <div class="body">
-      <div class="left">
-        <div class="scan-label">SCAN RESI</div>
-        <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-        <div class="qr-txt">${qrValue}</div>
-      </div>
-      <div class="right">
-        <div class="cust">${first?.customerName || "-"}</div>
-        <div class="grid">
-          <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
-          <div class="field"><div class="fl">Total Berat</div><div class="fv">${totalWeight.toFixed(3)} Kg</div></div>
-          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-          <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShipping.toLocaleString("id-ID")}</div></div>
-          <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
-          ${batchRow}
-        </div>
-      </div>
-    </div>
-    <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-  </div>
-  <script>window.onload = () => { window.print(); window.close(); }</script>
-</body>
-</html>`;
-}
-
-function BarcodeItem({
-  pkg,
-  onEdit,
-  onDelete,
-  batchLabel,
-}: {
-  pkg: any;
-  onEdit: (pkg: any) => void;
-  onDelete: (pkg: any) => void;
-  batchLabel?: string;
-}) {
+function SmallQR({ value }: { value: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   useEffect(() => {
     if (canvasRef.current) {
-      QRCode.toCanvas(canvasRef.current, pkg.barcode || pkg.resiNumber || pkg.id.toString(), {
-        width: 160,
-        margin: 2,
-        color: { dark: "#000000", light: "#ffffff" },
-      }).catch(() => {});
+      QRCode.toCanvas(canvasRef.current, value, { width: 80, margin: 1 }).catch(() => {});
     }
-  }, [pkg]);
-
-  async function printBarcode() {
-    const qrValue = pkg.barcode || pkg.resiNumber || pkg.id.toString();
-    let qrDataUrl = "";
-    try {
-      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
-    } catch { return; }
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(buildSinglePrintHtml(pkg, qrDataUrl, qrValue, batchLabel));
-    win.document.close();
-  }
-
-  function downloadBarcode() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const a = document.createElement("a");
-    a.download = `qr-${pkg.barcode || pkg.resiNumber || pkg.id}.png`;
-    a.href = canvas.toDataURL("image/png");
-    a.click();
-  }
-
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="pt-4 pb-3">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate font-mono">{pkg.barcode || pkg.resiNumber || "No Barcode"}</p>
-            <p className="text-xs text-muted-foreground">No Resi: {pkg.resiNumber || "-"}</p>
-            <p className="text-xs text-muted-foreground">Konsumen: {pkg.customerName || "-"}</p>
-            {pkg.serviceType && (
-              <p className="text-xs text-muted-foreground capitalize">{pkg.serviceType}</p>
-            )}
-            {batchLabel && (
-              <p className="text-xs font-semibold text-blue-700 mt-0.5">📦 {batchLabel}</p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-            <Badge
-              variant="outline"
-              className={`text-xs ${pkg.status === "diserahkan" ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
-            >
-              {pkg.status === "diserahkan" ? "Diserahkan" : "Pending"}
-            </Badge>
-          </div>
-        </div>
-        <div className="flex justify-center bg-white border rounded-lg p-2 mb-3">
-          <canvas ref={canvasRef} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mb-2 text-xs text-muted-foreground">
-          {pkg.usedWeight != null && <span>Berat: {pkg.usedWeight} Kg</span>}
-          {pkg.totalShipping != null && <span>Ongkir: {formatRp(pkg.totalShipping)}</span>}
-        </div>
-        <div className="flex gap-1.5 mb-1.5">
-          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={printBarcode}>
-            <Printer className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Cetak</span>
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={downloadBarcode}>
-            <Download className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Unduh</span>
-          </Button>
-        </div>
-        <div className="flex gap-1.5">
-          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => onEdit(pkg)}>
-            <Pencil className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Edit</span>
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => onDelete(pkg)}>
-            <Trash2 className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Hapus</span>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  }, [value]);
+  return <canvas ref={canvasRef} className="rounded" />;
 }
 
-function GroupedBarcodeItem({
-  pkgs,
-  batchLabel,
-}: {
-  pkgs: any[];
-  batchLabel?: string;
-  onEdit?: (pkg: any) => void;
-  onDelete?: (pkg: any) => void;
-}) {
-  const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  const base = user?.role === "owner" ? "/owner" : "/admin";
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const first = pkgs[0];
-  const qrValue = first?.barcode || first?.resiNumber || first?.id?.toString() || "";
-  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
-  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
-  const allPending = pkgs.every((p) => p.status !== "diserahkan");
-  const allDone = pkgs.every((p) => p.status === "diserahkan");
-
-  useEffect(() => {
-    if (canvasRef.current && qrValue) {
-      QRCode.toCanvas(canvasRef.current, qrValue, {
-        width: 160, margin: 2, color: { dark: "#000000", light: "#ffffff" },
-      }).catch(() => {});
-    }
-  }, [qrValue]);
-
-  async function printBarcode() {
-    let qrDataUrl = "";
-    try {
-      qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
-    } catch { return; }
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(buildGroupedPrintHtml(pkgs, qrDataUrl, qrValue, batchLabel));
-    win.document.close();
-  }
-
-  function downloadBarcode() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const a = document.createElement("a");
-    a.download = `qr-grup-${first?.customerName || first?.id}.png`;
-    a.href = canvas.toDataURL("image/png");
-    a.click();
-  }
-
-  return (
-    <Card className="hover:shadow-md transition-shadow border-blue-200">
-      <CardContent className="pt-4 pb-3">
-        <div className="mb-2">
-          <p className="font-bold text-sm leading-snug break-words line-clamp-2" title={first?.customerName || "-"}>
-            {first?.customerName || "-"}
-          </p>
-          <div className="flex items-center justify-between gap-2 mt-1">
-            <p className="text-xs text-muted-foreground truncate">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
-            <Badge
-              variant="outline"
-              className={`text-xs shrink-0 ${allDone ? "bg-green-100 text-green-800 border-green-300" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
-            >
-              {allDone ? "Diserahkan" : allPending ? "Pending" : "Sebagian"}
-            </Badge>
-          </div>
-          {first?.serviceType && (
-            <p className="text-xs text-muted-foreground capitalize truncate">{first.serviceType}</p>
-          )}
-          {batchLabel && (
-            <p className="text-xs font-semibold text-blue-700 mt-0.5 truncate">📦 {batchLabel}</p>
-          )}
-        </div>
-        <div className="flex justify-center bg-white border rounded-lg p-2 mb-2">
-          <canvas ref={canvasRef} />
-        </div>
-        <div className="mb-2 space-y-0.5">
-          {pkgs.map((p, i) => (
-            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="font-mono truncate max-w-[120px]">#{i + 1} {p.resiNumber || "-"}</span>
-              <span>{p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</span>
-            </div>
-          ))}
-        </div>
-        <div className="text-xs font-semibold text-primary mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
-        <div className="flex gap-1.5 mb-1.5">
-          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={printBarcode}>
-            <Printer className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Cetak</span>
-          </Button>
-          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={downloadBarcode}>
-            <Download className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Unduh</span>
-          </Button>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
-          onClick={() => {
-            const params = new URLSearchParams({ name: first?.customerName || "" });
-            if (first?.serviceType) params.set("serviceType", first.serviceType);
-            if (first?.batchId != null) params.set("batchId", String(first.batchId));
-            setLocation(`${base}/barcode-group?${params.toString()}`);
-          }}
-        >
-          <Pencil className="w-3 h-3 mr-1" /> Edit / Kelola Paket
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-function batchStatusColor(status: string) {
-  if (status === "OPEN") return "bg-green-100 text-green-800 border-green-200";
-  if (status === "CLOSED") return "bg-yellow-100 text-yellow-800 border-yellow-200";
-  return "bg-gray-100 text-gray-600 border-gray-200";
-}
-
-function batchStatusIcon(status: string) {
-  if (status === "OPEN") return <CheckCircle2 className="w-3 h-3" />;
-  if (status === "CLOSED") return <Lock className="w-3 h-3" />;
-  return <Archive className="w-3 h-3" />;
-}
-
-function batchStatusLabel(status: string) {
-  if (status === "OPEN") return "Aktif";
-  if (status === "CLOSED") return "Ditutup";
-  return "Arsip";
-}
-
-function fmtDate(d: string) {
-  if (!d) return "-";
-  return new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function groupPkgsByCustomer(pkgs: any[]) {
-  const map = new Map<string, any[]>();
-  for (const p of pkgs) {
-    const key = [
-      (p.customerName || "").trim().toLowerCase(),
-      (p.serviceType || "").toLowerCase(),
-      String(p.batchId ?? ""),
-    ].join("|");
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(p);
-  }
-  return [...map.values()];
-}
-
-// ── BatchBarcodeSection ───────────────────────────────────────────────────────
-
-function BatchBarcodeSection({
-  batch,
-  packages,
-  batchLabel,
-  search,
-  filterServiceType,
-  onEdit,
-  onDelete,
-}: {
-  batch: any;
-  packages: any[];
-  batchLabel: string;
-  search: string;
-  filterServiceType: string;
-  onEdit: (pkg: any) => void;
-  onDelete: (pkg: any) => void;
-}) {
-  const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  const base = user?.role === "owner" ? "/owner" : "/admin";
-
-  const batchPkgs = packages.filter((p: any) => p.batchId === batch.id &&
-    p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan");
-
-  const filtered = batchPkgs.filter((p: any) =>
-    (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
-    (!search ||
-      (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const totalBatchPkgs = batchPkgs.length;
-  const hasFilter = filterServiceType !== "all" || !!search;
-
-  async function printBatch() {
-    if (!batchPkgs.length) return;
-    const pages: string[] = [];
-    for (const pkg of batchPkgs) {
-      const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
-      let qrDataUrl = "";
-      try {
-        qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
-      } catch { continue; }
-      pages.push(`
-        <div class="page">
-          <div class="wrap">
-            <div class="header">
-              <div class="h-title">JASTIP ANGGUN JAYA</div>
-              <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-            </div>
-            <div class="body">
-              <div class="left">
-                <div class="scan-label">SCAN RESI</div>
-                <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-                <div class="qr-txt">${qrValue}</div>
-              </div>
-              <div class="right">
-                <div class="cust">${pkg.customerName || "-"}</div>
-                <div class="grid">
-                  <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div></div>
-                  <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-                  <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-                  <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-                  <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
-                  <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-          </div>
-        </div>
-      `);
-    }
-    if (!pages.length) return;
-    const html = `<!DOCTYPE html>
-<html><head>
-  <title>Print Barcode — ${batchLabel}</title>
-  <style>
-    @page { size: 100mm 100mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 100mm; height: 100mm; overflow: hidden; page-break-after: always; break-after: page; }
-    .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.mono { font-family: monospace; font-size: 5pt; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
-    .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head><body>
-  ${pages.join("")}
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
-</body></html>`;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-  }
-
-  return (
-    <Card
-      className={`border-2 cursor-pointer hover:shadow-md transition-shadow ${batch.statusBatch === "OPEN" ? "border-blue-200" : "border-gray-200"}`}
-      onClick={() => setLocation(`${base}/barcode/batch/${batch.id}`)}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className={`p-2 rounded-lg shrink-0 ${batch.statusBatch === "OPEN" ? "bg-blue-100" : "bg-gray-100"}`}>
-              <Ship className={`w-5 h-5 ${batch.statusBatch === "OPEN" ? "text-blue-700" : "text-gray-500"}`} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-base leading-snug">{batch.namaKapal}</span>
-                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${batchStatusColor(batch.statusBatch)}`}>
-                  {batchStatusIcon(batch.statusBatch)}
-                  {batchStatusLabel(batch.statusBatch)}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {batch.kotaAsal} → {batch.tujuan} &nbsp;·&nbsp;
-                ETD: {fmtDate(batch.etd)} &nbsp;·&nbsp;
-                Closing: {fmtDate(batch.periodeClosingMulai)} – {fmtDate(batch.periodeClosingSelesai)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                <span className="font-semibold text-foreground">{totalBatchPkgs} paket aktif</span>
-                {hasFilter && filtered.length !== totalBatchPkgs && (
-                  <span className="ml-1 text-primary font-medium">· {filtered.length} ditampilkan (filter aktif)</span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {totalBatchPkgs > 0 && (
-              <button
-                className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 px-2 py-1 rounded hover:bg-muted transition-colors"
-                onClick={(e) => { e.stopPropagation(); printBatch(); }}
-                title="Cetak semua barcode batch ini"
-              >
-                <Printer className="w-3.5 h-3.5" /> Cetak
-              </button>
-            )}
-            <ChevronDown className="w-5 h-5 text-muted-foreground" />
-          </div>
-        </div>
-      </CardHeader>
-    </Card>
-  );
-}
-
-// ── NoBatchSection ────────────────────────────────────────────────────────────
-
-function NoBatchSection({
-  packages,
-  search,
-  filterServiceType,
-  onEdit,
-  onDelete,
-}: {
-  packages: any[];
-  search: string;
-  filterServiceType: string;
-  onEdit: (pkg: any) => void;
-  onDelete: (pkg: any) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  const noBatch = packages.filter(
-    (p: any) => p.batchId == null && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
-  );
-
-  const filtered = noBatch.filter((p: any) =>
-    (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
-    (!search ||
-      (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const groups = groupPkgsByCustomer(filtered);
-
-  if (noBatch.length === 0) return null;
-
-  return (
-    <Card className="border-2 border-dashed border-gray-300">
-      <CardHeader
-        className="pb-3 cursor-pointer select-none hover:bg-muted/30 transition-colors rounded-t-lg"
-        onClick={() => setExpanded((e) => !e)}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-2 rounded-lg bg-gray-100 shrink-0">
-              <Clock className="w-5 h-5 text-gray-500" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-base">Paket Tanpa Batch</span>
-                <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full border font-medium bg-gray-100 text-gray-600 border-gray-200">
-                  Belum diassign
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                <span className="font-semibold text-foreground">{noBatch.length} paket</span> — belum dimasukkan ke batch pengiriman manapun
-              </p>
-            </div>
-          </div>
-          {expanded ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-        </div>
-      </CardHeader>
-      {expanded && (
-        <CardContent className="pt-0 pb-4">
-          <div className="border-t pt-4">
-            {groups.length === 0 ? (
-              <p className="text-center py-8 text-sm text-muted-foreground">Tidak ada paket yang cocok dengan filter saat ini.</p>
-            ) : (
-              <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                {groups.map((pkgs) => (
-                  <GroupedBarcodeItem
-                    key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|nobatch`}
-                    pkgs={pkgs}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-// ── AdminBarcode ──────────────────────────────────────────────────────────────
-
-export default function AdminBarcode() {
+export default function BarcodeGroupDetail() {
   const [location, setLocation] = useLocation();
-  const [search, setSearch] = useState("");
-  const { data: packages, isLoading } = useListPackages();
-  const { data: batches } = useListBatches();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
-  // Lookup: batchId → label name
-  const batchMap = new Map<number, string>(
-    (batches || []).map((b: any) => [b.id, b.name || `Batch #${b.id}`])
-  );
+  const q = new URLSearchParams(window.location.search);
+  const groupName = q.get("name") || "";
+  const idsParam = q.get("ids") || "";
+  const filterServiceType = q.get("serviceType") || "";
+  const filterBatchId = q.get("batchId") ? Number(q.get("batchId")) : null;
+  const filterIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
+
+  const { data: packages, isLoading } = useListPackages();
+
+  const groupPackages = (packages || []).filter((p: any) => {
+    if (filterIds) return filterIds.includes(p.id);
+    const nameMatch = (p.customerName || "").trim().toLowerCase() === groupName.trim().toLowerCase();
+    if (!nameMatch) return false;
+    // Narrow by serviceType and batchId when passed (composite group identity)
+    if (filterServiceType && (p.serviceType || "").toLowerCase() !== filterServiceType.toLowerCase()) return false;
+    if (filterBatchId !== null && p.batchId !== filterBatchId) return false;
+    return true;
+  });
+
+  const totalWeight = groupPackages.reduce((s: number, p: any) => s + Number(p.realWeight || 0), 0);
+  const totalShipping = groupPackages.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
 
   const [editPkg, setEditPkg] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({
     resiNumber: "", packageNumber: "", customerName: "", itemName: "",
-    serviceType: "", deliveryRoute: "", packagingType: "", packageDate: "",
+    serviceType: "", deliveryRoute: "", packageDate: "",
     realWeight: "", length: "", width: "", height: "",
   });
   const [isEditSaving, setIsEditSaving] = useState(false);
-
   const [deletePkg, setDeletePkg] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const [filterServiceType, setFilterServiceType] = useState<string>("all");
-
-  const idsParam = new URLSearchParams(window.location.search).get("ids");
-  const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
-
-  const allPackages = packages || [];
-  const allBatches = batches || [];
-
-  // Hanya tampilkan paket AKTIF (belum diambil)
-  const activePackages = allPackages.filter(
-    (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
-  );
-
-  const sudahDiambilCount = allPackages.filter(
-    (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
-  ).length;
-
-  // Paket tanpa batch (batchId null)
-  const noBatchPkgs = activePackages.filter((p: any) => p.batchId == null);
-
-  const totalActive = activePackages.length;
-
-  function handleSearch(v: string) { setSearch(v); }
 
   function openEdit(pkg: any) {
     setEditPkg(pkg);
@@ -762,7 +114,6 @@ export default function AdminBarcode() {
       itemName: pkg.itemName || "",
       serviceType: pkg.serviceType || "",
       deliveryRoute: pkg.deliveryRoute || "",
-      packagingType: pkg.packagingType || "",
       packageDate: pkg.packageDate ? pkg.packageDate.split("T")[0] : "",
       realWeight: pkg.realWeight != null ? String(pkg.realWeight) : "",
       length: pkg.length != null ? String(pkg.length) : "",
@@ -786,7 +137,6 @@ export default function AdminBarcode() {
           itemName: editForm.itemName || null,
           serviceType: editForm.serviceType || null,
           deliveryRoute: editForm.deliveryRoute || null,
-          packagingType: editForm.packagingType || null,
           packageDate: editForm.packageDate || null,
           realWeight: editForm.realWeight ? Number(editForm.realWeight) : null,
           length: editForm.length ? Number(editForm.length) : null,
@@ -796,7 +146,7 @@ export default function AdminBarcode() {
       });
       if (!r.ok) throw new Error("Gagal menyimpan perubahan");
       await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({ title: "Berhasil", description: "Data paket berhasil diperbarui." });
+      toast({ title: "Berhasil", description: "Data paket diperbarui." });
       setEditPkg(null);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal", description: err.message });
@@ -816,7 +166,7 @@ export default function AdminBarcode() {
       });
       if (!r.ok) throw new Error("Gagal menghapus paket");
       await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
-      toast({ title: "Berhasil", description: `Paket ${deletePkg.resiNumber} berhasil dihapus.` });
+      toast({ title: "Berhasil", description: `Paket ${deletePkg.resiNumber} dihapus.` });
       setDeletePkg(null);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Gagal", description: err.message });
@@ -825,236 +175,220 @@ export default function AdminBarcode() {
     }
   }
 
-  async function doPrintBarcodes(pkgs: any[], title = "Print Barcode — Jastip Anggun Jaya") {
+  async function printAll() {
+    const pkgs = groupPackages;
     if (!pkgs.length) return;
-    const pages: string[] = [];
-    for (const pkg of pkgs) {
-      const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
-      let qrDataUrl = "";
-      try {
-        qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
-      } catch { continue; }
-      pages.push(`
-        <div class="page">
-          <div class="wrap">
-            <div class="header">
-              <div class="h-title">JASTIP ANGGUN JAYA</div>
-              <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-            </div>
-            <div class="body">
-              <div class="left">
-                <div class="scan-label">SCAN RESI</div>
-                <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-                <div class="qr-txt">${qrValue}</div>
-              </div>
-              <div class="right">
-                <div class="cust">${pkg.customerName || "-"}</div>
-                <div class="grid">
-                  <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div></div>
-                  <div class="field"><div class="fl">Status</div><div class="fv"><span class="status" style="background:${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"};color:${pkg.status === "diserahkan" ? "#166534" : "#713f12"}">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></div></div>
-                  <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-                  <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-                  <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-                  <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-          </div>
-        </div>
-      `);
-    }
-    if (!pages.length) return;
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <title>${title}</title>
-  <style>
-    @page { size: 100mm 100mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 100mm; height: 100mm; overflow: hidden; page-break-after: always; break-after: page; }
-    .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
-    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
-    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
-    .qr-img { width: 15mm; height: 15mm; display: block; }
-    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
-    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
-    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
-    .field { display: flex; flex-direction: column; gap: 0.2mm; }
-    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-    .fv.mono { font-family: monospace; font-size: 5pt; }
-    .fv.red { color: #cc0000; font-size: 6pt; }
-    .full { grid-column: 1 / -1; }
-    .status { display: inline-block; padding: 0.3mm 1.5mm; border-radius: 3mm; font-size: 4.5pt; font-weight: 700; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head>
-<body>
-  ${pages.join("")}
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
-</body>
-</html>`;
+
+    const qrDataUrls: string[] = await Promise.all(
+      pkgs.map((p: any) =>
+        QRCode.toDataURL(p.barcode || p.resiNumber || String(p.id), { width: 300, margin: 2 }).catch(() => "")
+      )
+    );
+
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(html);
+
+    const pages = pkgs.map((p: any, i: number) => {
+      const qrValue = p.barcode || p.resiNumber || String(p.id);
+      const pkgDate = p.packageDate ? new Date(p.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-";
+      const svcType = p.serviceType ? p.serviceType.replace("jastip ", "Jastip ") : "-";
+      const ongkir = p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-";
+      return `
+        <div class="label">
+          <div class="header">
+            <div class="h-title">JASTIP ANGGUN JAYA</div>
+            <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
+          </div>
+          <div class="body">
+            <div class="left">
+              <div class="scan-label">SCAN RESI</div>
+              <img class="qr-img" src="${qrDataUrls[i]}" alt="QR" />
+              <div class="qr-txt">${qrValue}</div>
+            </div>
+            <div class="right">
+              <div class="cust">${p.customerName || "-"}</div>
+              <div class="grid">
+                <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${p.resiNumber || "-"}</div></div>
+                <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${p.packageNumber || "-"}</div></div>
+                <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
+                <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
+                <div class="field full"><div class="fl">Rute</div><div class="fv">${p.deliveryRoute || "-"}</div></div>
+                <div class="field"><div class="fl">Berat Real</div><div class="fv">${p.realWeight != null ? p.realWeight + " Kg" : "-"}</div></div>
+                <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</div></div>
+                <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+        </div>
+      `;
+    }).join("");
+
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>Label — ${groupName || "Grup Paket"}</title>
+      <style>
+        @page { size: 100mm 100mm; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #fff; }
+        .label { width: 100mm; height: 100mm; display: flex; flex-direction: column; page-break-after: always; overflow: hidden; }
+        .label:last-child { page-break-after: auto; }
+        .header { background: #cc0000; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
+        .h-title { font-size: 13pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
+        .h-sub { font-size: 4.5pt; opacity: 0.9; margin-top: 0.8mm; }
+        .body { flex: 1; display: flex; min-height: 0; }
+        .left { width: 31mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 3mm 2mm 2mm; flex-shrink: 0; }
+        .scan-label { background: #cc0000; color: #fff; font-size: 5.5pt; font-weight: 900; padding: 1mm 2.5mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2.5mm; }
+        .qr-img { width: 23mm; height: 23mm; display: block; }
+        .qr-txt { font-size: 3.2pt; color: #888; font-family: monospace; text-align: center; margin-top: 2mm; word-break: break-all; max-width: 27mm; line-height: 1.3; }
+        .right { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
+        .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.1; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 2.5mm; }
+        .field { display: flex; flex-direction: column; gap: 0.3mm; }
+        .fl { font-size: 4pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; }
+        .fv { font-size: 7pt; font-weight: 700; color: #222; line-height: 1.2; }
+        .fv.mono { font-family: monospace; font-size: 6.5pt; }
+        .fv.red { color: #cc0000; font-size: 8.5pt; }
+        .full { grid-column: 1 / -1; }
+        .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1mm 3mm; font-size: 3.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+      </style>
+    </head><body>
+      ${pages}
+      <script>window.onload = () => { window.print(); window.close(); }</script>
+    </body></html>`);
     win.document.close();
   }
 
-  async function printAllBarcodes() {
-    await doPrintBarcodes(allPackages, "Print Semua Barcode — Jastip Anggun Jaya");
-  }
-
-  const editIsKargo = editForm.serviceType === "jastip kargo";
   const editRouteOpts = deliveryRouteOptions[editForm.serviceType] || [];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => setLocation(`${base}/packages`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <QrCode className="h-7 w-7 text-primary" />
-              Label Barcode Paket
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Barcode dikelompokkan per batch pengiriman. Klik batch untuk melihat &amp; cetak barcode.
-            </p>
-          </div>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="icon" onClick={() => setLocation(`${base}/barcode`)}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Package className="h-6 w-6 text-primary" />
+            {groupName || "Grup Paket"}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {groupPackages.length} paket · Berat {totalWeight.toFixed(3)} Kg · Ongkir {formatRp(totalShipping)}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2 shrink-0 items-center">
-          <Button
-            variant="outline"
-            onClick={printAllBarcodes}
-            disabled={activePackages.length === 0}
-            className="flex items-center gap-2"
-          >
-            <Printer className="h-4 w-4" /> Print Semua
-          </Button>
-        </div>
+        <Button variant="outline" onClick={printAll} className="gap-2">
+          <Printer className="h-4 w-4" /> Cetak Semua
+        </Button>
       </div>
 
-      {/* Notif paket baru dari input grup */}
-      {highlightIds && highlightIds.length > 0 && (
-        <Card className="border-green-500 bg-green-50">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <p className="font-semibold text-green-800">Barcode siap — {highlightIds.length} paket baru ditambahkan</p>
-                <p className="text-sm text-green-700 mt-0.5">Cari batch yang sesuai dan klik untuk melihat barcode.</p>
-              </div>
-              <Button size="sm" variant="outline" className="border-green-400 text-green-700" onClick={() => setLocation(`${base}/barcode`)}>
-                Refresh
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filter jenis jastip + search */}
-      <div className="flex flex-wrap items-center gap-2">
-        {[
-          { value: "all", label: "Semua Jastip" },
-          { value: "jastip pesawat", label: "Pesawat" },
-          { value: "jastip hemat+", label: "Hemat+" },
-          { value: "jastip kargo", label: "Kargo" },
-          { value: "jastip pelni", label: "Pelni" },
-        ].map((opt) => {
-          const count = opt.value === "all"
-            ? totalActive
-            : activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === opt.value).length;
-          return (
-            <Button
-              key={opt.value}
-              size="sm"
-              variant={filterServiceType === opt.value ? "default" : "outline"}
-              onClick={() => setFilterServiceType(opt.value)}
-              className="text-xs"
-            >
-              {opt.label}
-              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${filterServiceType === opt.value ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
-                {count}
-              </span>
-            </Button>
-          );
-        })}
-        {sudahDiambilCount > 0 && (
-          <Button size="sm" variant="outline" className="text-xs border-green-300 text-green-700 hover:bg-green-50"
-            onClick={() => setLocation(`${base}/arsip`)}>
-            <span className="mr-1">✓</span> Arsip ({sudahDiambilCount})
-          </Button>
-        )}
-        <div className="relative ml-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari konsumen, resi..."
-            className="pl-9 w-56 text-sm"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Main content: batch cards */}
       {isLoading ? (
         <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="animate-pulse"><CardContent className="pt-4 h-20 bg-muted/20 rounded-xl" /></Card>
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse"><CardContent className="h-20 pt-4 bg-muted/20" /></Card>
           ))}
         </div>
-      ) : allBatches.length === 0 && noBatchPkgs.length === 0 ? (
+      ) : groupPackages.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
-          <QrCode className="w-16 h-16 mx-auto mb-4 opacity-20" />
-          <p className="text-lg font-medium">Belum ada paket</p>
-          <p className="text-sm mt-1">Buat batch dan tambah paket terlebih dahulu</p>
-          <div className="flex gap-2 justify-center mt-4">
-            <Button variant="outline" onClick={() => setLocation(`${base}/batches`)}>Kelola Batch</Button>
-            <Button onClick={() => setLocation(`${base}/packages/type`)}>Input Paket</Button>
-          </div>
+          <QrCode className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="font-medium">Tidak ada paket ditemukan</p>
+          <p className="text-sm mt-1">Nama "{groupName}" tidak memiliki paket terdaftar</p>
+          <Button className="mt-4" onClick={() => setLocation(`${base}/barcode`)}>Kembali ke Barcode</Button>
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Batch sections */}
-          {allBatches.map((batch: any) => {
-            const label = batch.namaKapal || `Batch #${batch.id}`;
-            return (
-              <BatchBarcodeSection
-                key={batch.id}
-                batch={batch}
-                packages={allPackages}
-                batchLabel={label}
-                search={search}
-                filterServiceType={filterServiceType}
-                onEdit={openEdit}
-                onDelete={(pkg) => setDeletePkg(pkg)}
-              />
-            );
-          })}
+          {groupPackages.map((pkg: any, idx: number) => (
+            <Card key={pkg.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-3">
+                {/* Header row */}
+                <div className="flex items-start gap-4 mb-3">
+                  <div className="shrink-0 text-center">
+                    <SmallQR value={pkg.barcode || pkg.resiNumber || String(pkg.id)} />
+                    <p className="text-xs text-muted-foreground mt-1 font-mono">#{idx + 1}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="font-mono font-bold text-sm">{pkg.barcode || "-"}</p>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${pkg.status === "diserahkan" ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}
+                      >
+                        {pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-semibold text-primary">{pkg.customerName || "-"}</p>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <Button size="sm" variant="outline" className="text-xs border-blue-300 text-blue-700 hover:bg-blue-50" onClick={() => openEdit(pkg)}>
+                      <Pencil className="w-3 h-3 mr-1" /> Edit
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => setDeletePkg(pkg)}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Hapus
+                    </Button>
+                  </div>
+                </div>
 
-          {/* Paket tanpa batch */}
-          {noBatchPkgs.length > 0 && (
-            <NoBatchSection
-              packages={allPackages}
-              search={search}
-              filterServiceType={filterServiceType}
-              onEdit={openEdit}
-              onDelete={(pkg) => setDeletePkg(pkg)}
-            />
-          )}
+                {/* All fields grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-xs border-t pt-3">
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Resi</p>
+                    <p className="font-mono font-semibold">{pkg.resiNumber || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">No Paket</p>
+                    <p className="font-mono">{pkg.packageNumber || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Tanggal</p>
+                    <p>{pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Jenis Jastip</p>
+                    <p>{serviceLabel[pkg.serviceType] || pkg.serviceType || "-"}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Rute Pengiriman</p>
+                    <p>{pkg.deliveryRoute || "-"}</p>
+                  </div>
+                  {(pkg.serviceType === "jastip kargo" || pkg.serviceType === "jastip pelni") && (
+                    <div className="md:col-span-2">
+                      <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Nama Barang</p>
+                      <p>{pkg.itemName || "-"}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Real</p>
+                    <p className="font-semibold">{pkg.realWeight != null ? `${pkg.realWeight} Kg` : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Volume</p>
+                    <p>{pkg.volumeWeight != null ? `${Number(pkg.volumeWeight).toFixed(3)} Kg` : "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Berat Digunakan</p>
+                    <p className="font-semibold">{pkg.usedWeight != null ? `${pkg.usedWeight} Kg` : "-"}</p>
+                  </div>
+                  {(pkg.length || pkg.width || pkg.height) && (
+                    <div>
+                      <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Dimensi (cm)</p>
+                      <p className="font-mono">{pkg.length || "?"} × {pkg.width || "?"} × {pkg.height || "?"}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-muted-foreground font-medium uppercase tracking-wide text-[10px]">Total Ongkir</p>
+                    <p className="font-bold text-primary text-sm">{formatRp(pkg.totalShipping)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* Add package hint */}
+          <Button
+            variant="outline"
+            className="w-full gap-2 border-dashed"
+            onClick={() => setLocation(`${base}/packages/new?serviceType=${(groupPackages[0] as any)?.serviceType || ""}&packageMode=grup`)}
+          >
+            <Plus className="h-4 w-4" /> Tambah Paket ke Grup Ini
+          </Button>
         </div>
       )}
 
@@ -1084,8 +418,7 @@ export default function AdminBarcode() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Jenis Jastip</label>
               <Select value={editForm.serviceType} onValueChange={v => setEditForm(f => ({
-                ...f,
-                serviceType: v,
+                ...f, serviceType: v,
                 deliveryRoute: deliveryRouteOptions[v]?.[0]?.value || "",
               }))}>
                 <SelectTrigger><SelectValue placeholder="Pilih jenis" /></SelectTrigger>
@@ -1112,19 +445,15 @@ export default function AdminBarcode() {
                 </Select>
               )}
             </div>
-            {editIsKargo && (
+            {(editForm.serviceType === "jastip kargo" || editForm.serviceType === "jastip pelni") && (
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-sm font-medium">Jenis Barang (Kargo)</label>
-                <Input value={editForm.itemName} onChange={e => setEditForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Contoh: Elektronik, Mesin..." />
+                <label className="text-sm font-medium">Nama Barang</label>
+                <Input value={editForm.itemName} onChange={e => setEditForm(f => ({ ...f, itemName: e.target.value }))} placeholder="Contoh: Pakaian, Elektronik..." />
               </div>
             )}
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Berat Real (Kg)</label>
               <Input type="number" step="0.001" value={editForm.realWeight} onChange={e => setEditForm(f => ({ ...f, realWeight: e.target.value }))} placeholder="0.000" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Jenis Paking</label>
-              <Input value={editForm.packagingType} onChange={e => setEditForm(f => ({ ...f, packagingType: e.target.value }))} placeholder="Karton, Plastik, Kayu..." />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Panjang (cm)</label>
@@ -1139,7 +468,7 @@ export default function AdminBarcode() {
               <Input type="number" step="0.1" value={editForm.height} onChange={e => setEditForm(f => ({ ...f, height: e.target.value }))} placeholder="0" />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Berat volume, berat digunakan, tarif, dan total ongkir akan dihitung ulang otomatis saat disimpan.</p>
+          <p className="text-xs text-muted-foreground">Berat volume, berat digunakan, tarif, dan total ongkir akan dihitung ulang otomatis.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditPkg(null)}>Batal</Button>
             <Button onClick={saveEdit} disabled={isEditSaving || !editForm.resiNumber || !editForm.customerName}>
@@ -1149,28 +478,23 @@ export default function AdminBarcode() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Single Package Confirmation */}
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deletePkg} onOpenChange={(o) => { if (!o) setDeletePkg(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Paket?</AlertDialogTitle>
             <AlertDialogDescription>
-              Paket <strong>{deletePkg?.resiNumber}</strong> — {deletePkg?.customerName} akan dihapus permanen dan tidak dapat dikembalikan.
+              Paket <strong>{deletePkg?.resiNumber}</strong> akan dihapus permanen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmDelete}
-              disabled={isDeleting}
-            >
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={confirmDelete} disabled={isDeleting}>
               {isDeleting ? "Menghapus..." : "Ya, Hapus"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }
