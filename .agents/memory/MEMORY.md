@@ -2,3 +2,4 @@
 - [Package status redesign](package-status-redesign.md) — statuses reduced to pending/diserahkan; scan page has Serahkan/Tolak buttons
 - [Scan anti-spam design](scan-antispam.md) — 3-layer duplicate guard; addedIdsRef is the critical atomic gate (itemsRef alone is stale)
 - [Batch pengiriman feature](batch-feature.md) — Priority 1 complete: batches table, batchId on packages, lock/status fields, batch management page, batch selector in input/import forms
+- [Thermal label printing convention](thermal-label-printing.md) — all barcode/label print builders must target 100mm x 50mm (not A4/100x100); grouped labels drop itemized tables to fit

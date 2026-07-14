@@ -65,86 +65,61 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
   const first = pkgs[0];
   const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
   const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
-  const pkgRows = pkgs.map((p, i) => `
-    <tr style="border-bottom:1px solid #eee;">
-      <td style="padding:5px 8px;font-size:11px;font-weight:700;">${i + 1}</td>
-      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.resiNumber || "-"}</td>
-      <td style="padding:5px 8px;font-size:11px;font-family:monospace;">${p.packageNumber || "-"}</td>
-      <td style="padding:5px 8px;font-size:11px;">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</td>
-      <td style="padding:5px 8px;font-size:11px;">${p.packagingType || "-"}</td>
-      <td style="padding:5px 8px;font-size:11px;color:#c00;font-weight:700;">${p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-"}</td>
-    </tr>`).join("");
+  const batchRow = batchLabel
+    ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
+    : "";
 
   return `<!DOCTYPE html>
 <html>
 <head>
   <title>Label Grup - ${first?.customerName}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm; }
+    @page { size: 100mm 50mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Arial', sans-serif; background: #fff; }
-    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
-    .header { background: #c00; color: #fff; padding: 14px 20px; }
-    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
-    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
-    .top-wrap { display: flex; flex-direction: row; align-items: stretch; }
-    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; border-right: 2px dashed #ddd; min-width: 160px; }
-    .qr-wrap img { width: 130px; height: 130px; display: block; }
-    .qr-label { font-size: 7px; color: #999; margin-top: 5px; font-family: monospace; text-align:center; word-break:break-all; max-width:130px; }
-    .info-section { flex: 1; padding: 14px 18px; }
-    .customer { font-size: 22px; font-weight: 900; color: #111; margin-bottom: 6px; }
-    .meta { font-size: 11px; color: #666; margin-bottom: 4px; }
-    .totals { display: flex; gap: 24px; margin-top: 10px; }
-    .total-item { display: flex; flex-direction: column; }
-    .total-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; }
-    .total-value { font-size: 15px; font-weight: 900; color: #c00; }
-    .pkgs-section { padding: 0 0 0 0; border-top: 2px solid #eee; }
-    .pkgs-title { font-size: 9px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 18px 4px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; padding: 4px 8px; text-align: left; background: #f8f8f8; }
-    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 7px 20px; font-size: 9px; color: #aaa; text-align: center; }
+    body { font-family: Arial, sans-serif; width: 100mm; height: 50mm; overflow: hidden; background: #fff; }
+    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
+    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
+    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
+    .body { flex: 1; display: flex; min-height: 0; }
+    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
+    .qr-img { width: 15mm; height: 15mm; display: block; }
+    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
+    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
+    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
+    .field { display: flex; flex-direction: column; gap: 0.2mm; }
+    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
+    .fv.red { color: #cc0000; font-size: 6pt; }
+    .full { grid-column: 1 / -1; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head>
 <body>
-  <div class="label">
+  <div class="wrap">
     <div class="header">
-      <div class="brand-name">JASTIP ANGGUN JAYA</div>
-      <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+      <div class="h-title">JASTIP ANGGUN JAYA</div>
+      <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
     </div>
-    <div class="top-wrap">
-      <div class="qr-wrap">
-        <img src="${qrDataUrl}" alt="QR Code" />
-        <div class="qr-label">${qrValue}</div>
+    <div class="body">
+      <div class="left">
+        <div class="scan-label">SCAN RESI</div>
+        <img class="qr-img" src="${qrDataUrl}" alt="QR" />
+        <div class="qr-txt">${qrValue}</div>
       </div>
-      <div class="info-section">
-        <div class="customer">${first?.customerName || "-"}</div>
-        <div class="meta">Jenis: ${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"} &nbsp;·&nbsp; Rute: ${first?.deliveryRoute || "-"}</div>
-        <div class="meta">Tanggal: ${first?.packageDate ? new Date(first.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div>
-        ${batchLabel ? `<div class="meta" style="color:#1d4ed8;font-weight:700;">📦 Batch: ${batchLabel}</div>` : ""}
-        <div class="totals">
-          <div class="total-item">
-            <span class="total-label">Total Paket</span>
-            <span class="total-value" style="color:#111;">${pkgs.length} pkt</span>
-          </div>
-          <div class="total-item">
-            <span class="total-label">Total Berat</span>
-            <span class="total-value" style="color:#111;">${totalWeight.toFixed(3)} Kg</span>
-          </div>
-          <div class="total-item">
-            <span class="total-label">Total Ongkir</span>
-            <span class="total-value">Rp ${totalShipping.toLocaleString("id-ID")}</span>
-          </div>
+      <div class="right">
+        <div class="cust">${first?.customerName || "-"}</div>
+        <div class="grid">
+          <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
+          <div class="field"><div class="fl">Total Berat</div><div class="fv">${totalWeight.toFixed(3)} Kg</div></div>
+          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+          <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShipping.toLocaleString("id-ID")}</div></div>
+          <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
+          ${batchRow}
         </div>
       </div>
-    </div>
-    <div class="pkgs-section">
-      <div class="pkgs-title">Daftar Paket (${pkgs.length} item)</div>
-      <table>
-        <thead><tr>
-          <th>#</th><th>No. Resi</th><th>No. Paket</th><th>Berat</th><th>Paking</th><th>Ongkir</th>
-        </tr></thead>
-        <tbody>${pkgRows}</tbody>
-      </table>
     </div>
     <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
   </div>
@@ -204,20 +179,22 @@ function GroupedBarcodeCard({
   return (
     <Card className="hover:shadow-md transition-shadow border-blue-200">
       <CardContent className="pt-4 pb-3">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm truncate">{first?.customerName || "-"}</p>
-            <p className="text-xs text-muted-foreground">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
-            {first?.serviceType && (
-              <p className="text-xs text-muted-foreground capitalize">{first.serviceType}</p>
-            )}
+        <div className="mb-2">
+          <p className="font-bold text-sm leading-snug break-words line-clamp-2" title={first?.customerName || "-"}>
+            {first?.customerName || "-"}
+          </p>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <p className="text-xs text-muted-foreground truncate">{pkgs.length} paket · {totalWeight.toFixed(3)} Kg</p>
+            <Badge
+              variant="outline"
+              className={`text-xs shrink-0 ${allDone ? "bg-green-100 text-green-800 border-green-300" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
+            >
+              {allDone ? "Diserahkan" : allPending ? "Pending" : "Sebagian"}
+            </Badge>
           </div>
-          <Badge
-            variant="outline"
-            className={`text-xs ml-2 shrink-0 ${allDone ? "bg-green-100 text-green-800 border-green-300" : allPending ? "bg-amber-100 text-amber-800 border-amber-300" : "bg-blue-100 text-blue-800 border-blue-300"}`}
-          >
-            {allDone ? "Diserahkan" : allPending ? "Pending" : "Sebagian"}
-          </Badge>
+          {first?.serviceType && (
+            <p className="text-xs text-muted-foreground capitalize truncate">{first.serviceType}</p>
+          )}
         </div>
         <div className="flex justify-center bg-white border rounded-lg p-2 mb-2">
           <canvas ref={canvasRef} />
@@ -344,29 +321,28 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
         : "-";
       pages.push(`
         <div class="page">
-          <div class="label">
+          <div class="wrap">
             <div class="header">
-              <div class="brand-name">JASTIP ANGGUN JAYA</div>
-              <div class="brand-sub">Layanan Pengiriman Paket — Jakarta · Surabaya → Manokwari, Papua</div>
+              <div class="h-title">JASTIP ANGGUN JAYA</div>
+              <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
             </div>
-            <div class="body-wrap">
-              <div class="qr-wrap">
-                <img src="${qrDataUrl}" alt="QR Code" />
-                <div class="qr-label">${qrValue}</div>
+            <div class="body">
+              <div class="left">
+                <div class="scan-label">SCAN RESI</div>
+                <img class="qr-img" src="${qrDataUrl}" alt="QR" />
+                <div class="qr-txt">${qrValue}</div>
               </div>
-              <div class="info-section">
-                <div class="customer">${pkg.customerName || "-"}</div>
-                <div class="batch-tag">📦 ${batchLabel}</div>
-                <div class="info-grid">
-                  <div class="info-item"><span class="info-label">No. Resi</span><span class="info-value mono">${pkg.resiNumber || "-"}</span></div>
-                  <div class="info-item"><span class="info-label">No. Paket</span><span class="info-value mono">${pkg.packageNumber || "-"}</span></div>
-                  <div class="info-item"><span class="info-label">Tanggal</span><span class="info-value">${pkgDate}</span></div>
-                  <div class="info-item"><span class="info-label">Jenis Jastip</span><span class="info-value">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</span></div>
-                  <div class="info-item"><span class="info-label">Rute</span><span class="info-value">${pkg.deliveryRoute || "-"}</span></div>
-                  <div class="info-item"><span class="info-label">Berat Real</span><span class="info-value">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</span></div>
-                  <div class="info-item"><span class="info-label">Berat Digunakan</span><span class="info-value">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</span></div>
-                  <div class="info-item"><span class="info-label">Jenis Paking</span><span class="info-value">${pkg.packagingType || "-"}</span></div>
-                  <div class="info-item"><span class="info-label">Total Ongkir</span><span class="info-value red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</span></div>
+              <div class="right">
+                <div class="cust">${pkg.customerName || "-"}</div>
+                <div class="grid">
+                  <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
+                  <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
+                  <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
+                  <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+                  <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
+                  <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
+                  <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
+                  <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
                 </div>
               </div>
             </div>
@@ -380,29 +356,30 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
 <html><head>
   <title>Print Barcode — ${batchLabel}</title>
   <style>
-    @page { size: A4 portrait; margin: 12mm; }
+    @page { size: 100mm 50mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 100%; height: calc(297mm - 24mm); display: flex; align-items: stretch; page-break-after: always; break-after: page; }
+    .page { width: 100mm; height: 50mm; overflow: hidden; page-break-after: always; break-after: page; }
     .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .label { border: 3px solid #222; border-radius: 10px; width: 100%; display: flex; flex-direction: column; overflow: hidden; }
-    .header { background: #c00; color: #fff; padding: 14px 20px; }
-    .brand-name { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
-    .brand-sub { font-size: 11px; opacity: 0.85; margin-top: 2px; }
-    .body-wrap { flex: 1; display: flex; flex-direction: row; align-items: stretch; }
-    .qr-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; border-right: 2px dashed #ddd; min-width: 180px; }
-    .qr-wrap img { width: 150px; height: 150px; display: block; }
-    .qr-label { font-size: 8px; color: #999; margin-top: 6px; font-family: monospace; text-align: center; word-break: break-all; max-width: 150px; }
-    .info-section { flex: 1; padding: 16px 20px; }
-    .customer { font-size: 20px; font-weight: 900; color: #111; margin-bottom: 4px; }
-    .batch-tag { font-size: 10px; font-weight: 700; color: #1d4ed8; margin-bottom: 10px; border-bottom: 1.5px solid #eee; padding-bottom: 8px; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
-    .info-item { display: flex; flex-direction: column; gap: 2px; }
-    .info-label { font-size: 8px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
-    .info-value { font-size: 12px; font-weight: 700; color: #111; line-height: 1.3; }
-    .info-value.mono { font-family: monospace; font-size: 11px; }
-    .info-value.red { color: #c00; font-size: 14px; }
-    .footer { background: #f8f8f8; border-top: 1px solid #eee; padding: 8px 20px; font-size: 9px; color: #aaa; text-align: center; }
+    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
+    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
+    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
+    .body { flex: 1; display: flex; min-height: 0; }
+    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
+    .qr-img { width: 15mm; height: 15mm; display: block; }
+    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
+    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
+    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
+    .field { display: flex; flex-direction: column; gap: 0.2mm; }
+    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
+    .fv.mono { font-family: monospace; font-size: 5pt; }
+    .fv.red { color: #cc0000; font-size: 6pt; }
+    .full { grid-column: 1 / -1; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head><body>
   ${pages.join("")}
