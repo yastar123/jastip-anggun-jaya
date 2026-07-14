@@ -1,21 +1,12 @@
 ---
 name: Thermal label printing convention
-description: Standard for all barcode/label print HTML builders in the Jastip app — 100mm x 50mm, not A4 or 100x100.
+description: Physical label size and shared print module for Jastip barcode/QR label printouts
 ---
 
-All package/barcode label print functions in `artifacts/jastip/src/pages/admin/barcode.tsx` and
-`barcode-batch-detail.tsx` must target a **100mm x 50mm thermal label** (`@page { size: 100mm 50mm; margin: 0; }`),
-not A4 and not a square 100x100mm label.
+The physical thermal printer used in the shop is **100mm × 150mm** (not 50mm or 100mm square, and not A4 — those were past mistakes). All barcode/QR label print HTML must target this exact page size and fill it (QR + info must not float in a corner or overflow).
 
-**Why:** the physical printer is a 100x50mm thermal label printer. Sizing for A4 caused printed labels to
-render tiny/shrunk into a corner of an A4-sized page; sizing for 100x100 overflowed the actual 50mm-tall stock.
+All label print builders (single, grouped-by-customer, batch "print all", group "print all") share one module: `artifacts/jastip/src/lib/print-label.ts`, exposing `LABEL_WIDTH_MM`/`LABEL_HEIGHT_MM`, `LABEL_STYLES`, and helpers `qrSectionHtml()`, `labelPageHtml()`, `labelDocumentHtml()`. This replaced ~5 near-duplicate inline HTML/CSS builders previously spread across `barcode.tsx`, `barcode-batch-detail.tsx`, `barcode-group-detail.tsx`, and `packages-detail.tsx`.
 
-**How to apply:**
-- Layout pattern: red header bar (brand name + tagline) → body row (QR code in a ~20mm-wide left column, package/customer
-  info in a right-side 2-col grid) → thin footer bar. Fonts are in `pt`/`mm` units sized to fit within 50mm height, not `px`.
-- Per-customer/group and batch "print all" labels **cannot** fit an itemized per-package table in 50mm of height — they
-  were redesigned to show only aggregate fields (customer, totals, batch tag), matching the single-label design, with
-  the itemized detail left to the in-app UI instead of the printout.
-- There are currently 4 near-duplicate inline HTML/CSS builders implementing this same layout (single, grouped x2,
-  batch-print x2) — see the tracked follow-up task about consolidating them into one shared template before adding new
-  fields, or updates will drift.
+**Why:** the builders had drifted to different, wrong page sizes over time (A4, 100×50mm, 100×100mm, 200×200mm) because each print call site duplicated its own markup/CSS instead of sharing one source of truth.
+
+**How to apply:** any new label print flow should import from `print-label.ts` rather than writing inline HTML/CSS. `arsip-batch-detail.tsx`'s `buildGroupedArsipPrintHtml` is a different document type (A4 "archive report", not a thermal barcode label) and intentionally does not use this module.

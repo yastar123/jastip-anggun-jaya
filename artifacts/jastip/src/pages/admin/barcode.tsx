@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2, Ship, ChevronDown, ChevronUp, Lock, Archive, Clock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { labelDocumentHtml, labelPageHtml, qrSectionHtml } from "@/lib/print-label";
 
 const PAGE_SIZE = 15;
 
@@ -75,68 +76,23 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batc
   const batchRow = batchLabel
     ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
     : "";
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
-  <style>
-    @page { size: 200mm 200mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 200mm; height: 200mm; overflow: hidden; background: #fff; margin:0; padding:0; }
-    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
-    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
-    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
-    .qr-img { width: 55mm; height: 55mm; display: block; }
-    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
-    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
-    .field { display: flex; flex-direction: column; gap: 0.5mm; }
-    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.mono { font-family: monospace; font-size: 10pt; }
-    .fv.red { color: #cc0000; font-size: 13pt; }
-    .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div class="h-title">JASTIP ANGGUN JAYA</div>
-      <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-    </div>
-    <div class="body">
-      <div class="left">
-        <div class="scan-label">SCAN RESI</div>
-        <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-        <div class="qr-txt">${qrValue}</div>
+  const inner = `${qrSectionHtml(qrDataUrl, qrValue)}
+    <div class="info">
+      <div class="cust">${pkg.customerName || "-"}</div>
+      <div class="grid">
+        <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
+        <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
+        <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
+        <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${serviceType}</div></div>
+        <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
+        <div class="field"><div class="fl">Berat Real</div><div class="fv">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</div></div>
+        <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
+        <div class="field"><div class="fl">Jenis Paking</div><div class="fv">${pkg.packagingType || "-"}</div></div>
+        <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
+        ${batchRow}
       </div>
-      <div class="right">
-        <div class="cust">${pkg.customerName || "-"}</div>
-        <div class="grid">
-          <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-          <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-          <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
-          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${serviceType}</div></div>
-          <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-          <div class="field"><div class="fl">Berat Real</div><div class="fv">${pkg.realWeight != null ? pkg.realWeight + " Kg" : "-"}</div></div>
-          <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-          <div class="field"><div class="fl">Jenis Paking</div><div class="fv">${pkg.packagingType || "-"}</div></div>
-          <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
-          ${batchRow}
-        </div>
-      </div>
-    </div>
-    <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-  </div>
-  <script>window.onload = () => { window.print(); window.close(); }</script>
-</body>
-</html>`;
+    </div>`;
+  return labelDocumentHtml(`Label Paket - ${pkg.resiNumber || pkg.barcode}`, labelPageHtml(inner));
 }
 
 function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
@@ -146,64 +102,19 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
   const batchRow = batchLabel
     ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
     : "";
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <title>Label Grup - ${first?.customerName}</title>
-  <style>
-    @page { size: 200mm 200mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 200mm; height: 200mm; overflow: hidden; background: #fff; margin:0; padding:0; }
-    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
-    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
-    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
-    .qr-img { width: 55mm; height: 55mm; display: block; }
-    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
-    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
-    .field { display: flex; flex-direction: column; gap: 0.5mm; }
-    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.red { color: #cc0000; font-size: 13pt; }
-    .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div class="h-title">JASTIP ANGGUN JAYA</div>
-      <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-    </div>
-    <div class="body">
-      <div class="left">
-        <div class="scan-label">SCAN RESI</div>
-        <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-        <div class="qr-txt">${qrValue}</div>
+  const inner = `${qrSectionHtml(qrDataUrl, qrValue)}
+    <div class="info">
+      <div class="cust">${first?.customerName || "-"}</div>
+      <div class="grid">
+        <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
+        <div class="field"><div class="fl">Total Berat</div><div class="fv">${totalWeight.toFixed(3)} Kg</div></div>
+        <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+        <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShipping.toLocaleString("id-ID")}</div></div>
+        <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
+        ${batchRow}
       </div>
-      <div class="right">
-        <div class="cust">${first?.customerName || "-"}</div>
-        <div class="grid">
-          <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
-          <div class="field"><div class="fl">Total Berat</div><div class="fv">${totalWeight.toFixed(3)} Kg</div></div>
-          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-          <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShipping.toLocaleString("id-ID")}</div></div>
-          <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
-          ${batchRow}
-        </div>
-      </div>
-    </div>
-    <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-  </div>
-  <script>window.onload = () => { window.print(); window.close(); }</script>
-</body>
-</html>`;
+    </div>`;
+  return labelDocumentHtml(`Label Grup - ${first?.customerName}`, labelPageHtml(inner));
 }
 
 function BarcodeItem({
@@ -497,72 +408,23 @@ function BatchBarcodeSection({
       try {
         qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
       } catch { continue; }
-      pages.push(`
-        <div class="page">
-          <div class="wrap">
-            <div class="header">
-              <div class="h-title">JASTIP ANGGUN JAYA</div>
-              <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-            </div>
-            <div class="body">
-              <div class="left">
-                <div class="scan-label">SCAN RESI</div>
-                <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-                <div class="qr-txt">${qrValue}</div>
-              </div>
-              <div class="right">
-                <div class="cust">${pkg.customerName || "-"}</div>
-                <div class="grid">
-                  <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div></div>
-                  <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-                  <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-                  <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-                  <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
-                  <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+      pages.push(labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
+        <div class="info">
+          <div class="cust">${pkg.customerName || "-"}</div>
+          <div class="grid">
+            <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
+            <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
+            <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div></div>
+            <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+            <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
+            <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
+            <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
+            <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
           </div>
-        </div>
-      `);
+        </div>`));
     }
     if (!pages.length) return;
-    const html = `<!DOCTYPE html>
-<html><head>
-  <title>Print Barcode — ${batchLabel}</title>
-  <style>
-    @page { size: 200mm 200mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; margin:0; padding:0; }
-    .page { width: 200mm; height: 200mm; overflow: hidden; page-break-after: always; break-after: page; }
-    .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
-    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
-    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
-    .qr-img { width: 55mm; height: 55mm; display: block; }
-    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
-    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
-    .field { display: flex; flex-direction: column; gap: 0.5mm; }
-    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.mono { font-family: monospace; font-size: 10pt; }
-    .fv.red { color: #cc0000; font-size: 13pt; }
-    .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head><body>
-  ${pages.join("")}
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
-</body></html>`;
+    const html = labelDocumentHtml(`Print Barcode — ${batchLabel}`, pages.join(""));
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);
@@ -831,76 +693,23 @@ export default function AdminBarcode() {
       try {
         qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
       } catch { continue; }
-      pages.push(`
-        <div class="page">
-          <div class="wrap">
-            <div class="header">
-              <div class="h-title">JASTIP ANGGUN JAYA</div>
-              <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
-            </div>
-            <div class="body">
-              <div class="left">
-                <div class="scan-label">SCAN RESI</div>
-                <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-                <div class="qr-txt">${qrValue}</div>
-              </div>
-              <div class="right">
-                <div class="cust">${pkg.customerName || "-"}</div>
-                <div class="grid">
-                  <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-                  <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div></div>
-                  <div class="field"><div class="fl">Status</div><div class="fv"><span class="status" style="background:${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"};color:${pkg.status === "diserahkan" ? "#166534" : "#713f12"}">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></div></div>
-                  <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-                  <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-                  <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-                  <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
+      pages.push(labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
+        <div class="info">
+          <div class="cust">${pkg.customerName || "-"}</div>
+          <div class="grid">
+            <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
+            <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
+            <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkg.packageDate ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-"}</div></div>
+            <div class="field"><div class="fl">Status</div><div class="fv"><span class="status" style="background:${pkg.status === "diserahkan" ? "#dcfce7" : "#fef9c3"};color:${pkg.status === "diserahkan" ? "#166534" : "#713f12"}">${pkg.status === "diserahkan" ? "✓ Diserahkan" : "● Pending"}</span></div></div>
+            <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+            <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
+            <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
+            <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
           </div>
-        </div>
-      `);
+        </div>`));
     }
     if (!pages.length) return;
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-  <title>${title}</title>
-  <style>
-    @page { size: 200mm 200mm; margin: 0; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: #fff; margin:0; padding:0; }
-    .page { width: 200mm; height: 200mm; overflow: hidden; page-break-after: always; break-after: page; }
-    .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 200mm; height: 200mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 2.5mm 5mm 2mm; flex-shrink: 0; }
-    .h-title { font-size: 18pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; }
-    .h-sub { font-size: 8pt; opacity: 0.9; margin-top: 1mm; }
-    .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 60mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 9pt; font-weight: 900; padding: 1.5mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2mm; }
-    .qr-img { width: 55mm; height: 55mm; display: block; }
-    .qr-txt { font-size: 6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 55mm; line-height: 1.2; }
-    .right { flex: 1; padding: 2mm 4mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.2; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 4mm; }
-    .field { display: flex; flex-direction: column; gap: 0.5mm; }
-    .fl { font-size: 8pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
-    .fv { font-size: 11pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.mono { font-family: monospace; font-size: 10pt; }
-    .fv.red { color: #cc0000; font-size: 13pt; }
-    .full { grid-column: 1 / -1; }
-    .status { display: inline-block; padding: 0.8mm 2.5mm; border-radius: 3mm; font-size: 8pt; font-weight: 700; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1.5mm 5mm; font-size: 6pt; color: #bbb; text-align: center; flex-shrink: 0; }
-  </style>
-</head>
-<body>
-  ${pages.join("")}
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
-</body>
-</html>`;
+    const html = labelDocumentHtml(title, pages.join(""));
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(html);

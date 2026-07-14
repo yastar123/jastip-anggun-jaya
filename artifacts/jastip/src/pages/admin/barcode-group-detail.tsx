@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Pencil, Trash2, Printer, Package, QrCode, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { labelDocumentHtml, labelPageHtml, qrSectionHtml } from "@/lib/print-label";
 
 function formatRp(n: any) {
   if (n == null) return "-";
@@ -193,68 +194,23 @@ export default function BarcodeGroupDetail() {
       const pkgDate = p.packageDate ? new Date(p.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-";
       const svcType = p.serviceType ? p.serviceType.replace("jastip ", "Jastip ") : "-";
       const ongkir = p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-";
-      return `
-        <div class="label">
-          <div class="header">
-            <div class="h-title">JASTIP ANGGUN JAYA</div>
-            <div class="h-sub">Layanan Pengiriman Paket — Jakarta · Surabaya · Manokwari · Papua</div>
+      return labelPageHtml(`${qrSectionHtml(qrDataUrls[i], qrValue)}
+        <div class="info">
+          <div class="cust">${p.customerName || "-"}</div>
+          <div class="grid">
+            <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${p.resiNumber || "-"}</div></div>
+            <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${p.packageNumber || "-"}</div></div>
+            <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
+            <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
+            <div class="field full"><div class="fl">Rute</div><div class="fv">${p.deliveryRoute || "-"}</div></div>
+            <div class="field"><div class="fl">Berat Real</div><div class="fv">${p.realWeight != null ? p.realWeight + " Kg" : "-"}</div></div>
+            <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</div></div>
+            <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
           </div>
-          <div class="body">
-            <div class="left">
-              <div class="scan-label">SCAN RESI</div>
-              <img class="qr-img" src="${qrDataUrls[i]}" alt="QR" />
-              <div class="qr-txt">${qrValue}</div>
-            </div>
-            <div class="right">
-              <div class="cust">${p.customerName || "-"}</div>
-              <div class="grid">
-                <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${p.resiNumber || "-"}</div></div>
-                <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${p.packageNumber || "-"}</div></div>
-                <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
-                <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
-                <div class="field full"><div class="fl">Rute</div><div class="fv">${p.deliveryRoute || "-"}</div></div>
-                <div class="field"><div class="fl">Berat Real</div><div class="fv">${p.realWeight != null ? p.realWeight + " Kg" : "-"}</div></div>
-                <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</div></div>
-                <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
-              </div>
-            </div>
-          </div>
-          <div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>
-        </div>
-      `;
+        </div>`);
     }).join("");
 
-    win.document.write(`<!DOCTYPE html><html><head>
-      <title>Label — ${groupName || "Grup Paket"}</title>
-      <style>
-        @page { size: 100mm 100mm; margin: 0; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; background: #fff; }
-        .label { width: 100mm; height: 100mm; display: flex; flex-direction: column; page-break-after: always; overflow: hidden; }
-        .label:last-child { page-break-after: auto; }
-        .header { background: #cc0000; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
-        .h-title { font-size: 13pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
-        .h-sub { font-size: 4.5pt; opacity: 0.9; margin-top: 0.8mm; }
-        .body { flex: 1; display: flex; min-height: 0; }
-        .left { width: 31mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 3mm 2mm 2mm; flex-shrink: 0; }
-        .scan-label { background: #cc0000; color: #fff; font-size: 5.5pt; font-weight: 900; padding: 1mm 2.5mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2.5mm; }
-        .qr-img { width: 23mm; height: 23mm; display: block; }
-        .qr-txt { font-size: 3.2pt; color: #888; font-family: monospace; text-align: center; margin-top: 2mm; word-break: break-all; max-width: 27mm; line-height: 1.3; }
-        .right { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
-        .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.1; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 2.5mm; }
-        .field { display: flex; flex-direction: column; gap: 0.3mm; }
-        .fl { font-size: 4pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; }
-        .fv { font-size: 7pt; font-weight: 700; color: #222; line-height: 1.2; }
-        .fv.mono { font-family: monospace; font-size: 6.5pt; }
-        .fv.red { color: #cc0000; font-size: 8.5pt; }
-        .full { grid-column: 1 / -1; }
-        .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1mm 3mm; font-size: 3.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
-      </style>
-    </head><body>
-      ${pages}
-      <script>window.onload = () => { window.print(); window.close(); }</script>
-    </body></html>`);
+    win.document.write(labelDocumentHtml(`Label — ${groupName || "Grup Paket"}`, pages));
     win.document.close();
   }
 
