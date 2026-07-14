@@ -209,11 +209,11 @@ function GroupedBarcodeCard({
         </div>
         <div className="text-xs font-semibold text-primary mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
         <div className="flex gap-1.5 mb-1.5">
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={printBarcode}>
-            <Printer className="w-3 h-3 mr-1" /> Cetak
+          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={printBarcode}>
+            <Printer className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Cetak</span>
           </Button>
-          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={downloadBarcode}>
-            <Download className="w-3 h-3 mr-1" /> Unduh
+          <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={downloadBarcode}>
+            <Download className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Unduh</span>
           </Button>
         </div>
         <Button
