@@ -80,10 +80,10 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batc
 <head>
   <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
   <style>
-    @page { size: 100mm 50mm; margin: 0; }
+    @page { size: 100mm 100mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 50mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
+    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
     .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
     .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
     .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
@@ -152,10 +152,10 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
 <head>
   <title>Label Grup - ${first?.customerName}</title>
   <style>
-    @page { size: 100mm 50mm; margin: 0; }
+    @page { size: 100mm 100mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 50mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
+    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
     .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
     .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
     .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
@@ -534,12 +534,12 @@ function BatchBarcodeSection({
 <html><head>
   <title>Print Barcode — ${batchLabel}</title>
   <style>
-    @page { size: 100mm 50mm; margin: 0; }
+    @page { size: 100mm 100mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 100mm; height: 50mm; overflow: hidden; page-break-after: always; break-after: page; }
+    .page { width: 100mm; height: 100mm; overflow: hidden; page-break-after: always; break-after: page; }
     .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
     .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
     .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
     .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
@@ -872,12 +872,12 @@ export default function AdminBarcode() {
 <head>
   <title>${title}</title>
   <style>
-    @page { size: 100mm 50mm; margin: 0; }
+    @page { size: 100mm 100mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; background: #fff; }
-    .page { width: 100mm; height: 50mm; overflow: hidden; page-break-after: always; break-after: page; }
+    .page { width: 100mm; height: 100mm; overflow: hidden; page-break-after: always; break-after: page; }
     .page:last-child { page-break-after: avoid; break-after: avoid; }
-    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
     .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
     .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
     .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
