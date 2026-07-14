@@ -4,8 +4,10 @@ Platform manajemen jastip ekspedisi untuk bisnis "Jastip Anggun Jaya" — mengel
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
-- `pnpm --filter @workspace/jastip run dev` — run the frontend (port 21033)
+- Two workflows are configured and running: `API Server` (port 8080, console) and `Start application` (port 5000, webview — this is what shows in Preview)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080) manually
+- `pnpm --filter @workspace/jastip run dev` — run the frontend manually (defaults to port 5000; vite proxies `/api` to `localhost:8080`)
+- `pnpm --filter @workspace/scripts run seed-demo` — seed demo accounts (owner/admin/customer) into the DB
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
