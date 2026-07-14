@@ -1,0 +1,163 @@
+Claude selesai meresponscara setting printer thermal agar print barcode website sya dengan printer iniNavigated thermal printer setup complexities, sought clarifying specificationsNavigated thermal printer setup complexities, sought clarifying specificationsUntuk mencetak barcode dari website ke printer thermal, langkah-langkahnya tergantung dari setup Anda. Berikut panduan umum yang biasa dipakai:
+1. Install Driver Printer Thermal
+
+Sambungkan printer thermal ke komputer (USB/Bluetooth/LAN).
+Install driver resmi dari pabrikan (misal: Epson TM-T20/T82, Xprinter, Zebra GK420, dll — cari "driver [merk+tipe printer] windows/mac").
+Setelah terinstall, printer akan muncul di Devices and Printers (Windows) atau System Settings > Printers (Mac).
+
+2. Atur Ukuran Kertas Sesuai Label/Struk
+
+Buka Printer Properties > Preferences.
+Set ukuran kertas custom sesuai label barcode Anda (misal 58mm x 40mm, atau ukuran struk 58mm/80mm).
+Set orientasi dan margin ke 0 agar tidak terpotong.
+
+3. Cetak dari Browser
+
+Buka halaman barcode di website Anda.
+Tekan Ctrl+P (Windows) atau Cmd+P (Mac).
+Pilih printer thermal Anda sebagai tujuan cetak.
+Di pengaturan lanjutan, matikan margin/header-footer, dan pastikan skala "100%" atau "Fit to page" sesuai kebutuhan.
+
+4. Jika Hasil Cetak Kurang Presisi (Umum Terjadi)
+Browser sering kurang akurat untuk mencetak barcode karena mengikuti tata letak halaman web, bukan ukuran label asli. Solusi yang lebih baik:
+
+Gunakan software bridge seperti QZ Tray (gratis, open-source) yang bisa dipanggil dari JavaScript website untuk print langsung ke printer thermal via ESC/POS command — hasil lebih presisi dan bisa auto-print tanpa dialog print.
+Kalau website berbasis sistem kasir/POS (WooCommerce, custom web app, dll), banyak yang pakai QZ Tray atau plugin serupa untuk printer thermal.
+
+Agar saya bisa kasih langkah yang lebih spesifik dan tepat sasaran, boleh bantu jawab dulu:ada bug ukurannya yang di printMengidentifikasi penyebab umum masalah ukuran cetak thermal printerMengidentifikasi penyebab umum masalah ukuran cetak thermal printerBug ukuran yang salah saat print ke printer thermal biasanya disebabkan beberapa hal berikut. Coba dicek satu-satu:
+1. Ukuran Kertas di Driver Tidak Sesuai
+
+Buka Control Panel > Printer & Scanner > [Printer Thermal Anda] > Printing Preferences.
+Cek apakah Paper Size sudah diset custom sesuai label barcode Anda (misal 40mm x 30mm, 58mm x 40mm), bukan ukuran default seperti A4/Letter.
+Kalau ukurannya tidak ada di daftar, buat custom paper size baru lewat Printer Properties > Advanced > Custom Paper Size.
+
+2. Scaling di Dialog Print Browser
+
+Saat Ctrl+P, cek bagian More settings:
+
+Scale: pastikan diset "Default"/"100%", JANGAN pakai "Fit to page" — ini sering jadi penyebab barcode mengecil/membesar otomatis mengikuti ukuran kertas driver.
+Margins: set ke "None".
+Paper size: pilih ukuran custom yang sudah dibuat di driver, bukan A4.
+
+
+
+3. CSS Website Tidak Diset untuk Ukuran Label
+Kalau Anda yang membuat halaman barcode di website, ukurannya harus didefinisikan eksplisit pakai @media print dan satuan fisik (mm/cm), bukan px atau %. Contoh:
+css@media print {
+  @page {
+    size: 58mm 40mm;
+    margin: 0;
+  }
+  body {
+    width: 58mm;
+    height: 40mm;
+  }
+}
+Tanpa ini, browser akan menyesuaikan ukuran halaman ke default (biasanya A4), sehingga barcode tercetak kecil di pojok atau malah terpotong.
+4. DPI Printer vs DPI Gambar Barcode
+Kalau barcode-nya berupa gambar (bukan font/vector), pastikan resolusinya cukup tinggi (min. 203 DPI, sesuai printer thermal kebanyakan). Barcode dari gambar low-res akan tercetak buram atau ukurannya melar/menyusut tidak proporsional.
+Boleh tahu lebih detail biar saya bisa kasih solusi yang pas:ukurang bercode dll jadi kecil seperti gambar padahal di mode preview sudah pasMengidentifikasi masalah skala cetak dan merancang solusi troubleshootingMengidentifikasi masalah skala cetak dan merancang solusi troubleshootingIni gejala klasik: preview di browser sudah pas (karena mengikuti CSS @page size Anda), tapi begitu tercetak fisik jadi mengecil. Penyebab paling umum untuk kasus ini:
+Penyebab #1: Paper Size Driver ≠ Paper Size CSS (paling sering terjadi)
+Browser me-render preview sesuai @page { size: 58mm 40mm } di CSS Anda, TAPI kalau paper size yang aktif di driver printer ternyata beda (misal driver masih set ke A4/Letter atau ukuran default lain), maka:
+
+Browser terpaksa "menyusutkan" konten agar muat ke ukuran kertas driver → hasil jadi kecil.
+
+Solusi: Pastikan ukuran kertas di driver printer (Printing Preferences) PERSIS SAMA dengan yang didefinisikan di CSS @page. Kalau CSS-nya 58mm x 40mm, driver juga harus diset custom paper size 58mm x 40mm — bukan dipilih dari dropdown default.
+Penyebab #2: Scale Otomatis "Fit to Printable Area"
+Beberapa driver printer thermal (terutama Windows generic/text driver atau driver merk tertentu) punya opsi tersembunyi seperti "Shrink to fit" atau "Scale to fit" yang aktif default. Ini akan menyusutkan hasil cetak walau preview browser sudah benar.
+Solusi: Cek di Printer Properties > Advanced atau Preferences, cari opsi scaling dan set ke 100% / None / Actual Size.
+Penyebab #3: Print Dialog Browser Sendiri Override
+Saat Ctrl+P, cek ulang bagian Scale di dialog print — kadang browser (terutama Chrome) otomatis pilih "Fit to printable area" meskipun paper size sudah dipilih benar.
+Solusi: Ubah manual ke "Custom" → 100%.
+
+Cara cepat mengecek mana penyebabnya:
+
+Buka dialog print (Ctrl+P).
+Screenshot atau cek apakah Paper size yang terpilih sudah sesuai (bukan A4).
+Cek nilai Scale — kalau bukan "100%" atau "Default", itu biang keroknya.
+
+Kalau sudah dicek dan paper size + scale sudah benar tapi tetap kecil, kemungkinan besar drivernya sendiri yang override — solusi paling stabil adalah pakai QZ Tray untuk print langsung via ESC/POS command, karena ini bypass sepenuhnya print dialog browser dan drivernya jadi presisi 1:1 ke ukuran fisik.
+Printer thermal-nya merk/tipe apa? Biar saya bisa cek pengaturan spesifik di driver-nya.Berpikir selama 7 detikBerpikir selama 7 detikSudah kelihatan penyebabnya dari screenshot ini. Ada 2 masalah yang kelihatan jelas:
+1. "Headers and footers" masih AKTIF (tercentang) ❌
+Ini yang paling mungkin jadi biang kerok. Kalau opsi ini aktif, Chrome otomatis menambahkan header (judul halaman/URL) dan footer (nomor halaman) di setiap sisi kertas — ini memakan ruang, sehingga konten label/barcode Anda "dipaksa mengecil" agar muat di sisa area yang tersedia.
+Solusi: Klik checkbox "Headers and footers" untuk matikan/uncheck.
+2. Margins masih "Default", bukan "None"
+Margin default Chrome cukup besar (biasanya ~1.27cm/0.5 inch di semua sisi). Untuk label kecil seperti ini, margin segitu sudah memakan porsi signifikan dari kertas.
+Solusi: Ubah dropdown Margins dari "Default" → "None".
+3. Scale sebaiknya dicek juga
+Scale masih "Default" — untuk custom paper size sebaiknya diubah ke "Custom" → 100% supaya tidak ada penyesuaian otomatis.
+
+Langkah perbaikan:
+
+Uncheck Headers and footers
+Ubah Margins → None
+Ubah Scale → Custom 100%
+Cek preview lagi — seharusnya konten label sekarang mengisi penuh area kertas "USER" yang sudah dipilih.
+
+Kalau setelah 3 langkah ini masih kecil juga, kemungkinan besar ukuran fisik "USER" paper size yang didefinisikan di driver tidak sama dengan ukuran CSS @page di website Anda (misal driver di-set 100mm x 150mm padahal CSS Anda define 58mm x 40mm) — perlu disamakan persis di kedua tempat.
+Coba dulu 3 langkah di atas, kabari hasilnya ya.Mengidentifikasi dimensi kertas dan merencanakan penyesuaian pengaturanMengidentifikasi dimensi kertas dan merencanakan penyesuaian pengaturanBaik, berarti ukuran labelnya 100mm x 50mm — ini persis sama dengan nilai awal yang sudah benar di Diagnostic Tool tadi (3.94 inch x 1.97 inch). Jadi:
+1. Kembalikan Paper Height ke Nilai Semula
+
+Buka lagi Diagnostic Tool
+Ubah Paper Height dari 5 (yang Anda ubah tadi) kembali ke 1.97 (inch) — atau kalau mau lebih presisi, klik radio button "mm" dulu, lalu isi:
+
+Paper Width: 100 mm
+Paper Height: 50 mm
+
+
+Klik Set → Save
+
+2. Set Ukuran yang Sama di Windows Printing Preferences
+
+Buka Printing Preferences printer di Windows
+Set Paper Size custom ke 100mm x 50mm (samakan persis)
+Set Margins ke 0 semua sisi
+
+3. Set CSS di Website (Kalau Anda Kelola Websitenya)
+css@media print {
+  @page {
+    size: 100mm 50mm;
+    margin: 0;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100mm;
+    height: 50mm;
+  }
+}
+Ini memastikan konten (barcode, teks, dll) didesain untuk mengisi penuh area 100mm x 50mm, bukan ukuran kertas lain seperti A4.
+4. Print Langsung dari Website (Bukan Test Page)
+Setelah 3 langkah di atas selesai, langsung coba print halaman barcode/label dari website Anda (bukan "Print TestPage" bawaan Diagnostic Tool) — itu baru bisa menunjukkan apakah kontennya sudah memenuhi label dengan benar.
+
+Silakan kembalikan Paper Height ke 50mm/1.97 inch dulu, samakan di Windows, lalu langsung coba print halaman barcode asli dari website Anda — kirim hasilnya untuk saya cek.import { useEffect, useRef, useState } from "react";
+import { useListPackages, getListPackagesQueryKey, useListBatches } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import QRCode from "qrcode";
+import { ButtonpastedkdoenyaUnable to determine primary language from "kdoenya"Unable to determine primary language from "kdoenya"Ini penyebab pastinya! Saya sudah cek kodenya, dan ternyata ada mismatch ukuran di file ini:
+Masalah Utama: buildSinglePrintHtml (fungsi cetak 1 barcode)
+css@page { size: 100mm 100mm; margin: 0; }
+body { ... width: 100mm; height: 100mm; ... }
+Kode ini men-desain label untuk ukuran 100mm x 100mm (persegi), padahal printer fisik Anda 100mm x 50mm (setengah dari tinggi yang di-desain). Makanya hasil cetak jadi tidak pas — konten didesain untuk kertas 2x lebih tinggi dari kertas fisik yang sebenarnya.
+Perbaikan:
+Ganti baris ini:
+css@page { size: 100mm 100mm; margin: 0; }
+Menjadi:
+css@page { size: 100mm 50mm; margin: 0; }
+Dan baris ini:
+cssbody { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
+Menjadi:
+cssbody { font-family: Arial, sans-serif; width: 100mm; height: 50mm; overflow: hidden; background: #fff; }
+Serta:
+css.wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
+Menjadi:
+css.wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+⚠️ Catatan penting: Karena tinggi labelnya jadi setengah (50mm bukan 100mm), elemen-elemen di dalamnya (QR code 23mm, font size, padding) kemungkinan akan terlalu besar/overflow dan perlu di-scale ulang juga supaya tetap muat rapi di ruang yang lebih pendek. Beberapa yang perlu disesuaikan: ukuran font .cust (14pt mungkin kegedean), ukuran QR .qr-img (23mm mungkin kegedean untuk tinggi 50mm), padding di .header, dan .grid gap.
+Masalah Lain: Fungsi Print Grup & Print Batch
+Fungsi buildGroupedPrintHtml, printBatch (dalam BatchBarcodeSection), dan doPrintBarcodes (print semua) semuanya pakai:
+css@page { size: A4 portrait; margin: 12mm; }
+Ini didesain untuk kertas A4 biasa, bukan printer thermal 100x50mm Anda. Kalau tombol "Cetak" grup/batch/semua ini juga diarahkan ke printer thermal yang sama, hasilnya pasti kacau (karena A4 jauh lebih besar).
+
+Pertanyaan untuk saya pastikan dulu:
+Apakah tombol "Cetak" untuk grup/batch/print semua ini memang sengaja dibuat untuk print ke printer biasa/A4 (bukan thermal), atau seharusnya juga ke printer thermal 100x50mm yang sama? Ini menentukan apakah perlu saya perbaiki juga fungsi grup/batch, atau cukup buildSinglePrintHtml saja.

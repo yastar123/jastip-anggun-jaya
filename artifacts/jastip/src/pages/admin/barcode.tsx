@@ -80,28 +80,28 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batc
 <head>
   <title>Label Paket - ${pkg.resiNumber || pkg.barcode}</title>
   <style>
-    @page { size: 100mm 100mm; margin: 0; }
+    @page { size: 100mm 50mm; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; width: 100mm; height: 100mm; overflow: hidden; background: #fff; }
-    .wrap { width: 100mm; height: 100mm; display: flex; flex-direction: column; }
-    .header { background: #cc0000; color: #fff; padding: 3mm 4mm 2.5mm; flex-shrink: 0; }
-    .h-title { font-size: 13pt; font-weight: 900; letter-spacing: 1px; line-height: 1; }
-    .h-sub { font-size: 4.5pt; opacity: 0.9; margin-top: 0.8mm; }
+    body { font-family: Arial, sans-serif; width: 100mm; height: 50mm; overflow: hidden; background: #fff; }
+    .wrap { width: 100mm; height: 50mm; display: flex; flex-direction: column; }
+    .header { background: #cc0000; color: #fff; padding: 1.4mm 3mm 1mm; flex-shrink: 0; }
+    .h-title { font-size: 9pt; font-weight: 900; letter-spacing: 0.5px; line-height: 1; }
+    .h-sub { font-size: 3.2pt; opacity: 0.9; margin-top: 0.5mm; }
     .body { flex: 1; display: flex; min-height: 0; }
-    .left { width: 31mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 3mm 2mm 2mm; flex-shrink: 0; }
-    .scan-label { background: #cc0000; color: #fff; font-size: 5.5pt; font-weight: 900; padding: 1mm 2.5mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 2.5mm; }
-    .qr-img { width: 23mm; height: 23mm; display: block; }
-    .qr-txt { font-size: 3.2pt; color: #888; font-family: monospace; text-align: center; margin-top: 2mm; word-break: break-all; max-width: 27mm; line-height: 1.3; }
-    .right { flex: 1; padding: 2.5mm 3mm; overflow: hidden; }
-    .cust { font-size: 14pt; font-weight: 900; color: #111; margin-bottom: 2mm; border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.1; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 2.5mm; }
-    .field { display: flex; flex-direction: column; gap: 0.3mm; }
-    .fl { font-size: 4pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; }
-    .fv { font-size: 7pt; font-weight: 700; color: #222; line-height: 1.2; }
-    .fv.mono { font-family: monospace; font-size: 6.5pt; }
-    .fv.red { color: #cc0000; font-size: 8.5pt; }
+    .left { width: 20mm; border-right: 0.5px solid #ddd; display: flex; flex-direction: column; align-items: center; padding: 1.4mm 1mm 1mm; flex-shrink: 0; }
+    .scan-label { background: #cc0000; color: #fff; font-size: 4pt; font-weight: 900; padding: 0.6mm 1.8mm; border-radius: 2px; letter-spacing: 0.3px; margin-bottom: 1.2mm; }
+    .qr-img { width: 15mm; height: 15mm; display: block; }
+    .qr-txt { font-size: 2.6pt; color: #888; font-family: monospace; text-align: center; margin-top: 1mm; word-break: break-all; max-width: 18mm; line-height: 1.2; }
+    .right { flex: 1; padding: 1.2mm 2mm; overflow: hidden; }
+    .cust { font-size: 8pt; font-weight: 900; color: #111; margin-bottom: 1mm; border-bottom: 0.5px solid #eee; padding-bottom: 0.8mm; line-height: 1.1; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 2mm; }
+    .field { display: flex; flex-direction: column; gap: 0.2mm; }
+    .fl { font-size: 3pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+    .fv { font-size: 5.5pt; font-weight: 700; color: #222; line-height: 1.15; }
+    .fv.mono { font-family: monospace; font-size: 5pt; }
+    .fv.red { color: #cc0000; font-size: 6pt; }
     .full { grid-column: 1 / -1; }
-    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 1mm 3mm; font-size: 3.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
+    .footer { border-top: 0.5px solid #eee; background: #f9f9f9; padding: 0.5mm 3mm; font-size: 2.8pt; color: #bbb; text-align: center; flex-shrink: 0; }
   </style>
 </head>
 <body>
