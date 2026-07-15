@@ -136,6 +136,19 @@ export default function AdminScan() {
     return r.json();
   }
 
+  // Menambahkan satu paket ke daftar scan, dengan deduplikasi atomik yang
+  // sama seperti alur single-package. Dipakai baik oleh scan biasa maupun
+  // saat memproses tiap anggota dari barcode grup.
+  // Return: "added" | "duplicate" | "delivered"
+  function addPackageItem(pkg: any): "added" | "duplicate" | "delivered" {
+    if (pkg.status === "diserahkan") return "delivered";
+    if (addedIdsRef.current.has(pkg.id)) return "duplicate";
+    addedIdsRef.current.add(pkg.id); // klaim ID — sinkron, tidak ada race
+    const newItem = toItem(pkg);
+    setItems((prev) => [...prev, newItem]);
+    return "added";
+  }
+
   // Mengembalikan true = boleh coba lagi dengan kode yang sama (tidak ditemukan / error)
   //               false = lock tetap terpasang (berhasil / sudah ada / sudah diserahkan)
   async function lookupAndAdd(code: string): Promise<boolean> {
@@ -144,11 +157,42 @@ export default function AdminScan() {
     setIsLooking(true);
     setAlreadyDelivered(null);
     try {
-      let pkg: any = null;
       const data = await fetchJson(`/api/packages/scan/${encodeURIComponent(trimmed)}`);
-      if (data.package) {
-        pkg = data.package;
-      } else {
+
+      // Barcode grup ("JAJ-GRUP-...") membungkus beberapa paket sekaligus —
+      // API mengembalikan semua anggotanya di bawah `packages`, bukan `package`.
+      if (data.group && Array.isArray(data.packages)) {
+        const groupPkgs = data.packages;
+        if (!groupPkgs.length) {
+          toast({ variant: "destructive", title: "Paket grup tidak ditemukan", description: `Barcode: ${trimmed}` });
+          return true;
+        }
+
+        let added = 0, duplicate = 0, delivered = 0;
+        let lastDelivered: any = null;
+        for (const pkg of groupPkgs) {
+          const result = addPackageItem(pkg);
+          if (result === "added") added++;
+          else if (result === "duplicate") duplicate++;
+          else { delivered++; lastDelivered = pkg; }
+        }
+
+        if (added > 0) {
+          toast({
+            title: `✓ ${added} paket grup ditambahkan`,
+            description: `${groupPkgs[0]?.customerName ?? ""}${duplicate ? ` · ${duplicate} sudah ada` : ""}${delivered ? ` · ${delivered} sudah diserahkan` : ""}`,
+          });
+        } else if (delivered > 0 && duplicate === 0) {
+          setAlreadyDelivered(lastDelivered);
+          toast({ title: "Grup sudah diserahkan sebelumnya", description: `${lastDelivered?.customerName ?? ""}` });
+        } else {
+          toast({ title: "Semua paket grup sudah ada dalam daftar" });
+        }
+        return false; // tetap lock → jangan proses ulang barcode grup yang sama
+      }
+
+      let pkg: any = data.package ?? null;
+      if (!pkg) {
         const list = await fetchJson(`/api/packages?search=${encodeURIComponent(trimmed)}`);
         if (Array.isArray(list) && list.length > 0) pkg = list[0];
       }

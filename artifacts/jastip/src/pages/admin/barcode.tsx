@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Download, Printer, Search, ArrowLeft, QrCode, CheckCircle2, Pencil, Trash2, Ship, ChevronDown, ChevronUp, Lock, Archive, Clock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { labelDocumentHtml, labelPageHtml, qrSectionHtml } from "@/lib/print-label";
+import { labelDocumentHtml, labelPageHtml, qrSectionHtml, groupQrValue } from "@/lib/print-label";
 
 const PAGE_SIZE = 15;
 
@@ -227,7 +227,7 @@ function GroupedBarcodeItem({
   const base = user?.role === "owner" ? "/owner" : "/admin";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const first = pkgs[0];
-  const qrValue = first?.barcode || first?.resiNumber || first?.id?.toString() || "";
+  const qrValue = groupQrValue(pkgs);
   const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
   const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
   const allPending = pkgs.every((p) => p.status !== "diserahkan");

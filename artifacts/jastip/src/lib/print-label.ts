@@ -69,6 +69,27 @@ export function labelFooterHtml() {
   return `<div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>`;
 }
 
+// Prefix used to encode a "grup" barcode — a single QR/barcode that stands
+// for several packages belonging to the same customer (same trip). Scanning
+// it (see admin/scan.tsx + POST /api/packages/scan/:barcode) must resolve
+// and add ALL of the underlying packages, not just one of them.
+export const GROUP_BARCODE_PREFIX = "JAJ-GRUP-";
+
+/**
+ * Builds the QR/barcode value for a set of packages. When there is more than
+ * one package, encodes all of their ids into a single group barcode so a
+ * single scan resolves every package in the group. A lone package keeps
+ * using its own individual barcode/resi so single-package labels are
+ * unaffected.
+ */
+export function groupQrValue(pkgs: { id: number; barcode?: string | null; resiNumber?: string | null }[]) {
+  if (pkgs.length > 1) {
+    return `${GROUP_BARCODE_PREFIX}${pkgs.map((p) => p.id).join("-")}`;
+  }
+  const first = pkgs[0];
+  return first?.barcode || first?.resiNumber || first?.id?.toString() || "";
+}
+
 export function qrSectionHtml(qrDataUrl: string, qrValue: string) {
   return `<div class="qr-section">
     <div class="scan-label">SCAN RESI</div>

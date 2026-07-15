@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, packagesTable, usersTable, serviceTypesTable, batchesTable } from "@workspace/db";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -428,10 +428,54 @@ router.post(
   },
 );
 
+// Prefix used by "grup" barcode labels (see print-label.ts groupQrValue) that
+// stand for several packages belonging to the same customer/trip. Must stay
+// in sync with GROUP_BARCODE_PREFIX in artifacts/jastip/src/lib/print-label.ts.
+const GROUP_BARCODE_PREFIX = "JAJ-GRUP-";
+
 // GET /api/packages/scan/:barcode
 router.get("/scan/:barcode", requireAuth, requireRole("admin", "owner"), async (req, res) => {
   try {
     const barcode = String(req.params.barcode);
+
+    if (barcode.startsWith(GROUP_BARCODE_PREFIX)) {
+      const ids = barcode
+        .slice(GROUP_BARCODE_PREFIX.length)
+        .split("-")
+        .map((s) => Number(s))
+        .filter((n) => Number.isInteger(n) && n > 0);
+
+      if (!ids.length) {
+        res.json({ valid: false, message: "Barcode grup tidak valid" });
+        return;
+      }
+
+      const groupPkgs = await db
+        .select()
+        .from(packagesTable)
+        .where(inArray(packagesTable.id, ids));
+
+      if (!groupPkgs.length) {
+        res.json({ valid: false, message: "Paket grup tidak ditemukan" });
+        return;
+      }
+
+      const adminIds = [...new Set(groupPkgs.map((p) => p.adminId).filter((v): v is number => v != null))];
+      const adminMap = new Map<number, any>();
+      if (adminIds.length) {
+        const admins = await db.select().from(usersTable).where(inArray(usersTable.id, adminIds));
+        for (const a of admins) adminMap.set(a.id, a);
+      }
+
+      res.json({
+        valid: true,
+        group: true,
+        message: "Paket grup ditemukan",
+        packages: groupPkgs.map((p) => formatPackage(p, new Map(), adminMap)),
+      });
+      return;
+    }
+
     let pkgs = await db
       .select()
       .from(packagesTable)

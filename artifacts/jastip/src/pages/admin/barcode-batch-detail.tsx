@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Pagination } from "@/components/pagination";
-import { labelDocumentHtml, labelPageHtml, qrSectionHtml } from "@/lib/print-label";
+import { labelDocumentHtml, labelPageHtml, qrSectionHtml, groupQrValue } from "@/lib/print-label";
 
 const PAGE_SIZE = 15;
 
@@ -99,7 +99,7 @@ function GroupedBarcodeCard({
   const base = user?.role === "owner" ? "/owner" : "/admin";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const first = pkgs[0];
-  const qrValue = first?.barcode || first?.resiNumber || first?.id?.toString() || "";
+  const qrValue = groupQrValue(pkgs);
   const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
   const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
   const allPending = pkgs.every((p) => p.status !== "diserahkan");
