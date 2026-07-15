@@ -41,15 +41,15 @@ export const LABEL_STYLES = `
   }
   .info { flex: 1; padding: 3.5mm 5mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
   .cust {
-    font-size: 15pt; font-weight: 900; color: #111; margin-bottom: 3mm; text-align: center;
+    font-size: 19pt; font-weight: 900; color: #111; margin-bottom: 3mm; text-align: center;
     border-bottom: 0.5px solid #eee; padding-bottom: 2mm; line-height: 1.15;
   }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 4mm; }
-  .field { display: flex; flex-direction: column; gap: 0.6mm; }
-  .fl { font-size: 6pt; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.4px; }
-  .fv { font-size: 9.5pt; font-weight: 700; color: #222; line-height: 1.2; }
-  .fv.mono { font-family: monospace; font-size: 9pt; }
-  .fv.red { color: #cc0000; font-size: 11pt; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 4mm; }
+  .field { display: flex; flex-direction: column; gap: 0.8mm; }
+  .fl { font-size: 7.5pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.4px; }
+  .fv { font-size: 13pt; font-weight: 700; color: #222; line-height: 1.2; }
+  .fv.mono { font-family: monospace; font-size: 12pt; }
+  .fv.red { color: #cc0000; font-size: 15pt; }
   .full { grid-column: 1 / -1; }
   .status { display: inline-block; padding: 0.8mm 2.5mm; border-radius: 3mm; font-size: 7.5pt; font-weight: 700; }
   .footer {
