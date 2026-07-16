@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Ship, Package, FileInput, FileSpreadsheet, ChevronDown, ChevronUp,
-  Lock, Archive, CheckCircle2, Clock,
+  Lock, Archive, CheckCircle2, Clock, Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
@@ -213,9 +213,10 @@ interface BatchCardProps {
   batch: any;
   base: string;
   onStatusChange: (id: number, newStatus: string) => void;
+  onDelete: (id: number, namaKapal: string) => void;
 }
 
-function BatchCard({ batch, base, onStatusChange }: BatchCardProps) {
+function BatchCard({ batch, base, onStatusChange, onDelete }: BatchCardProps) {
   const [, setLocation] = useLocation();
   const [expanded, setExpanded] = useState(false);
 
@@ -323,6 +324,18 @@ function BatchCard({ batch, base, onStatusChange }: BatchCardProps) {
                 </Button>
               </>
             )}
+            {/* Hapus Batch: soft delete, tersedia untuk OPEN dan CLOSED */}
+            {(batch.statusBatch === "OPEN" || batch.statusBatch === "CLOSED") && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => onDelete(batch.id, batch.namaKapal)}
+              >
+                <Trash2 className="w-3 h-3" />
+                Hapus Batch
+              </Button>
+            )}
           </div>
         </CardContent>
       )}
@@ -340,6 +353,7 @@ export default function AdminBatches() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState<{ id: number; newStatus: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: number; namaKapal: string } | null>(null);
   const [showArchivedBatches, setShowArchivedBatches] = useState(false);
 
   const { data: batches = [], isLoading } = useQuery({
@@ -365,6 +379,10 @@ export default function AdminBatches() {
       return;
     }
     statusMutation.mutate({ id, status: newStatus });
+  }
+
+  function handleDeleteRequest(id: number, namaKapal: string) {
+    setShowDeleteConfirm({ id, namaKapal });
   }
 
   const openBatches = batches.filter((b: any) => b.statusBatch === "OPEN");
@@ -418,6 +436,7 @@ export default function AdminBatches() {
               batch={batch}
               base={base}
               onStatusChange={handleStatusChange}
+              onDelete={handleDeleteRequest}
             />
           ))
         )}
@@ -437,6 +456,7 @@ export default function AdminBatches() {
               batch={batch}
               base={base}
               onStatusChange={handleStatusChange}
+              onDelete={handleDeleteRequest}
             />
           ))}
         </div>
@@ -459,6 +479,7 @@ export default function AdminBatches() {
               batch={batch}
               base={base}
               onStatusChange={handleStatusChange}
+              onDelete={handleDeleteRequest}
             />
           ))}
         </div>
@@ -492,6 +513,38 @@ export default function AdminBatches() {
               }}
             >
               Ya, Arsipkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Hapus Batch confirmation (soft delete) */}
+      <AlertDialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Hapus Batch "{showDeleteConfirm?.namaKapal}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Batch ini akan disembunyikan dari daftar aktif (soft delete). Data paket yang sudah masuk tetap aman
+              di database dan tidak dihapus. Tindakan ini tidak bisa dibatalkan dari tampilan utama.
+              <br /><br />
+              Gunakan fitur ini jika data batch salah dan perlu diupload ulang.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (showDeleteConfirm) {
+                  statusMutation.mutate({ id: showDeleteConfirm.id, status: "HAPUS" });
+                  setShowDeleteConfirm(null);
+                }
+              }}
+            >
+              Ya, Hapus Batch
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

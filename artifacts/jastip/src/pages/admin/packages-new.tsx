@@ -42,7 +42,7 @@ const packageSchema = z.object({
   serviceType: z.string().optional().nullable(),
   packageMode: z.string().optional().nullable(),
   deliveryRoute: z.string().optional().nullable(),
-  realWeight: z.coerce.number().min(0.001, "Berat real wajib diisi"),
+  realWeight: z.coerce.number().optional().nullable(),
   length: z.coerce.number().optional().nullable(),
   width: z.coerce.number().optional().nullable(),
   height: z.coerce.number().optional().nullable(),
@@ -52,15 +52,16 @@ const packageSchema = z.object({
   totalWeight: z.coerce.number().optional().nullable(),
   totalShipping: z.coerce.number().optional().nullable(),
 }).superRefine((data, ctx) => {
+  // Berat real wajib untuk layanan non-Cargo
+  if (data.serviceType !== "jastip kargo") {
+    if (!data.realWeight || Number(data.realWeight) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Berat real wajib diisi", path: ["realWeight"] });
+    }
+  }
+  // Cargo: ongkir paket wajib diisi langsung
   if (data.serviceType === "jastip kargo") {
-    if (!data.length || Number(data.length) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Panjang wajib diisi untuk kargo", path: ["length"] });
-    }
-    if (!data.width || Number(data.width) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Lebar wajib diisi untuk kargo", path: ["width"] });
-    }
-    if (!data.height || Number(data.height) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tinggi wajib diisi untuk kargo", path: ["height"] });
+    if (!data.totalShipping || Number(data.totalShipping) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ongkir paket wajib diisi untuk Cargo", path: ["totalShipping"] });
     }
   }
 });
@@ -219,7 +220,6 @@ export default function AdminPackagesNew() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
-  const { data: savedKargoRate } = useKargoRate();
 
   const createPackage = useCreatePackage();
 
@@ -366,7 +366,6 @@ export default function AdminPackagesNew() {
   const watchedVolumeWeight = form.watch("volumeWeight");
   const watchedShippingRate = form.watch("shippingRate");
   const watchedTotalShipping = form.watch("totalShipping");
-  const shippingRateWatch = watchedShippingRate;
 
   useEffect(() => {
     if (!serviceType) {
@@ -390,7 +389,7 @@ export default function AdminPackagesNew() {
     let vw: number | null = null;
     const divisor = serviceType ? volumeDivisor[serviceType] : undefined;
     if (divisor && length && width && height && length > 0 && width > 0 && height > 0) {
-      vw = Number(((length * width * height) / divisor).toFixed(3));
+      vw = Number(((length * width * height) / divisor).toFixed(4));
     }
     form.setValue("volumeWeight", vw, { shouldDirty: true });
 
@@ -399,41 +398,15 @@ export default function AdminPackagesNew() {
     const uw = Math.max(real, volume);
     form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
 
+    // Kargo: ongkir diisi manual, tidak dihitung dari berat × tarif
+    if (serviceType === "jastip kargo") return;
+
     const effectiveRoute = currentRoute || deliveryRoute;
-
-    if (serviceType === "jastip kargo") {
-      // Kargo: minimum usedWeight = 10 M³/Ton; totalShipping = max(10, uw) × shippingRate
-      const currentRate = form.getValues("shippingRate") ?? 0;
-      const billableWeight = uw > 0 ? Math.max(10, uw) : 0;
-      const total = billableWeight > 0 && currentRate > 0 ? Math.round(billableWeight * currentRate) : null;
-      form.setValue("totalShipping", total ?? null, { shouldDirty: true });
-    } else {
-      const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
-      const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
-      form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
-      form.setValue("totalShipping", total ?? null, { shouldDirty: true });
-    }
-  }, [serviceType, deliveryRoute, realWeight, length, width, height]);
-
-  // Kargo: recalc ongkir saat Harga Kubikasi diubah; minimum 10 M³/Ton
-  useEffect(() => {
-    if (serviceType !== "jastip kargo") return;
-    const uw = form.getValues("usedWeight") ?? 0;
-    const rate = shippingRateWatch ?? 0;
-    const billableWeight = uw > 0 ? Math.max(10, uw) : 0;
-    const total = billableWeight > 0 && rate > 0 ? Math.round(billableWeight * rate) : null;
+    const rate = uw > 0 ? getShippingRate(serviceType, effectiveRoute, uw) : null;
+    const total = uw > 0 ? getTotalShipping(serviceType, effectiveRoute, uw) : null;
+    form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
     form.setValue("totalShipping", total ?? null, { shouldDirty: true });
-  }, [shippingRateWatch, serviceType]);
-
-  // Kargo: auto-fill tarif dari pengaturan saat pertama kali masuk form kargo
-  useEffect(() => {
-    if (serviceType !== "jastip kargo") return;
-    if (savedKargoRate == null) return;
-    const current = form.getValues("shippingRate");
-    if (!current || current === 0) {
-      form.setValue("shippingRate", savedKargoRate, { shouldDirty: false });
-    }
-  }, [serviceType, savedKargoRate]);
+  }, [serviceType, deliveryRoute, realWeight, length, width, height]);
 
   async function onSubmit(values: PackageFormValues) {
     // Require customerName for all modes
@@ -1029,13 +1002,13 @@ export default function AdminPackagesNew() {
                       <p className="text-xs text-muted-foreground mt-1">P × L × T ÷ 1.000.000</p>
                     </div>
 
-                    {/* Ton (input manual) */}
+                    {/* Ton (input manual, opsional untuk Cargo) */}
                     <FormField
                       control={form.control}
                       name="realWeight"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>M³ / Ton (Berat Aktual) <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>M³ / Ton (Berat Aktual) <span className="text-xs font-normal text-muted-foreground">(Opsional)</span></FormLabel>
                           <FormControl>
                             <Input
                               type="number" step="0.001" placeholder="0.000"
@@ -1043,7 +1016,7 @@ export default function AdminPackagesNew() {
                               onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                             />
                           </FormControl>
-                          <p className="text-xs text-muted-foreground mt-1">Masukkan dalam satuan Ton</p>
+                          <p className="text-xs text-muted-foreground mt-1">Masukkan dalam satuan Ton (opsional untuk Cargo)</p>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1067,75 +1040,37 @@ export default function AdminPackagesNew() {
                       </div>
                     )}
 
-                    {/* Harga Kubikasi Barang */}
+                    {/* Ongkir Paket (input langsung, bukan berat × tarif) */}
                     <FormField
                       control={form.control}
-                      name="shippingRate"
+                      name="totalShipping"
                       render={({ field }) => (
                         <FormItem>
-                          <div className="flex items-center justify-between">
-                            <FormLabel>Harga Kubikasi Barang (per M³/Ton) <span className="text-destructive">*</span></FormLabel>
-                            {field.value && Number(field.value) > 0 && (
-                              <button
-                                type="button"
-                                className="text-xs text-primary underline underline-offset-2 hover:text-primary/80 flex items-center gap-1"
-                                onClick={async () => {
-                                  const rate = Number(field.value);
-                                  if (!rate || rate <= 0) return;
-                                  try {
-                                    const token = localStorage.getItem("jaj_token");
-                                    await fetch("/api/settings", {
-                                      method: "PATCH",
-                                      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                                      body: JSON.stringify({ kargoRate: rate }),
-                                    });
-                                    toast({ title: "Tarif disimpan", description: `Rp ${rate.toLocaleString("id-ID")} / M³/Ton akan menjadi tarif default.` });
-                                  } catch {
-                                    toast({ variant: "destructive", title: "Gagal menyimpan tarif" });
-                                  }
-                                }}
-                              >
-                                Simpan sebagai tarif default
-                              </button>
-                            )}
-                          </div>
+                          <FormLabel>Ongkir Paket <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
                               <Input
                                 type="number" step="1000" placeholder="0"
-                                className="pl-9"
+                                className="pl-9 text-lg font-bold"
                                 {...field} value={field.value ?? ""}
                                 onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                               />
                             </div>
                           </FormControl>
-                          {savedKargoRate != null && (
-                            <p className="text-xs text-muted-foreground">
-                              Tarif default tersimpan: <strong>Rp {savedKargoRate.toLocaleString("id-ID")}</strong> / M³/Ton
-                            </p>
-                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Ongkir diisi langsung per paket — tidak dihitung dari berat × tarif
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                    {/* Ongkir Jastip */}
-                    <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ongkir Jastip</p>
-                          <p className="text-2xl font-black text-primary mt-1">
-                            {watchedTotalShipping != null ? formatRp(watchedTotalShipping) : "—"}
-                          </p>
-                          {watchedUsedWeight != null && watchedShippingRate != null && watchedTotalShipping != null && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {watchedUsedWeight.toFixed(4)} × {formatRp(watchedShippingRate)} = {formatRp(watchedTotalShipping)}
-                            </p>
-                          )}
-                        </div>
+                    {watchedTotalShipping != null && watchedTotalShipping > 0 && (
+                      <div className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ongkir Paket</p>
+                        <p className="text-2xl font-black text-primary mt-1">{formatRp(watchedTotalShipping)}</p>
                       </div>
-                    </div>
+                    )}
 
                     {/* Jenis Jastip (otomatis) | Lokasi Pengiriman (otomatis) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

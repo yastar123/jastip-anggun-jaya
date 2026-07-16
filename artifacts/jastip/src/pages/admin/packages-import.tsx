@@ -112,11 +112,13 @@ const TEMPLATE_KARGO = [
   { header: "Total Koli",       key: "packageNumber", example: "3",         required: false },
   { header: "Koli",             key: "packagingType", example: "Koli 1/3",  required: false },
   { header: "Jenis Barang",     key: "itemName",      example: "Perabot",   required: false },
+  { header: "Ukuran Barang",    key: "ukuranBarang",  example: "100x80x60", required: false },
   { header: "Panjang (cm)",     key: "length",        example: "100",       required: false },
   { header: "Lebar (cm)",       key: "width",         example: "80",        required: false },
   { header: "Tinggi (cm)",      key: "height",        example: "60",        required: false },
-  { header: "Berat Real (Ton)", key: "realWeight",    example: "0.5",       required: true },
-  { header: "Harga Kubikasi",   key: "kargoRate",     example: "7000",      required: false },
+  { header: "Pakai (m3)",       key: "pakaiM3",       example: "0.48",      required: false },
+  { header: "Berat Real (Ton)", key: "realWeight",    example: "0.5",       required: false },
+  { header: "Ongkir Paket",     key: "ongkirPaket",   example: "70000",     required: true },
 ];
 
 const ROUTE_OPTIONS: Record<string, { value: string; label: string }[]> = {
@@ -171,6 +173,8 @@ interface ParsedRow {
   height:        number | null;
   packagingType: string;
   kargoRate?:    number | null;
+  ongkirPaket?:  number | null;
+  pakaiM3?:      number | null;
   // computed
   volumeWeight?:  number | null;
   usedWeight?:    number | null;
@@ -303,8 +307,9 @@ export default function AdminPackagesImport() {
           const val = row[idx];
           return val !== undefined && val !== null ? String(val).trim() : "";
         };
+        // Normalisasi desimal: ganti koma dengan titik, lalu parseFloat
         const num = (key: string) => {
-          const v = get(key);
+          const v = get(key).replace(",", ".");
           const n = parseFloat(v);
           return isNaN(n) ? null : n;
         };
@@ -312,10 +317,13 @@ export default function AdminPackagesImport() {
         const customerName = get("customerName");
         const resiNumber   = get("resiNumber");
         const realWeightVal = num("realWeight");
+        const ongkirPaketVal = tplType === "kargo" ? num("ongkirPaket") : null;
         let error: string | undefined;
         if (!customerName) error = "Nama Konsumen kosong";
         else if (tplType === "standard" && !resiNumber) error = "No Resi kosong";
-        else if (realWeightVal === null || realWeightVal <= 0) error = "Berat Real wajib diisi";
+        else if (tplType === "standard" && (realWeightVal === null || realWeightVal <= 0)) error = "Berat Real wajib diisi";
+        // Kargo: berat tidak wajib, tapi ongkir paket wajib
+        else if (tplType === "kargo" && (ongkirPaketVal === null || ongkirPaketVal <= 0)) error = "Ongkir Paket wajib diisi";
 
         return {
           customerName,
@@ -328,6 +336,8 @@ export default function AdminPackagesImport() {
           height:        num("height"),
           packagingType: get("packagingType"),
           kargoRate:     tplType === "kargo" ? num("kargoRate") : undefined,
+          ongkirPaket:   tplType === "kargo" ? ongkirPaketVal : undefined,
+          pakaiM3:       tplType === "kargo" ? num("pakaiM3") : undefined,
           error,
         };
       });
@@ -419,15 +429,19 @@ export default function AdminPackagesImport() {
 
       if (templateType === "kargo") {
         const rw = row.realWeight ?? 0;
+        // Pakai (m3): gunakan kolom pakaiM3 jika ada, atau hitung dari dimensi
         let vw: number | null = null;
-        if (row.length && row.width && row.height && row.length > 0 && row.width > 0 && row.height > 0) {
+        if (row.pakaiM3 != null && row.pakaiM3 > 0) {
+          // Kolom Pakai (m3) diisi langsung — simpan apa adanya (fix bug 0.01→10)
+          vw = row.pakaiM3;
+        } else if (row.length && row.width && row.height && row.length > 0 && row.width > 0 && row.height > 0) {
           vw = Number(((row.length * row.width * row.height) / 1000000).toFixed(4));
         }
-        const rawUsed = rw > 0 && vw !== null ? Math.max(rw, vw) : rw > 0 ? rw : (vw ?? null);
-        const billable = rawUsed !== null && rawUsed > 0 ? Math.max(10, rawUsed) : rawUsed;
-        const rate     = row.kargoRate ?? null;
-        const total    = billable && rate ? Math.round(billable * rate) : null;
-        return { ...row, volumeWeight: vw, usedWeight: billable, shippingRate: rate, totalShipping: total };
+        // usedWeight = max(realWeight, volumeWeight) — nilai asli, bukan dibulatkan ke minimum
+        const usedWeight = rw > 0 && vw !== null ? Math.max(rw, vw) : rw > 0 ? rw : (vw ?? null);
+        // Ongkir diambil langsung dari kolom Ongkir Paket — bukan berat × tarif
+        const total = row.ongkirPaket ?? null;
+        return { ...row, volumeWeight: vw, usedWeight, shippingRate: null, totalShipping: total };
       }
 
       // Standard (Hemat+, Pesawat, Pelni)
@@ -454,6 +468,10 @@ export default function AdminPackagesImport() {
     setImportResult(null);
 
     try {
+      // Kargo: setiap paket punya barcode sendiri (packageMode: "single")
+      // Layanan lain: packageMode: "grup" untuk batching barcode per konsumen
+      const kargoMode = templateType === "kargo" ? "single" : "grup";
+
       const payload = valid.map((r) => ({
         customerName:  r.customerName,
         customerPhone: "",
@@ -472,7 +490,7 @@ export default function AdminPackagesImport() {
         serviceType,
         deliveryRoute,
         packageDate,
-        packageMode: "grup",
+        packageMode:   kargoMode,
       }));
 
       setProgress(50);
@@ -902,15 +920,11 @@ export default function AdminPackagesImport() {
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">#</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Nama Konsumen</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Toko/Kurir</th>
-                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Total Koli</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Koli</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Jenis Barang</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">P×L×T (cm)</th>
-                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap">M³ (Vol)</th>
-                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Ton (Real)</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap text-blue-700">Pakai (M³)</th>
-                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Hrg Kbk</th>
-                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap text-green-700">Total Ongkir</th>
+                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap text-green-700">Ongkir Paket</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -918,23 +932,25 @@ export default function AdminPackagesImport() {
                           <tr key={i} className={`border-t ${row.error ? "bg-red-50" : i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}>
                             <td className="px-2 py-1.5 text-muted-foreground">{i + 1}</td>
                             {row.error ? (
-                              <td colSpan={11} className="px-2 py-1.5 text-red-600">
+                              <td colSpan={7} className="px-2 py-1.5 text-red-600">
                                 <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0" />{row.error}</span>
                               </td>
                             ) : (
                               <>
                                 <td className="px-2 py-1.5 font-medium whitespace-nowrap">{row.customerName || "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap">{row.resiNumber || "-"}</td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">{row.packageNumber || "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap">{row.packagingType || "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap">{row.itemName || "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap">
                                   {(row.length && row.width && row.height) ? `${row.length}×${row.width}×${row.height}` : "-"}
                                 </td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">{(row as any).volumeWeight != null ? Number((row as any).volumeWeight).toFixed(4) : "-"}</td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">{row.realWeight ?? "-"}</td>
-                                <td className="px-2 py-1.5 whitespace-nowrap font-semibold text-blue-700">{(row as any).usedWeight != null ? (row as any).usedWeight : "-"}</td>
-                                <td className="px-2 py-1.5 whitespace-nowrap">{row.kargoRate ? `Rp ${row.kargoRate.toLocaleString("id-ID")}` : "-"}</td>
+                                <td className="px-2 py-1.5 whitespace-nowrap font-semibold text-blue-700">
+                                  {(row as any).usedWeight != null
+                                    ? Number((row as any).usedWeight).toFixed(4)
+                                    : (row as any).volumeWeight != null
+                                    ? Number((row as any).volumeWeight).toFixed(4)
+                                    : "-"}
+                                </td>
                                 <td className="px-2 py-1.5 whitespace-nowrap font-semibold text-green-700">{formatRp((row as any).totalShipping)}</td>
                               </>
                             )}

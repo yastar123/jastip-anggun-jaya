@@ -27,6 +27,7 @@ const JENIS_JASTIP = [
 ];
 
 const GROUPED_JENIS = ["jastip hemat+", "jastip pelni", "jastip pesawat"];
+const KARGO_JENIS   = ["jastip kargo", "jastip cargo"];
 
 function formatRp(n: any) {
   if (n == null || n === "" || n === 0) return "-";
@@ -143,14 +144,99 @@ export default function AdminPackages() {
     return GROUPED_JENIS.includes(pdfJenis.toLowerCase());
   }
 
+  function isKargoExport() {
+    return KARGO_JENIS.includes(pdfJenis.toLowerCase());
+  }
+
   function exportPdf() {
     if (!packages || packages.length === 0) return;
     if (!pdfBatchId) return;
-    if (isGroupedExport()) {
+    if (isKargoExport()) {
+      exportPdfKargo();
+    } else if (isGroupedExport()) {
       exportPdfGrouped();
     } else {
       exportPdfFlat();
     }
+  }
+
+  function exportPdfKargo() {
+    const filtered = getFilteredPackages();
+    if (filtered.length === 0) return;
+
+    filtered.sort((a: any, b: any) =>
+      (a.customerName || "").localeCompare(b.customerName || "", "id")
+    );
+
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageW = 297;
+    const margin = 10;
+
+    const batchLabel = selectedPdfBatch
+      ? `${selectedPdfBatch.namaKapal} (${selectedPdfBatch.kotaAsal} → ${selectedPdfBatch.tujuan})`
+      : "-";
+
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text("JASTIP CARGO — JASTIP ANGGUN JAYA", pageW / 2, 11, { align: "center" });
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Batch: ${batchLabel}`, margin, 17);
+    doc.text(`Total Paket: ${filtered.length} paket`, margin, 21);
+    doc.text(`Dicetak: ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, margin, 25);
+
+    const head = [[
+      "No", "Nama Konsumen", "Tgl Masuk", "No Resi / Kurir",
+      "No Paket", "Jenis Barang", "Ukuran (cm)",
+      "Pakai (M³)", "Ongkir Paket", "Status",
+    ]];
+
+    const rows = filtered.map((p: any, i: number) => [
+      i + 1,
+      p.customerName || "-",
+      formatDate(p.packageDate || p.createdAt),
+      p.resiNumber || "-",
+      p.packageNumber || "-",
+      p.itemName || "-",
+      (p.length && p.width && p.height) ? `${p.length}×${p.width}×${p.height}` : "-",
+      p.usedWeight != null ? Number(p.usedWeight).toFixed(4) : "-",
+      p.totalShipping != null ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
+      p.status === "diserahkan" ? "Diserahkan" : "Pending",
+    ]);
+
+    autoTable(doc, {
+      startY: 30,
+      head,
+      body: rows,
+      styles: { fontSize: 6.5, cellPadding: 1.3, overflow: "ellipsize", lineColor: [200, 200, 200], lineWidth: 0.1 },
+      headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: "bold", fontSize: 6.5, halign: "center", valign: "middle" },
+      alternateRowStyles: { fillColor: [255, 247, 237] },
+      columnStyles: {
+        0:  { cellWidth: 8,  halign: "center" },
+        1:  { cellWidth: 30 },
+        2:  { cellWidth: 18 },
+        3:  { cellWidth: 30 },
+        4:  { cellWidth: 18 },
+        5:  { cellWidth: 30 },
+        6:  { cellWidth: 22, halign: "center" },
+        7:  { cellWidth: 18, halign: "right" },
+        8:  { cellWidth: 25, halign: "right" },
+        9:  { cellWidth: 18, halign: "center" },
+      },
+      margin: { left: margin, right: margin },
+    });
+
+    // Rekap total ongkir per konsumen
+    const totalOngkir = filtered.reduce((s: number, p: any) => s + (Number(p.totalShipping) || 0), 0);
+    const finalY = (doc as any).lastAutoTable.finalY + 5;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total Ongkir Keseluruhan: Rp ${totalOngkir.toLocaleString("id-ID")}`, pageW - margin, finalY, { align: "right" });
+
+    const safeBatch = selectedPdfBatch ? `-${selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase()}` : "";
+    doc.save(`laporan-kargo${safeBatch}.pdf`);
+    setPdfOpen(false);
   }
 
   function exportPdfGrouped() {

@@ -180,22 +180,37 @@ export default function AdminPackagesType() {
               </CardHeader>
 
               <CardContent className="pt-0 space-y-4">
-                {/* Mode buttons — always visible */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    className="w-full"
-                    onClick={() => navigate(s.key, "single")}
-                  >
-                    1 Paket
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={`w-full border-2 ${s.borderColor}`}
-                    onClick={() => navigate(s.key, "grup")}
-                  >
-                    Grup Paket
-                  </Button>
-                </div>
+                {/* Mode buttons */}
+                {s.key === "jastip kargo" ? (
+                  /* Kargo: hanya 1 paket per input — tidak ada Grup Paket */
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full"
+                      onClick={() => navigate(s.key, "single")}
+                    >
+                      Input Paket Kargo
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Setiap paket Cargo memiliki barcode sendiri
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      className="w-full"
+                      onClick={() => navigate(s.key, "single")}
+                    >
+                      1 Paket
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className={`w-full border-2 ${s.borderColor}`}
+                      onClick={() => navigate(s.key, "grup")}
+                    >
+                      Grup Paket
+                    </Button>
+                  </div>
+                )}
 
                 {/* Tarif ongkir — collapsible, at bottom */}
                 <div className="border rounded-lg overflow-hidden">
