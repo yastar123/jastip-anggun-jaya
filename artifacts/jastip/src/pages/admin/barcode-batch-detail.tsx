@@ -424,8 +424,19 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
 
   // ── Sinkronisasi ongkir Kargo ─────────────────────────────────────────────
+  const KARGO_RATE = 7000;
   const [syncOpen, setSyncOpen] = useState(false);
-  const [syncRows, setSyncRows] = useState<{ id: number; customerName: string; resiNumber: string; packageNumber: string; itemName: string; currentOngkir: string; newOngkir: string }[]>([]);
+  const [syncRows, setSyncRows] = useState<{
+    id: number;
+    customerName: string;
+    resiNumber: string;
+    packageNumber: string;
+    itemName: string;
+    usedWeight: number | null;
+    calcOngkir: number | null;   // berat × 7.000
+    currentOngkir: string;
+    newOngkir: string;
+  }[]>([]);
   const [syncing, setSyncing] = useState(false);
 
   const { data: batches } = useListBatches();
@@ -484,23 +495,42 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   function handleFilter(v: string) { setFilterServiceType(v); setPage(1); }
 
   // ── Sinkronisasi ongkir Kargo ─────────────────────────────────────────────
+  function calcKargoOngkir(berat: number | null): number | null {
+    if (!berat || berat <= 0) return null;
+    return Math.round(berat * KARGO_RATE);
+  }
+
   function openSync() {
     const kargoPkgs = batchPkgs.filter((p: any) => (p.serviceType || "").toLowerCase() === "jastip kargo");
     setSyncRows(
       kargoPkgs
         .slice()
         .sort((a: any, b: any) => (a.customerName || "").localeCompare(b.customerName || ""))
-        .map((p: any) => ({
-          id: p.id,
-          customerName: p.customerName || "-",
-          resiNumber: p.resiNumber || "-",
-          packageNumber: p.packageNumber || "",
-          itemName: p.itemName || "",
-          currentOngkir: p.totalShipping != null ? String(p.totalShipping) : "",
-          newOngkir: p.totalShipping != null ? String(p.totalShipping) : "",
-        }))
+        .map((p: any) => {
+          const berat = Number(p.usedWeight ?? p.realWeight ?? 0) || null;
+          const calc = calcKargoOngkir(berat);
+          return {
+            id: p.id,
+            customerName: p.customerName || "-",
+            resiNumber: p.resiNumber || "-",
+            packageNumber: p.packageNumber || "",
+            itemName: p.itemName || "",
+            usedWeight: berat,
+            calcOngkir: calc,
+            currentOngkir: p.totalShipping != null ? String(p.totalShipping) : "",
+            // pre-fill dengan hasil formula jika ada berat, else pakai nilai tersimpan
+            newOngkir: calc != null ? String(calc) : (p.totalShipping != null ? String(p.totalShipping) : ""),
+          };
+        })
     );
     setSyncOpen(true);
+  }
+
+  function recalcAll() {
+    setSyncRows(rows => rows.map(r => ({
+      ...r,
+      newOngkir: r.calcOngkir != null ? String(r.calcOngkir) : r.newOngkir,
+    })));
   }
 
   async function saveSync() {
@@ -713,48 +743,77 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
 
       {/* ── Dialog Sinkronisasi Ongkir Kargo ─────────────────────────────── */}
       <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RefreshCw className="w-4 h-4 text-orange-600" />
               Sinkronisasi Ongkir — Jastip Kargo
             </DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Edit ongkir per paket sesuai harga sebenarnya, lalu klik <b>Simpan Semua</b>.
-              Kolom <span className="text-orange-700 font-semibold">Ongkir Baru</span> yang diubah akan disimpan ke database.
-            </p>
+            <div className="mt-2 rounded-md bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-800 space-y-0.5">
+              <p className="font-semibold">Rumus: Berat Paket × Rp 7.000</p>
+              <p className="text-orange-600">Kolom <b>Ongkir Baru</b> sudah dihitung otomatis. Edit manual jika ada perbedaan, lalu klik <b>Simpan Semua</b>.</p>
+            </div>
           </DialogHeader>
+
+          {/* Toolbar: Hitung Ulang Semua */}
+          {syncRows.length > 0 && (
+            <div className="flex items-center gap-2 -mt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs border-orange-300 text-orange-700 hover:bg-orange-50 gap-1"
+                onClick={recalcAll}
+              >
+                <RefreshCw className="w-3 h-3" /> Hitung Ulang Semua (Berat × Rp 7.000)
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {syncRows.filter(r => r.usedWeight == null).length > 0 &&
+                  `⚠ ${syncRows.filter(r => r.usedWeight == null).length} paket tanpa data berat — isi manual`}
+              </span>
+            </div>
+          )}
 
           <div className="overflow-y-auto flex-1 -mx-6 px-6">
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 bg-background z-10">
                 <tr className="border-b bg-muted/40">
-                  <th className="text-left py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Konsumen</th>
-                  <th className="text-left py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Resi / Paket</th>
-                  <th className="text-left py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Jenis Barang</th>
-                  <th className="text-right py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Ongkir Saat Ini</th>
-                  <th className="py-2 px-3 font-medium text-xs text-orange-700 uppercase text-right">Ongkir Baru (Rp)</th>
+                  <th className="text-left py-2 px-2 font-medium text-xs text-muted-foreground uppercase">Konsumen</th>
+                  <th className="text-left py-2 px-2 font-medium text-xs text-muted-foreground uppercase">Resi / Paket</th>
+                  <th className="text-left py-2 px-2 font-medium text-xs text-muted-foreground uppercase">Barang</th>
+                  <th className="text-right py-2 px-2 font-medium text-xs text-muted-foreground uppercase">Berat (Kg)</th>
+                  <th className="text-right py-2 px-2 font-medium text-xs text-blue-600 uppercase">Hitung (×7rb)</th>
+                  <th className="text-right py-2 px-2 font-medium text-xs text-muted-foreground uppercase">Saat Ini</th>
+                  <th className="py-2 px-2 font-medium text-xs text-orange-700 uppercase text-right">Ongkir Baru (Rp)</th>
                 </tr>
               </thead>
               <tbody>
                 {syncRows.map((row, i) => {
                   const changed = row.newOngkir !== row.currentOngkir && row.newOngkir !== "";
+                  const noWeight = row.usedWeight == null;
                   return (
-                    <tr key={row.id} className={`border-b ${i % 2 === 0 ? "" : "bg-muted/20"} ${changed ? "bg-orange-50" : ""}`}>
-                      <td className="py-2 px-3 font-medium">{row.customerName}</td>
-                      <td className="py-2 px-3 font-mono text-xs">
+                    <tr key={row.id} className={`border-b text-xs ${i % 2 === 0 ? "" : "bg-muted/20"} ${changed ? "bg-orange-50" : ""} ${noWeight ? "bg-yellow-50/60" : ""}`}>
+                      <td className="py-1.5 px-2 font-medium">{row.customerName}</td>
+                      <td className="py-1.5 px-2 font-mono">
                         <div>{row.resiNumber}</div>
-                        {row.packageNumber && <div className="text-muted-foreground">#{row.packageNumber}</div>}
+                        {row.packageNumber && <div className="text-muted-foreground text-[10px]">#{row.packageNumber}</div>}
                       </td>
-                      <td className="py-2 px-3 text-muted-foreground truncate max-w-[140px]" title={row.itemName}>{row.itemName || "-"}</td>
-                      <td className="py-2 px-3 text-right text-muted-foreground">
+                      <td className="py-1.5 px-2 text-muted-foreground max-w-[100px] truncate" title={row.itemName}>{row.itemName || "-"}</td>
+                      <td className="py-1.5 px-2 text-right">
+                        {row.usedWeight != null
+                          ? <span className="font-mono">{row.usedWeight} Kg</span>
+                          : <span className="text-yellow-600 font-semibold">—</span>}
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-blue-700 font-semibold">
+                        {row.calcOngkir != null ? `Rp ${row.calcOngkir.toLocaleString("id-ID")}` : <span className="text-yellow-600">—</span>}
+                      </td>
+                      <td className="py-1.5 px-2 text-right text-muted-foreground">
                         {row.currentOngkir ? `Rp ${Number(row.currentOngkir).toLocaleString("id-ID")}` : "-"}
                       </td>
-                      <td className="py-2 px-3">
+                      <td className="py-1.5 px-2">
                         <Input
                           type="number"
                           min={0}
-                          className={`h-8 text-right text-sm w-36 ml-auto ${changed ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
+                          className={`h-7 text-right text-xs w-32 ml-auto ${changed ? "border-orange-400 ring-1 ring-orange-300" : ""} ${noWeight ? "border-yellow-400" : ""}`}
                           value={row.newOngkir}
                           onChange={e => setSyncRows(rows => rows.map((r, j) => j === i ? { ...r, newOngkir: e.target.value } : r))}
                           placeholder="0"
@@ -772,8 +831,11 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
 
           <div className="border-t pt-3 flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              {syncRows.filter(r => r.newOngkir !== r.currentOngkir && r.newOngkir !== "").length} paket akan diubah
-              · Total baru: <span className="font-semibold text-primary">
+              <span className="font-semibold text-foreground">
+                {syncRows.filter(r => r.newOngkir !== r.currentOngkir && r.newOngkir !== "").length}
+              </span> paket akan diubah
+              &nbsp;·&nbsp;Total baru:&nbsp;
+              <span className="font-semibold text-primary">
                 {formatRp(syncRows.reduce((s, r) => s + (r.newOngkir !== "" ? Number(r.newOngkir) : Number(r.currentOngkir || 0)), 0))}
               </span>
             </p>

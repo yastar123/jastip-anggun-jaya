@@ -151,7 +151,7 @@ function getShippingRate(
   if (!serviceType || !weight || weight <= 0) return null;
   if (serviceType === "jastip pesawat") return 77000;
   if (serviceType === "jastip hemat+") return 10000;
-  // Kargo: tidak ada tarif per-kg — ongkir diambil langsung dari data per paket
+  if (serviceType === "jastip kargo") return 7000;
   // Pelni: gunakan getPelniRateByTotalWeight (tarif berdasarkan total berat konsumen)
   // Fungsi ini hanya dipakai sebagai estimasi awal; recalcPelniCustomerOngkir akan
   // menghitung ulang dengan benar setelah semua paket tersimpan.
@@ -177,7 +177,10 @@ function getTotalShipping(
     return Math.round(weight * 10000);
   }
 
-  // Kargo: ongkir tidak dihitung dari berat — diambil langsung dari data per paket
+  // Kargo: setiap paket dihitung sendiri — berat × Rp 7.000
+  if (serviceType === "jastip kargo") {
+    return Math.round(weight * 7000);
+  }
 
   if (serviceType === "jastip pelni") {
     const rate = getPelniRateByTotalWeight(weight, deliveryRoute);
