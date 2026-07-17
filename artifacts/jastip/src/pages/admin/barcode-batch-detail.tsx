@@ -62,12 +62,48 @@ function groupPkgsByCustomer(pkgs: any[]) {
   return [...map.values()];
 }
 
+// Pelni: tarif bertingkat berdasarkan total berat gabungan konsumen dalam batch
+function getPelniRateByTotalWeight(totalWeight: number, deliveryRoute: string): number | null {
+  if (!deliveryRoute || !totalWeight || totalWeight <= 0) return null;
+  if (deliveryRoute === "Jakarta → Manokwari") {
+    if (totalWeight <= 10.1) return 20000;
+    if (totalWeight <= 20.1) return 19000;
+    if (totalWeight <= 40.1) return 18000;
+    if (totalWeight <= 80.1) return 17000;
+    return 16000;
+  }
+  if (deliveryRoute === "Surabaya → Manokwari") {
+    if (totalWeight <= 10) return 18000;
+    if (totalWeight <= 20) return 17000;
+    if (totalWeight <= 40) return 16000;
+    return 15500;
+  }
+  return null;
+}
+
+// Untuk Pelni: hitung total ongkir dari total berat gabungan × tarif
+// Untuk layanan lain: jumlahkan totalShipping per paket
+function calcGroupTotalShipping(pkgs: any[]): number {
+  const first = pkgs[0];
+  if ((first?.serviceType || "").toLowerCase() === "jastip pelni") {
+    const totalWeight = pkgs.reduce((s, p) => s + (Number(p.usedWeight) || Number(p.realWeight) || 0), 0);
+    const rate = getPelniRateByTotalWeight(totalWeight, first?.deliveryRoute || "");
+    return rate ? Math.round(totalWeight * rate) : pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  }
+  return pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+}
+
 function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
   const first = pkgs[0];
-  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
-  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const isPelni = (first?.serviceType || "").toLowerCase() === "jastip pelni";
+  const totalWeight = pkgs.reduce((s, p) => s + (Number(p.usedWeight) || Number(p.realWeight) || 0), 0);
+  const totalShipping = calcGroupTotalShipping(pkgs);
+  const pelniRate = isPelni ? getPelniRateByTotalWeight(totalWeight, first?.deliveryRoute || "") : null;
   const batchRow = batchLabel
     ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
+    : "";
+  const pelniRateRow = isPelni && pelniRate
+    ? `<div class="field"><div class="fl">Harga/Kg</div><div class="fv">Rp ${pelniRate.toLocaleString("id-ID")}</div></div>`
     : "";
 
   const inner = `${qrSectionHtml(qrDataUrl, qrValue)}
@@ -77,6 +113,7 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
         <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
         <div class="field"><div class="fl">Total Berat</div><div class="fv">${totalWeight.toFixed(3)} Kg</div></div>
         <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+        ${pelniRateRow}
         <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShipping.toLocaleString("id-ID")}</div></div>
         <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
         ${batchRow}
@@ -99,9 +136,11 @@ function GroupedBarcodeCard({
   const base = user?.role === "owner" ? "/owner" : "/admin";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const first = pkgs[0];
+  const isPelniCard = (first?.serviceType || "").toLowerCase() === "jastip pelni";
   const qrValue = groupQrValue(pkgs);
-  const totalWeight = pkgs.reduce((s, p) => s + (p.usedWeight ?? p.realWeight ?? 0), 0);
-  const totalShipping = pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+  const totalWeight = pkgs.reduce((s, p) => s + (Number(p.usedWeight) || Number(p.realWeight) || 0), 0);
+  const totalShipping = calcGroupTotalShipping(pkgs);
+  const pelniRate = isPelniCard ? getPelniRateByTotalWeight(totalWeight, first?.deliveryRoute || "") : null;
   const allPending = pkgs.every((p) => p.status !== "diserahkan");
   const allDone = pkgs.every((p) => p.status === "diserahkan");
 
@@ -164,6 +203,11 @@ function GroupedBarcodeCard({
             </div>
           ))}
         </div>
+        {isPelniCard && pelniRate && (
+          <div className="text-xs text-indigo-600 mb-0.5">
+            🚢 Harga/kg: {formatRp(pelniRate)} · Berat total: {totalWeight.toFixed(3)} Kg
+          </div>
+        )}
         <div className="text-xs font-semibold text-primary mb-2">Total Ongkir: {formatRp(totalShipping)}</div>
         <div className="flex gap-1.5 mb-1.5">
           <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={printBarcode}>

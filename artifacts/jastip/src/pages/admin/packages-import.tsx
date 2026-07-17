@@ -30,6 +30,27 @@ function calcVolumeWeight(serviceType: string, l: number, w: number, h: number):
   return (l * w * h) / d;
 }
 
+// Pelni: tarif bertingkat berdasarkan TOTAL BERAT GABUNGAN konsumen dalam batch.
+// Estimasi preview ini dihitung per-paket; server menghitung ulang dengan benar
+// setelah semua paket diimpor.
+function getPelniRateByTotalWeight(totalWeight: number, deliveryRoute: string): number | null {
+  if (!deliveryRoute || !totalWeight || totalWeight <= 0) return null;
+  if (deliveryRoute === "Jakarta → Manokwari") {
+    if (totalWeight <= 10.1) return 20000;
+    if (totalWeight <= 20.1) return 19000;
+    if (totalWeight <= 40.1) return 18000;
+    if (totalWeight <= 80.1) return 17000;
+    return 16000; // 81–200 kg
+  }
+  if (deliveryRoute === "Surabaya → Manokwari") {
+    if (totalWeight <= 10) return 18000;
+    if (totalWeight <= 20) return 17000;
+    if (totalWeight <= 40) return 16000;
+    return 15500;
+  }
+  return null;
+}
+
 function getTotalShipping(serviceType: string, deliveryRoute: string, weight: number): number | null {
   if (!serviceType || !deliveryRoute || !weight || weight <= 0) return null;
   if (serviceType === "jastip pesawat" && deliveryRoute === "Jakarta → Manokwari") {
@@ -51,14 +72,8 @@ function getTotalShipping(serviceType: string, deliveryRoute: string, weight: nu
     return Math.max(10000, Math.round(weight * 10000));
   }
   if (serviceType === "jastip pelni") {
-    if (deliveryRoute === "Jakarta → Manokwari") {
-      const raw = weight <= 10 ? weight * 20000 : weight <= 20 ? weight * 19000 : weight <= 40 ? weight * 18000 : weight * 17000;
-      return Math.max(20000, Math.round(raw));
-    }
-    if (deliveryRoute === "Surabaya → Manokwari") {
-      const raw = weight <= 10 ? weight * 18000 : weight <= 20 ? weight * 17000 : weight <= 40 ? weight * 16000 : weight * 15500;
-      return Math.max(18000, Math.round(raw));
-    }
+    const rate = getPelniRateByTotalWeight(weight, deliveryRoute);
+    if (rate) return Math.round(weight * rate);
   }
   return null;
 }
@@ -67,20 +82,7 @@ function getShippingRate(serviceType: string, deliveryRoute: string, weight: num
   if (!serviceType || !weight || weight <= 0) return null;
   if (serviceType === "jastip pesawat") return 77000;
   if (serviceType === "jastip hemat+") return 10000;
-  if (serviceType === "jastip pelni") {
-    if (deliveryRoute === "Jakarta → Manokwari") {
-      if (weight <= 10) return 20000;
-      if (weight <= 20) return 19000;
-      if (weight <= 40) return 18000;
-      return 17000;
-    }
-    if (deliveryRoute === "Surabaya → Manokwari") {
-      if (weight <= 10) return 18000;
-      if (weight <= 20) return 17000;
-      if (weight <= 40) return 16000;
-      return 15500;
-    }
-  }
+  if (serviceType === "jastip pelni") return getPelniRateByTotalWeight(weight, deliveryRoute);
   return null;
 }
 

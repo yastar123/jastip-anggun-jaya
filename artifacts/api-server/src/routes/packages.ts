@@ -18,6 +18,74 @@ function toNum(val: any): number | null {
   return isNaN(n) ? null : n;
 }
 
+// Pelni: tarif per-kg berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch
+// (bukan berdasarkan berat per paket)
+function getPelniRateByTotalWeight(
+  totalWeight: number,
+  deliveryRoute: string | null | undefined,
+): number | null {
+  if (!deliveryRoute || !totalWeight || totalWeight <= 0) return null;
+  if (deliveryRoute === "Jakarta → Manokwari") {
+    if (totalWeight <= 10.1) return 20000;
+    if (totalWeight <= 20.1) return 19000;
+    if (totalWeight <= 40.1) return 18000;
+    if (totalWeight <= 80.1) return 17000;
+    return 16000; // 81–200 kg
+  }
+  if (deliveryRoute === "Surabaya → Manokwari") {
+    if (totalWeight <= 10) return 18000;
+    if (totalWeight <= 20) return 17000;
+    if (totalWeight <= 40) return 16000;
+    return 15500;
+  }
+  return null;
+}
+
+// Recalculate shippingRate + totalShipping untuk SEMUA paket Pelni milik satu
+// konsumen dalam satu batch, berdasarkan total berat gabungan mereka.
+async function recalcPelniCustomerOngkir(
+  batchId: number,
+  customerName: string,
+  deliveryRoute: string,
+): Promise<void> {
+  if (!batchId || !customerName || !deliveryRoute) return;
+
+  // Ambil semua paket Pelni dalam batch ini
+  const allBatchPelni = await db
+    .select()
+    .from(packagesTable)
+    .where(and(eq(packagesTable.batchId, batchId), eq(packagesTable.serviceType, "jastip pelni")));
+
+  // Filter per konsumen (case-insensitive)
+  const customerLower = customerName.trim().toLowerCase();
+  const customerPkgs = allBatchPelni.filter(
+    (p) => (p.customerName || "").trim().toLowerCase() === customerLower,
+  );
+  if (!customerPkgs.length) return;
+
+  // Total berat gabungan
+  const totalWeight = customerPkgs.reduce((s, p) => s + (Number(p.usedWeight) || 0), 0);
+  if (!totalWeight) return;
+
+  // Tarif dari tabel bertingkat berdasarkan total berat
+  const rate = getPelniRateByTotalWeight(totalWeight, deliveryRoute);
+  if (!rate) return;
+
+  // Update setiap paket: shippingRate = rate, totalShipping = usedWeight × rate
+  for (const pkg of customerPkgs) {
+    const pkgWeight = Number(pkg.usedWeight) || 0;
+    const pkgTotalShipping = Math.round(pkgWeight * rate);
+    await db
+      .update(packagesTable)
+      .set({
+        shippingRate: String(rate),
+        totalShipping: String(pkgTotalShipping),
+        updatedAt: new Date(),
+      })
+      .where(eq(packagesTable.id, pkg.id));
+  }
+}
+
 function getShippingRate(
   serviceType: string | null | undefined,
   deliveryRoute: string | null | undefined,
@@ -27,20 +95,10 @@ function getShippingRate(
   if (serviceType === "jastip pesawat") return 77000;
   if (serviceType === "jastip hemat+") return 10000;
   if (serviceType === "jastip kargo") return 7000;
-  if (serviceType === "jastip pelni") {
-    if (deliveryRoute === "Jakarta → Manokwari") {
-      if (weight <= 10) return 20000;
-      if (weight <= 20) return 19000;
-      if (weight <= 40) return 18000;
-      return 17000;
-    }
-    if (deliveryRoute === "Surabaya → Manokwari") {
-      if (weight <= 10) return 18000;
-      if (weight <= 20) return 17000;
-      if (weight <= 40) return 16000;
-      return 15500;
-    }
-  }
+  // Pelni: gunakan getPelniRateByTotalWeight (tarif berdasarkan total berat konsumen)
+  // Fungsi ini hanya dipakai sebagai estimasi awal; recalcPelniCustomerOngkir akan
+  // menghitung ulang dengan benar setelah semua paket tersimpan.
+  if (serviceType === "jastip pelni") return getPelniRateByTotalWeight(weight, deliveryRoute);
   return null;
 }
 
@@ -76,18 +134,8 @@ function getTotalShipping(
   }
 
   if (serviceType === "jastip pelni") {
-    if (deliveryRoute === "Jakarta → Manokwari") {
-      if (weight <= 10) return Math.round(weight * 20000);
-      if (weight <= 20) return Math.round(weight * 19000);
-      if (weight <= 40) return Math.round(weight * 18000);
-      return Math.round(weight * 17000);
-    }
-    if (deliveryRoute === "Surabaya → Manokwari") {
-      if (weight <= 10) return Math.round(weight * 18000);
-      if (weight <= 20) return Math.round(weight * 17000);
-      if (weight <= 40) return Math.round(weight * 16000);
-      return Math.round(weight * 15500);
-    }
+    const rate = getPelniRateByTotalWeight(weight, deliveryRoute);
+    if (rate) return Math.round(weight * rate);
   }
 
   return null;
@@ -305,7 +353,16 @@ router.post(
         .values(insertData as any)
         .returning();
 
-      const pkg = inserted[0];
+      let pkg = inserted[0];
+
+      // Pelni: hitung ulang ongkir berdasarkan total berat gabungan konsumen dalam batch
+      if (serviceType === "jastip pelni" && pkg.batchId && pkg.customerName && pkg.deliveryRoute) {
+        await recalcPelniCustomerOngkir(pkg.batchId, pkg.customerName, pkg.deliveryRoute);
+        // Re-fetch agar nilai yang dikembalikan sudah benar
+        const refreshed = await db.select().from(packagesTable).where(eq(packagesTable.id, pkg.id)).limit(1);
+        if (refreshed[0]) pkg = refreshed[0];
+      }
+
       const adminMap = new Map<number, any>();
       if (pkg.adminId) {
         const admin = await db
@@ -420,6 +477,23 @@ router.post(
           errors.push(`Error processing row: ${String(e)}`);
         }
       }
+      // Pelni: setelah semua paket diinsert, hitung ulang ongkir per konsumen
+      // berdasarkan total berat gabungan mereka dalam batch ini
+      const pelniRows = (rows as any[]).filter((r: any) => r.serviceType === "jastip pelni");
+      if (pelniRows.length > 0) {
+        const pelniGroups = new Map<string, { customerName: string; deliveryRoute: string }>();
+        for (const r of pelniRows) {
+          if (!r.customerName || !r.deliveryRoute) continue;
+          const key = `${(r.customerName as string).trim().toLowerCase()}|${r.deliveryRoute}`;
+          if (!pelniGroups.has(key)) {
+            pelniGroups.set(key, { customerName: String(r.customerName), deliveryRoute: String(r.deliveryRoute) });
+          }
+        }
+        for (const { customerName, deliveryRoute } of pelniGroups.values()) {
+          await recalcPelniCustomerOngkir(Number(batchId), customerName, deliveryRoute);
+        }
+      }
+
       res.json({ success, failed, total: rows.length, errors, ids: createdIds });
     } catch (err) {
       req.log.error(err);
@@ -645,11 +719,19 @@ router.patch(
         .set(updateData)
         .where(eq(packagesTable.id, id))
         .returning();
-      const pkg = updated[0];
+      let pkg = updated[0];
       if (!pkg) {
         res.status(404).json({ error: "Not found" });
         return;
       }
+
+      // Pelni: hitung ulang ongkir berdasarkan total berat gabungan konsumen dalam batch
+      if (pkg.serviceType === "jastip pelni" && pkg.batchId && pkg.customerName && pkg.deliveryRoute) {
+        await recalcPelniCustomerOngkir(pkg.batchId, pkg.customerName, pkg.deliveryRoute);
+        const refreshed = await db.select().from(packagesTable).where(eq(packagesTable.id, pkg.id)).limit(1);
+        if (refreshed[0]) pkg = refreshed[0];
+      }
+
       res.json(formatPackage(pkg, new Map(), new Map()));
     } catch (err) {
       req.log.error(err);

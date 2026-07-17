@@ -89,6 +89,30 @@ const deliveryRouteOptions: Record<string, { value: string; label: string }[]> =
   ],
 };
 
+// Pelni: tarif per-kg berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch.
+// Fungsi ini dipakai sebagai estimasi tampilan; server akan menghitung ulang
+// dengan benar setelah paket disimpan.
+function getPelniRateByTotalWeight(
+  totalWeight: number,
+  deliveryRoute: string | null | undefined,
+): number | null {
+  if (!deliveryRoute || !totalWeight || totalWeight <= 0) return null;
+  if (deliveryRoute === "Jakarta → Manokwari") {
+    if (totalWeight <= 10.1) return 20000;
+    if (totalWeight <= 20.1) return 19000;
+    if (totalWeight <= 40.1) return 18000;
+    if (totalWeight <= 80.1) return 17000;
+    return 16000; // 81–200 kg
+  }
+  if (deliveryRoute === "Surabaya → Manokwari") {
+    if (totalWeight <= 10) return 18000;
+    if (totalWeight <= 20) return 17000;
+    if (totalWeight <= 40) return 16000;
+    return 15500;
+  }
+  return null;
+}
+
 function getShippingRate(
   serviceType: string | null | undefined,
   deliveryRoute: string | null | undefined,
@@ -98,20 +122,7 @@ function getShippingRate(
   if (serviceType === "jastip pesawat") return 77000;
   if (serviceType === "jastip hemat+") return 10000;
   if (serviceType === "jastip kargo") return 7000;
-  if (serviceType === "jastip pelni") {
-    if (deliveryRoute === "Jakarta → Manokwari") {
-      if (weight <= 10) return 20000;
-      if (weight <= 20) return 19000;
-      if (weight <= 40) return 18000;
-      return 17000;
-    }
-    if (deliveryRoute === "Surabaya → Manokwari") {
-      if (weight <= 10) return 18000;
-      if (weight <= 20) return 17000;
-      if (weight <= 40) return 16000;
-      return 15500;
-    }
-  }
+  if (serviceType === "jastip pelni") return getPelniRateByTotalWeight(weight, deliveryRoute);
   return null;
 }
 
@@ -143,18 +154,8 @@ function getTotalShipping(
     return Math.max(70000, Math.round(weight * 7000));
   }
   if (serviceType === "jastip pelni") {
-    if (deliveryRoute === "Jakarta → Manokwari") {
-      if (weight <= 10) return Math.max(20000, Math.round(weight * 20000));
-      if (weight <= 20) return Math.max(20000, Math.round(weight * 19000));
-      if (weight <= 40) return Math.max(20000, Math.round(weight * 18000));
-      return Math.max(20000, Math.round(weight * 17000));
-    }
-    if (deliveryRoute === "Surabaya → Manokwari") {
-      if (weight <= 10) return Math.max(18000, Math.round(weight * 18000));
-      if (weight <= 20) return Math.max(18000, Math.round(weight * 17000));
-      if (weight <= 40) return Math.max(18000, Math.round(weight * 16000));
-      return Math.max(18000, Math.round(weight * 15500));
-    }
+    const rate = getPelniRateByTotalWeight(weight, deliveryRoute);
+    if (rate) return Math.round(weight * rate);
   }
   return null;
 }
@@ -1315,9 +1316,23 @@ export default function AdminPackagesNew() {
                       ))}
                     </div>
 
+                    {/* Notif khusus Pelni: hitung dari total berat konsumen */}
+                    {isPelni && (
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 flex gap-3">
+                        <span className="text-indigo-500 text-lg shrink-0">🚢</span>
+                        <div className="text-xs text-indigo-800 space-y-1">
+                          <p className="font-bold">Pelni: Ongkir dihitung dari total berat gabungan konsumen</p>
+                          <p>Sistem akan menjumlahkan semua berat paket konsumen ini dalam batch yang sama, lalu menentukan harga/kg dari tabel bertingkat. Nilai di bawah adalah estimasi paket ini saja — akan diperbarui otomatis setelah disimpan.</p>
+                          <p className="font-medium">Tabel: ≤10,1 kg → Rp20.000 · ≤20,1 kg → Rp19.000 · ≤40,1 kg → Rp18.000 · ≤80,1 kg → Rp17.000 · &gt;80 kg → Rp16.000</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Auto-calculated summary */}
                     <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Kalkulasi Otomatis</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                        Kalkulasi Otomatis{isPelni ? " (estimasi paket ini)" : ""}
+                      </p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div>
                           <p className="text-xs text-muted-foreground">Berat Volume (Kg)</p>
@@ -1338,11 +1353,15 @@ export default function AdminPackagesNew() {
                           )}
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">Tarif / Kg</p>
+                          <p className="text-xs text-muted-foreground">
+                            {isPelni ? "Tarif/Kg (estimasi)" : "Tarif / Kg"}
+                          </p>
                           <p className="font-semibold">{formatRp(watchedShippingRate)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">Total Ongkir</p>
+                          <p className="text-xs text-muted-foreground">
+                            {isPelni ? "Ongkir (estimasi)" : "Total Ongkir"}
+                          </p>
                           <p className="font-semibold text-primary">{formatRp(watchedTotalShipping)}</p>
                         </div>
                       </div>

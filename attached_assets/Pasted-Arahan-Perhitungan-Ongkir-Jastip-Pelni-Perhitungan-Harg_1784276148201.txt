@@ -1,0 +1,65 @@
+Arahan Perhitungan Ongkir Jastip Pelni
+Perhitungan Harga Bertingkat Berdasarkan Total Berat Konsumen
+Tujuan Perbaikan: Sistem Jastip Pelni harus menghitung ongkir dari total berat gabungan semua paket milik satu konsumen dalam satu batch, bukan dihitung per paket lalu dijumlahkan.
+1. Aturan Utama
+Untuk layanan Jastip Pelni, ongkir memakai harga bertingkat berdasarkan total berat keseluruhan paket milik satu konsumen.
+Sistem harus menjumlahkan semua berat paket dalam satu batch Pelni yang sama, lalu menentukan tarif per kg.
+Perhitungan tidak boleh dilakukan per paket satu per satu karena hasil akhirnya bisa salah.
+2. Cara Hitung yang Salah dan Benar
+SALAH	BENAR
+Paket 1 x tarif
+Paket 2 x tarif
+Paket 3 x tarif
+Lalu dijumlahkan	Jumlahkan semua berat paket konsumen
+Tentukan harga/kg dari total berat
+Total berat x harga/kg
+3. Tabel Harga Bertingkat
+Total Berat Gabungan Konsumen	Harga Per Kg
+1 kg - 10,1 kg	Rp20.000/kg
+11 kg - 20,1 kg	Rp19.000/kg
+21 kg - 40,1 kg	Rp18.000/kg
+41 kg - 80,1 kg	Rp17.000/kg
+81 kg - 200 kg	Rp16.000/kg
+4. Contoh Perhitungan
+Contoh 1
+Nama Konsumen	Nawar Musakir
+Jumlah Paket	10 paket
+Total Berat Gabungan	5 kg
+Tarif yang Dipakai	Rp20.000/kg
+Total Ongkir	5 kg x Rp20.000 = Rp100.000
+Contoh 2
+Nama Konsumen	Alinwahyudi
+Jumlah Paket	6 paket
+Total Berat Gabungan	12 kg
+Tarif yang Dipakai	Rp19.000/kg
+Total Ongkir	12 kg x Rp19.000 = Rp228.000
+5. Logika Sistem untuk Tim IT
+Grouping data Pelni wajib berdasarkan: batch_id + jenis_jastip + nama_konsumen
+total_berat = SUM(berat_paket) dalam batch Pelni yang sama
+
+Jika total_berat <= 10,1      harga_per_kg = 20.000
+Jika total_berat 11 - 20,1    harga_per_kg = 19.000
+Jika total_berat 21 - 40,1    harga_per_kg = 18.000
+Jika total_berat 41 - 80,1    harga_per_kg = 17.000
+Jika total_berat 81 - 200      harga_per_kg = 16.000
+
+total_ongkir = total_berat x harga_per_kg
+ 
+6. Tampilan yang Harus Muncul di Sistem
+Pada Label Barcode, Verifikasi Paket, Pembayaran, dan Export Pelni, tampilkan ringkasan per konsumen:
+Nama Konsumen	Nawar Musakir
+Jenis Jastip	Jastip Pelni
+Batch Pengiriman	Dobonsolo ETD 3 Juli 2026
+Jumlah Paket	10 paket
+Total Berat	5 kg
+Harga/kg	Rp20.000
+Total Ongkir	Rp100.000
+Detail paket tetap boleh tampil satu per satu, tetapi total ongkir akhir harus dihitung dari total berat gabungan konsumen.
+7. Catatan Penting
+•	Pelni berbeda dari Cargo. Cargo memakai konsep 1 paket = 1 harga, sedangkan Pelni menjumlahkan semua berat paket konsumen terlebih dahulu.
+•	Sistem tidak boleh menjumlahkan ongkir per baris paket sebagai total akhir Pelni.
+•	Jika ada paket susulan dalam batch yang sama, total berat konsumen harus otomatis berubah dan harga/kg dihitung ulang.
+•	Data harus dipisahkan berdasarkan batch_id dan jenis_jastip agar tidak tercampur dengan layanan atau batch lain.
+8. Instruksi Singkat untuk Tim IT
+Mohon perbaiki sistem Jastip Pelni. Perhitungan ongkir harus berdasarkan total berat gabungan semua paket milik satu konsumen dalam satu batch, bukan dihitung per paket. Sistem harus menjumlahkan seluruh berat paket terlebih dahulu, lalu menentukan harga/kg berdasarkan harga bertingkat. Contoh: total berat 5 kg x Rp20.000/kg = Rp100.000. Jika total berat 12 kg, maka tarif Rp19.000/kg sehingga 12 kg x Rp19.000 = Rp228.000. Grouping data wajib berdasarkan batch_id + jenis_jastip + nama_konsumen.
+
