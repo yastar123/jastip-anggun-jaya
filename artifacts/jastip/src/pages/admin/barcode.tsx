@@ -350,11 +350,14 @@ function fmtDate(d: string) {
 function groupPkgsByCustomer(pkgs: any[]) {
   const map = new Map<string, any[]>();
   for (const p of pkgs) {
-    const key = [
-      (p.customerName || "").trim().toLowerCase(),
-      (p.serviceType || "").toLowerCase(),
-      String(p.batchId ?? ""),
-    ].join("|");
+    // Paket Cargo (packageMode "single") tidak digabung — tiap paket jadi kartu sendiri
+    const key = p.packageMode === "single"
+      ? `__single__|${p.id}`
+      : [
+          (p.customerName || "").trim().toLowerCase(),
+          (p.serviceType || "").toLowerCase(),
+          String(p.batchId ?? ""),
+        ].join("|");
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(p);
   }
@@ -548,12 +551,21 @@ function NoBatchSection({
               <p className="text-center py-8 text-sm text-muted-foreground">Tidak ada paket yang cocok dengan filter saat ini.</p>
             ) : (
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                {groups.map((pkgs) => (
-                  <GroupedBarcodeItem
-                    key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|nobatch`}
-                    pkgs={pkgs}
-                  />
-                ))}
+                {groups.map((pkgs) =>
+                  pkgs[0]?.packageMode === "single" ? (
+                    <BarcodeItem
+                      key={`single|${pkgs[0].id}`}
+                      pkg={pkgs[0]}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  ) : (
+                    <GroupedBarcodeItem
+                      key={`${pkgs[0]?.customerName}|${pkgs[0]?.serviceType}|nobatch`}
+                      pkgs={pkgs}
+                    />
+                  )
+                )}
               </div>
             )}
           </div>
