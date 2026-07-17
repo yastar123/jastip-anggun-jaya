@@ -51,6 +51,13 @@ After `pnpm install` + `pnpm --filter @workspace/db run push` + `seed-demo`, you
 `npx tsx scripts/migrate-batch-legacy.ts` — otherwise `service_types` stays empty and package creation
 with a serviceType silently gets `serviceTypeId: null` (no error, but batch grouping/reports break).
 
+## Features added (July 2026)
+- **Tetap di halaman input setelah simpan**: Single mode simpan → stay on page, reset form, tampil card sukses dengan tombol Cetak Barcode. State: `lastSavedId`.
+- **Pengaturan Tarif (Owner only)**: `/owner/tarif` — edit pesawatRate, hematRate, kargoRate, pelniTiersJakarta/Surabaya. PATCH `/api/settings` sekarang Owner-only, simpan history ke `tarif_history` table. GET `/api/settings/history` endpoint.
+- **Pengeluaran Harian**: `/owner/pengeluaran` — CRUD pengeluaran, filter tanggal/kategori/metode, export Excel. DB table `pengeluaran`. API `/api/pengeluaran`.
+- **Diskon Nominal di Scan**: Field diskon (Rp, bukan %) + alasan (wajib jika ada diskon) di payment modal scan.tsx. totalAkhir = totalTagihan - diskon.
+- **Hapus Batch**: Sudah ada di batches.tsx (soft delete status HAPUS) — tidak perlu perubahan.
+
 ## OpenAPI spec must match actual DB/route fields
 `lib/api-spec/openapi.yaml` is the source of truth for generated types in `lib/api-zod` and
 `lib/api-client-react` (via `pnpm run codegen` in `lib/api-spec`). It had drifted from the real API:

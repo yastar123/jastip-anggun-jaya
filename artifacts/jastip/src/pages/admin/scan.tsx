@@ -11,7 +11,7 @@ import {
 import {
   Camera, Upload, ScanLine, X, Hash, Trash2, CheckCircle2,
   ShoppingCart, RotateCcw, Banknote, CreditCard, Clock, ChevronDown, ChevronUp,
-  AlertTriangle, Users,
+  AlertTriangle, Users, Tag,
 } from "lucide-react";
 
 function formatRp(n: number | string | null | undefined) {
@@ -99,36 +99,27 @@ export default function AdminScan() {
   const [paymentType, setPaymentType] = useState<PaymentType>("tunai");
   const [isSaving, setIsSaving] = useState(false);
 
+  // ── Diskon State ─────────────────────────────────────────────────────────
+  const [diskon, setDiskon] = useState<string>("");
+  const [alasanDiskon, setAlasanDiskon] = useState("");
+  // ─────────────────────────────────────────────────────────────────────────
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const manualRef = useRef<HTMLInputElement>(null);
-  // ── Anti-spam refs ───────────────────────────────────────────────────────
-  // lastScannedCodeRef: kode terakhir yang berhasil diproses.
-  //   Selama kamera masih mengarah ke barcode yang sama, kode ini tidak berubah
-  //   sehingga scan berikutnya langsung diabaikan — TANPA batas waktu.
-  //   Hanya di-reset saat kamera dimatikan, atau ketika kode berbeda terdeteksi,
-  //   atau ketika lookup gagal (agar user bisa coba ulang).
   const lastScannedCodeRef = useRef<string>("");
-  // isScanProcessingRef: lock saat lookupAndAdd sedang berjalan (async).
-  //   Mencegah callback kamera yang datang berturut-turut masuk bersamaan.
   const isScanProcessingRef = useRef<boolean>(false);
-  // itemsRef: bayangan items state yang selalu up-to-date.
-  //   Digunakan oleh handleScanSuccess (stable callback) agar bisa cek daftar
-  //   terbaru tanpa terjebak stale closure.
   const itemsRef = useRef<ScannedItem[]>([]);
-  // addedIdsRef: set ID paket yang sudah diklaim (ditambahkan atau sedang diproses).
-  //   Di-update sinkron sebelum setItems → tidak ada race condition antar
-  //   concurrent lookupAndAdd calls, bahkan kalau itemsRef belum di-sync.
   const addedIdsRef = useRef<Set<number>>(new Set());
-  // ─────────────────────────────────────────────────────────────────────────
   const SCANNER_ID = "admin-scan-pos-scanner";
 
-  // Sync itemsRef setiap kali items berubah agar callback scanner (stable) bisa cek data terbaru
   useEffect(() => { itemsRef.current = items; }, [items]);
 
   const totalTagihan = items.reduce((s, i) => s + i.totalShipping, 0);
+  const diskonNum = Number(diskon.replace(/\D/g, "")) || 0;
+  const totalAkhir = Math.max(0, totalTagihan - diskonNum);
   const uangNum = Number(uangDibayar.replace(/\D/g, "")) || 0;
-  const kembalian = uangNum - totalTagihan;
+  const kembalian = uangNum - totalAkhir;
 
   async function fetchJson(url: string) {
     const token = localStorage.getItem("jaj_token");
@@ -136,21 +127,15 @@ export default function AdminScan() {
     return r.json();
   }
 
-  // Menambahkan satu paket ke daftar scan, dengan deduplikasi atomik yang
-  // sama seperti alur single-package. Dipakai baik oleh scan biasa maupun
-  // saat memproses tiap anggota dari barcode grup.
-  // Return: "added" | "duplicate" | "delivered"
   function addPackageItem(pkg: any): "added" | "duplicate" | "delivered" {
     if (pkg.status === "diserahkan") return "delivered";
     if (addedIdsRef.current.has(pkg.id)) return "duplicate";
-    addedIdsRef.current.add(pkg.id); // klaim ID — sinkron, tidak ada race
+    addedIdsRef.current.add(pkg.id);
     const newItem = toItem(pkg);
     setItems((prev) => [...prev, newItem]);
     return "added";
   }
 
-  // Mengembalikan true = boleh coba lagi dengan kode yang sama (tidak ditemukan / error)
-  //               false = lock tetap terpasang (berhasil / sudah ada / sudah diserahkan)
   async function lookupAndAdd(code: string): Promise<boolean> {
     const trimmed = code.trim();
     if (!trimmed) return true;
@@ -159,8 +144,6 @@ export default function AdminScan() {
     try {
       const data = await fetchJson(`/api/packages/scan/${encodeURIComponent(trimmed)}`);
 
-      // Barcode grup ("JAJ-GRUP-...") membungkus beberapa paket sekaligus —
-      // API mengembalikan semua anggotanya di bawah `packages`, bukan `package`.
       if (data.group && Array.isArray(data.packages)) {
         const groupPkgs = data.packages;
         if (!groupPkgs.length) {
@@ -188,7 +171,7 @@ export default function AdminScan() {
         } else {
           toast({ title: "Semua paket grup sudah ada dalam daftar" });
         }
-        return false; // tetap lock → jangan proses ulang barcode grup yang sama
+        return false;
       }
 
       let pkg: any = data.package ?? null;
@@ -199,25 +182,20 @@ export default function AdminScan() {
 
       if (!pkg) {
         toast({ variant: "destructive", title: "Paket tidak ditemukan", description: `Barcode: ${trimmed}` });
-        return true; // unlock → user boleh coba scan ulang barcode yang sama
+        return true;
       }
 
       if (pkg.status === "diserahkan") {
         setAlreadyDelivered(pkg);
         toast({ title: "Sudah diserahkan sebelumnya", description: `${pkg.customerName} — ${pkg.resiNumber || pkg.barcode}` });
-        return false; // tetap lock → tampilkan warning, jangan proses ulang
+        return false;
       }
 
-      // Gunakan itemsRef (bukan state items) agar tidak terjebak stale closure
-      // Deduplikasi atomik: cek & klaim ID secara sinkron via addedIdsRef.
-      // addedIdsRef di-update SEBELUM await apapun, sehingga dua concurrent
-      // lookupAndAdd calls tidak bisa sama-sama lolos — yang kedua akan melihat
-      // ID sudah diklaim meski itemsRef belum di-sync ke state terbaru.
       if (addedIdsRef.current.has(pkg.id)) {
         toast({ title: "Sudah ditambahkan", description: `${pkg.resiNumber || pkg.barcode} sudah ada dalam daftar.` });
-        return false; // tetap lock
+        return false;
       }
-      addedIdsRef.current.add(pkg.id); // klaim ID — sinkron, tidak ada race
+      addedIdsRef.current.add(pkg.id);
 
       const newItem = toItem(pkg);
       setItems((prev) => [...prev, newItem]);
@@ -225,39 +203,27 @@ export default function AdminScan() {
         title: "✓ Paket ditambahkan",
         description: `${pkg.customerName} — ${formatRp(newItem.totalShipping)}`,
       });
-      return false; // tetap lock → sukses, jangan proses lagi selama kamera di sini
+      return false;
     } catch {
       toast({ variant: "destructive", title: "Gagal mencari paket" });
-      return true; // unlock → biarkan coba ulang bila ini error sementara
+      return true;
     } finally {
       setIsLooking(false);
     }
   }
 
   const handleScanSuccess = useCallback(async (code: string) => {
-    // ① Kode yang sama masih terbaca kamera → abaikan sepenuhnya (tidak ada batas waktu).
-    //   Lock hanya dibuka bila kamera berpindah ke barcode berbeda, kamera dimatikan,
-    //   atau bila lookup sebelumnya gagal (tidak ditemukan / error).
     if (code === lastScannedCodeRef.current) return;
-
-    // ② lookupAndAdd sebelumnya masih berjalan (async) → abaikan callback masuk berikutnya.
     if (isScanProcessingRef.current) return;
-
-    // Pasang lock segera sebelum operasi async
     isScanProcessingRef.current = true;
     lastScannedCodeRef.current = code;
-
     try {
       const allowRetry = await lookupAndAdd(code);
-      if (allowRetry) {
-        // Barcode tidak ditemukan atau error → hapus lock agar user bisa coba lagi
-        lastScannedCodeRef.current = "";
-      }
+      if (allowRetry) lastScannedCodeRef.current = "";
     } finally {
-      // Pastikan processing lock SELALU dibuka, bahkan bila terjadi error tak terduga
       isScanProcessingRef.current = false;
     }
-  }, []); // deps kosong: semua akses lewat ref / setState (stable), tidak ada stale closure
+  }, []);
 
   async function startCamera() {
     setScanMode("camera");
@@ -333,7 +299,7 @@ export default function AdminScan() {
   function removeItem(id: number) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setExpandedIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
-    addedIdsRef.current.delete(id); // hapus klaim agar bisa scan ulang paket ini
+    addedIdsRef.current.delete(id);
   }
 
   function toggleExpand(id: number) {
@@ -351,13 +317,17 @@ export default function AdminScan() {
     setUangDibayar("");
     setPaymentType("tunai");
     setAlreadyDelivered(null);
-    addedIdsRef.current.clear(); // bersihkan semua klaim ID
+    setDiskon("");
+    setAlasanDiskon("");
+    addedIdsRef.current.clear();
     stopCamera();
   }
 
   function openPayModal() {
     setUangDibayar("");
     setPaymentType("tunai");
+    setDiskon("");
+    setAlasanDiskon("");
     setShowPayModal(true);
   }
 
@@ -366,15 +336,24 @@ export default function AdminScan() {
     setUangDibayar(digits ? Number(digits).toLocaleString("id-ID") : "");
   }
 
-  // Fungsi tolak sengaja dihapus — setelah SUDAH_DIAMBIL, status terkunci permanen (spec §4.2)
+  function handleDiskonInput(val: string) {
+    const digits = val.replace(/\D/g, "");
+    setDiskon(digits ? Number(digits).toLocaleString("id-ID") : "");
+  }
 
   async function handleKonfirmasiBayar() {
+    // Validasi diskon: jika ada diskon, alasan wajib diisi
+    if (diskonNum > 0 && !alasanDiskon.trim()) {
+      toast({ variant: "destructive", title: "Alasan diskon wajib diisi", description: "Isi alasan/catatan diskon sebelum konfirmasi." });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const token = localStorage.getItem("jaj_token");
       const body = {
         paymentType,
-        totalAmount: totalTagihan,
+        totalAmount: totalAkhir,
         paidAmount: (paymentType === "tunai" || paymentType === "transfer") ? uangNum : null,
         changeAmount: (paymentType === "tunai" || paymentType === "transfer") ? kembalian : null,
         packageIds: items.map((i) => i.id),
@@ -391,6 +370,9 @@ export default function AdminScan() {
           totalShipping: i.totalShipping,
           packageDate: i.packageDate,
         })),
+        notes: diskonNum > 0
+          ? `Diskon: ${formatRp(diskonNum)} | Total ongkir: ${formatRp(totalTagihan)} | Total setelah diskon: ${formatRp(totalAkhir)} | Alasan: ${alasanDiskon}`
+          : null,
       };
 
       const res = await fetch("/api/payments", {
@@ -400,7 +382,6 @@ export default function AdminScan() {
       });
       if (!res.ok) throw new Error("Gagal menyimpan pembayaran");
 
-      // Tandai semua paket sebagai diserahkan setelah pembayaran tercatat
       const results = await Promise.allSettled(
         items.map((i) =>
           fetch(`/api/packages/${i.id}/serahkan`, {
@@ -412,9 +393,10 @@ export default function AdminScan() {
       const failedCount = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
 
       const typeLabel = PAYMENT_TYPES.find((t) => t.value === paymentType)?.label || paymentType;
+      const diskonInfo = diskonNum > 0 ? ` | Diskon: ${formatRp(diskonNum)}` : "";
       toast({
         title: "✓ Pembayaran & Serah Terima Selesai",
-        description: `${typeLabel} — ${formatRp(totalTagihan)}${(paymentType === "tunai" || paymentType === "transfer") ? ` | Kembalian: ${formatRp(kembalian)}` : ""}${failedCount > 0 ? ` (${failedCount} paket gagal diupdate statusnya)` : ""}`,
+        description: `${typeLabel} — ${formatRp(totalAkhir)}${diskonInfo}${(paymentType === "tunai" || paymentType === "transfer") ? ` | Kembalian: ${formatRp(kembalian)}` : ""}${failedCount > 0 ? ` (${failedCount} paket gagal diupdate)` : ""}`,
       });
       setShowPayModal(false);
       resetAll();
@@ -426,38 +408,40 @@ export default function AdminScan() {
   }
 
   const canConfirm =
-    paymentType === "piutang" ||
-    ((paymentType === "tunai" || paymentType === "transfer") && uangNum >= totalTagihan);
+    (diskonNum === 0 || alasanDiskon.trim().length > 0) && (
+      paymentType === "piutang" ||
+      ((paymentType === "tunai" || paymentType === "transfer") && uangNum >= totalAkhir)
+    );
 
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ScanLine className="h-7 w-7 text-primary" /> Scan Barcode dan Pembayaran
+            <ScanLine className="h-7 w-7 text-primary" />
+            Scan Barcode &amp; Pembayaran
           </h1>
           <p className="text-muted-foreground mt-1">
-            Scan barcode paket satu per satu (seperti kasir minimarket), lalu selesaikan pembayaran &amp; serah terima sekaligus.
+            Scan barcode paket, hitung tagihan, dan proses pembayaran sekaligus
           </p>
         </div>
         {items.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={resetAll} className="text-muted-foreground shrink-0">
-            <RotateCcw className="h-4 w-4 mr-1" /> Reset
+          <Button variant="outline" size="sm" className="gap-1.5 text-muted-foreground" onClick={resetAll}>
+            <RotateCcw className="h-4 w-4" /> Reset
           </Button>
         )}
       </div>
 
       {alreadyDelivered && (
-        <Card className="border-amber-300 bg-amber-50">
-          <CardContent className="flex items-center gap-3 py-4">
+        <Card className="border-amber-400 bg-amber-50">
+          <CardContent className="py-3 px-4 flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-amber-900">
-                Paket sudah diserahkan &amp; dikunci permanen
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                Paket sudah diserahkan: <strong>{alreadyDelivered.customerName}</strong>
               </p>
-              <p className="text-xs text-amber-700 truncate">
-                {alreadyDelivered.customerName} — {alreadyDelivered.resiNumber || alreadyDelivered.barcode}
-                {alreadyDelivered.pickedUpAt ? ` · Diserahkan: ${formatDate(alreadyDelivered.pickedUpAt)}` : ""}
+              <p className="text-xs text-amber-700 mt-0.5">
+                {alreadyDelivered.resiNumber || alreadyDelivered.barcode}
               </p>
               <p className="text-xs text-amber-600 mt-0.5">Status tidak dapat diubah kembali.</p>
             </div>
@@ -713,10 +697,64 @@ export default function AdminScan() {
                 </div>
               ))}
               <div className="border-t pt-2 flex justify-between items-center">
-                <span className="font-bold text-base">Total Tagihan</span>
-                <span className="font-black text-xl text-primary">{formatRp(totalTagihan)}</span>
+                <span className="font-semibold text-sm text-muted-foreground">Total Ongkir</span>
+                <span className="font-bold text-foreground">{formatRp(totalTagihan)}</span>
               </div>
             </div>
+
+            {/* Diskon / Potongan Harga */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-orange-500" /> Diskon / Potongan Harga
+                <span className="font-normal text-xs text-muted-foreground">(opsional)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
+                <Input
+                  className="pl-9 font-bold"
+                  placeholder="0"
+                  value={diskon}
+                  onChange={(e) => handleDiskonInput(e.target.value)}
+                />
+              </div>
+              {diskonNum > 0 && (
+                <Input
+                  placeholder="Alasan diskon (wajib diisi) *"
+                  value={alasanDiskon}
+                  onChange={(e) => setAlasanDiskon(e.target.value)}
+                  className={!alasanDiskon.trim() ? "border-orange-400 focus-visible:ring-orange-400" : ""}
+                />
+              )}
+              {diskonNum > 0 && !alasanDiskon.trim() && (
+                <p className="text-xs text-orange-600">Alasan diskon wajib diisi jika ada potongan harga.</p>
+              )}
+            </div>
+
+            {/* Total setelah diskon */}
+            {diskonNum > 0 && (
+              <div className="rounded-xl p-3 border-2 border-orange-200 bg-orange-50 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Ongkir</span>
+                  <span className="font-semibold">{formatRp(totalTagihan)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-orange-700">
+                  <span>Diskon / Potongan</span>
+                  <span className="font-semibold">- {formatRp(diskonNum)}</span>
+                </div>
+                <div className="flex justify-between text-base font-black border-t pt-1 mt-1">
+                  <span>Total Setelah Diskon</span>
+                  <span className="text-green-700">{formatRp(totalAkhir)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Total akhir kalau tidak ada diskon */}
+            {diskonNum === 0 && (
+              <div className="flex justify-between items-center px-1">
+                <span className="font-bold text-base">Total Tagihan</span>
+                <span className="font-black text-xl text-primary">{formatRp(totalAkhir)}</span>
+              </div>
+            )}
 
             {/* Payment type */}
             <div>

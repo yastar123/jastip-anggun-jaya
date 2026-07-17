@@ -33,6 +33,8 @@ import {
   History,
   Ship,
   Archive,
+  TrendingDown,
+  Tag,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: any; exact?: boolean };
@@ -68,7 +70,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         { name: "Monitor Paket", href: "/owner/packages", icon: Package },
         { name: "Data Admin", href: "/owner/admins", icon: UserPlus, exact: true },
         { name: "Keuangan", href: "/owner/finance", icon: TrendingUp, exact: true },
+        { name: "Pengeluaran Harian", href: "/owner/pengeluaran", icon: TrendingDown, exact: true },
         { name: "Laporan", href: "/owner/reports", icon: FileText, exact: true },
+        { name: "Pengaturan Tarif", href: "/owner/tarif", icon: Tag, exact: true },
         { name: "Manajemen User", href: "/owner/users", icon: Settings, exact: true },
         { name: "Profil", href: "/owner/profile", icon: UserCircle, exact: true },
       ],

@@ -309,6 +309,8 @@ export default function AdminPackagesNew() {
   // ─────────────────────────────────────────────────────────────────────────
 
   // Single-mode group state (legacy)
+  const [lastSavedId, setLastSavedId] = useState<number | null>(null);
+
   const [savedGrup, setSavedGrup] = useState<{
     customerName: string;
     serviceType: string;
@@ -460,9 +462,23 @@ export default function AdminPackagesNew() {
           });
           toast({ title: "Paket disimpan", description: "Silakan input paket berikutnya atau klik Selesai." });
         } else {
-          toast({ title: "Berhasil", description: "Paket baru berhasil ditambahkan. Barcode siap dicetak." });
+          // SINGLE MODE: Tetap di halaman input setelah simpan
           const newId = (result as any)?.id;
-          setLocation(`${base}/barcode${newId ? `?ids=${newId}` : ""}`);
+          setLastSavedId(newId ?? null);
+          form.reset({
+            packageDate: values.packageDate || todayStr(),
+            resiNumber: "",
+            packageNumber: "",
+            itemName: "",
+            customerName: "",
+            serviceType: values.serviceType,
+            packageMode: values.packageMode,
+            deliveryRoute: values.deliveryRoute,
+          });
+          toast({
+            title: "✓ Paket berhasil disimpan",
+            description: "Silakan input paket berikutnya. Klik 'Cetak Barcode' jika perlu mencetak label.",
+          });
         }
       } else {
         // --- GRUP MULTI-NAMA MODE ---
@@ -729,6 +745,40 @@ export default function AdminPackagesNew() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ===== NOTIFIKASI SIMPAN SINGLE MODE ===== */}
+      {!isGrup && packageMode !== "grup" && lastSavedId !== null && (
+        <Card className="border-green-500 bg-green-50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-green-800">Paket berhasil disimpan!</p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  Form sudah dikosongkan. Silakan input paket berikutnya.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 border-green-400 text-green-700 hover:bg-green-100"
+                    onClick={() => setLastSavedId(null)}
+                  >
+                    Input Paket Baru
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 gap-1"
+                    onClick={() => setLocation(`${base}/barcode?ids=${lastSavedId}`)}
+                  >
+                    <QrCode className="h-3.5 w-3.5" /> Cetak Barcode
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ===== SINGLE GRUP MODE (legacy - same customer name) ===== */}

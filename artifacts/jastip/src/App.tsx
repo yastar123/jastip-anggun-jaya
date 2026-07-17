@@ -35,6 +35,8 @@ import OwnerReports from "@/pages/owner/reports";
 import OwnerUsers from "@/pages/owner/users";
 import OwnerFinance from "@/pages/owner/finance";
 import OwnerSettings from "@/pages/owner/settings";
+import OwnerPengeluaran from "@/pages/owner/pengeluaran";
+import OwnerTarif from "@/pages/owner/tarif";
 import ProfilePage from "@/pages/profile";
 
 const queryClient = new QueryClient();
@@ -189,6 +191,12 @@ function Router() {
       </Route>
       <Route path="/owner/settings">
         {(params) => <ProtectedRoute role="owner" component={OwnerSettings} params={params} />}
+      </Route>
+      <Route path="/owner/pengeluaran">
+        {(params) => <ProtectedRoute role="owner" component={OwnerPengeluaran} params={params} />}
+      </Route>
+      <Route path="/owner/tarif">
+        {(params) => <ProtectedRoute role="owner" component={OwnerTarif} params={params} />}
       </Route>
       <Route path="/owner/profile">
         {(params) => <ProtectedRoute role="owner" component={ProfilePage} params={params} />}

@@ -9,6 +9,7 @@ import dashboardRouter from "./dashboard";
 import reportsRouter from "./reports";
 import paymentsRouter from "./payments";
 import settingsRouter from "./settings";
+import pengeluaranRouter from "./pengeluaran";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/dashboard", dashboardRouter);
 router.use("/reports", reportsRouter);
 router.use("/payments", paymentsRouter);
 router.use("/settings", settingsRouter);
+router.use("/pengeluaran", pengeluaranRouter);
 
 export default router;

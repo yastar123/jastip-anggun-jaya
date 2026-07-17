@@ -1,0 +1,116 @@
+ARAHAN TAMBAHAN PENGEMBANGAN SISTEM JASTIP
+Jastip Anggun Jaya - Untuk Tim IT
+Fokus: alur input paket, pengaturan harga, pengeluaran harian, diskon nominal, dan hapus batch.
+Tujuan dokumen ini adalah memperjelas kebutuhan sistem agar admin lebih cepat bekerja, Owner bisa mengatur tarif tanpa meminta bantuan IT, transaksi bisa memiliki diskon nominal, operasional harian tercatat, dan batch salah upload bisa dihapus secara aman.
+1. Setelah Simpan Input Paket, Tampilan Tetap di Halaman Input
+Untuk menu Input Paket Baru, baik layanan Jastip Pesawat, Pelni, Hemat, maupun Cargo, setelah admin klik tombol Simpan, sistem harus tetap berada pada halaman Input Paket Baru sesuai jenis jastip yang sedang dipilih.
+Permasalahan saat ini
+•	Setelah input data dan klik Simpan, tampilan berpindah ke menu Label Barcode atau kembali ke menu Pilih Jenis Jastip.
+•	Admin harus masuk ulang ke menu input jika ingin menambahkan paket berikutnya.
+•	Alur ini memperlambat pekerjaan saat input banyak paket manual atau paket susulan.
+Yang diharapkan
+Admin input paket Jastip Hemat / Pelni / Pesawat / Cargo
+Klik Simpan
+Data berhasil tersimpan
+Tetap berada di halaman Input Paket Baru pada jenis jastip yang sama
+Form dikosongkan untuk input data berikutnya
+Contoh: jika admin sedang input Jastip Pelni, setelah data disimpan sistem tetap berada di halaman Input Paket Baru - Jastip Pelni. Jangan otomatis pindah ke Label Barcode dan jangan kembali ke halaman pilih jenis jastip.
+Notifikasi setelah simpan
+Data paket berhasil disimpan.
+Silakan input paket berikutnya.
+2. Tambahkan Menu Pengaturan Harga / Tarif Jastip
+Sistem perlu memiliki menu khusus untuk mengubah harga atau tarif setiap layanan jastip. Harga sering berubah karena promo, penyesuaian operasional, atau kebijakan Owner, sehingga perubahan harga tidak boleh selalu bergantung kepada tim IT.
+Nama menu yang disarankan
+Pengaturan Harga / Tarif Jastip
+Hak akses
+•	Menu ini hanya boleh diakses oleh Owner atau Super Admin yang ditunjuk.
+•	Admin biasa tidak boleh mengubah tarif.
+•	Semua perubahan harga wajib tercatat di riwayat perubahan harga.
+Tarif yang harus bisa diatur
+Layanan	Pengaturan Harga yang Dibutuhkan
+Jastip Hemat	Tarif flat per kg, contoh Rp10.000/kg. Harga bisa diubah saat promo.
+Jastip Pesawat	Tarif per kg, contoh Rp77.000/kg, termasuk aturan pembulatan berat 0,2 / 0,4 / 0,5 kg.
+Jastip Pelni	Harga bertingkat berdasarkan total berat gabungan konsumen dalam 1 batch.
+Jastip Cargo	Harga diambil dari data per paket hasil import/input manual. Tidak menggunakan berat x tarif.
+3. Aturan Perubahan Harga
+Perubahan harga harus aman dan tidak merusak data lama. Oleh karena itu, harga baru sebaiknya hanya berlaku untuk paket baru yang diinput setelah perubahan dilakukan.
+Aturan utama
+Harga baru hanya berlaku untuk data baru.
+Data lama tidak boleh ikut berubah otomatis.
+Contoh
+Hari ini tarif Hemat adalah Rp10.000/kg. Besok Owner mengubah tarif menjadi Rp9.000/kg karena promo. Maka paket yang sudah diinput sebelum perubahan tetap memakai Rp10.000/kg, sedangkan paket baru setelah perubahan memakai Rp9.000/kg.
+Riwayat perubahan harga
+Setiap perubahan harga wajib tersimpan agar Owner bisa melihat siapa yang mengubah, kapan diubah, dan alasan perubahan.
+Tanggal perubahan
+Jenis jastip
+Harga lama
+Harga baru
+Diubah oleh
+Alasan perubahan
+4. Tambahkan Menu Pengeluaran Harian
+Sistem belum memiliki menu Pengeluaran Harian. Menu ini dibutuhkan untuk mencatat biaya operasional harian Jastip Anggun Jaya agar laporan keuangan lebih lengkap.
+Nama menu
+Pengeluaran Harian
+Contoh kategori pengeluaran
+•	Bensin
+•	Parkir
+•	Bongkar muat
+•	Uang makan kurir
+•	Biaya kendaraan
+•	Biaya ekspedisi
+•	Biaya cetak label
+•	Biaya packing
+•	Biaya operasional kantor
+•	Lain-lain
+Kolom yang perlu ada
+Kolom	Keterangan
+Tanggal	Tanggal pengeluaran terjadi.
+Kategori Pengeluaran	Bensin, parkir, bongkar muat, dan lainnya.
+Nominal	Jumlah uang yang keluar.
+Metode Pembayaran	Cash, transfer, atau metode lain.
+Dicatat oleh	Nama admin yang input data.
+Laporan pengeluaran
+•	Bisa difilter berdasarkan tanggal, bulan, kategori, admin, dan metode pembayaran.
+•	Bisa diexport ke Excel dan PDF.
+•	Owner bisa melihat total pengeluaran harian, mingguan, bulanan, dan kategori pengeluaran terbesar.
+5. Tambahkan Diskon / Potongan Harga di Menu Transaksi
+Pada menu transaksi/pembayaran, perlu ditambahkan fitur Diskon atau Potongan Harga. Diskon yang digunakan adalah nominal rupiah, bukan persentase.
+Aturan diskon
+Diskon benar: Rp10.000, Rp25.000, Rp50.000
+Diskon yang tidak digunakan: 5%, 10%, 15%
+Rumus transaksi
+Total Bayar Akhir = Total Ongkir - Diskon Nominal
+Contoh
+Total ongkir       : Rp150.000
+Diskon/Potongan    : Rp10.000
+Total setelah diskon: Rp140.000
+Kolom transaksi yang perlu ditambahkan
+•	Total Ongkir
+•	Diskon / Potongan Harga
+•	Total Setelah Diskon
+•	Jumlah Dibayar
+•	Sisa Pembayaran
+•	Metode Pembayaran
+•	Catatan / Alasan Diskon
+Pengamanan diskon
+•	Jika kolom diskon diisi, alasan diskon wajib diisi.
+•	Diskon sebaiknya hanya bisa diberikan oleh Owner, atau admin dengan batas nominal tertentu.
+6. Tambahkan Fitur Hapus Batch
+Tambahkan fitur Hapus Batch pada menu Batch Pengiriman. Fitur ini dibutuhkan karena admin bisa saja salah upload data dan perlu menghapus batch tersebut lalu upload ulang. Selain itu, fitur ini membantu agar data aktif tidak terlalu banyak dan sistem lebih rapi.
+Tujuan fitur Hapus Batch
+•	Menghapus batch yang salah upload agar admin bisa upload data baru yang benar.
+•	Mengurangi data aktif yang tidak terpakai agar tampilan sistem tidak terlalu penuh.
+•	Mencegah data salah ikut muncul di Label Barcode, Verifikasi Paket, Transaksi, dan Export.
+Pesan konfirmasi sebelum hapus
+Apakah Anda yakin ingin menghapus batch ini?
+Hak akses Hapus Batch
+•	Saran terbaik: hanya Owner atau Super Admin yang bisa menghapus batch.
+7. Ringkasan Prioritas untuk Tim IT
+Prioritas	Fitur	Keterangan Singkat
+1	Tetap di halaman input setelah simpan	Setelah klik Simpan, form tetap di Input Paket Baru dan siap input data berikutnya.
+2	Pengaturan Harga/Tarif	Owner bisa ubah harga tiap layanan tanpa bantuan IT.
+4	Pengeluaran Harian	Mencatat biaya operasional harian dan bisa diexport.
+5	Diskon Nominal Transaksi	Diskon berupa rupiah, bukan persen, dan wajib ada alasan.
+6	Hapus Batch	Batch salah upload bisa disembunyikan dari menu aktif menggunakan soft delete.
+8. Kalimat Singkat untuk Tim IT
+Mohon lakukan pengembangan berikut: setelah admin klik Simpan di menu Input Paket Baru, halaman harus tetap berada di form input layanan yang sama agar admin bisa langsung input paket berikutnya. Tambahkan menu Pengaturan Harga/Tarif Jastip yang hanya bisa diakses Owner, karena harga sering berubah saat promo. Perubahan harga hanya berlaku untuk data baru dan harus memiliki riwayat perubahan. Tambahkan menu Pengeluaran Harian untuk mencatat biaya operasional. Pada menu transaksi, tambahkan fitur Diskon/Potongan Harga dalam bentuk nominal rupiah, bukan persen, dan wajib ada alasan diskon. Tambahkan juga fitur Hapus Batch agar batch yang salah upload bisa dihapus/disembunyikan dari data aktif dan admin bisa upload ulang,
