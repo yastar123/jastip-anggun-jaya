@@ -89,6 +89,16 @@ const deliveryRouteOptions: Record<string, { value: string; label: string }[]> =
   ],
 };
 
+// Pesawat: pembulatan berat gabungan sesuai spec
+// 0.01–0.20→0.20 kg | 0.21–0.40→0.40 kg | 0.41–0.50→0.50 kg | >0.50→berat asli
+function roundPesawatGroupWeight(totalWeight: number): number {
+  if (totalWeight <= 0) return 0;
+  if (totalWeight <= 0.20) return 0.20;
+  if (totalWeight <= 0.40) return 0.40;
+  if (totalWeight <= 0.50) return 0.50;
+  return totalWeight;
+}
+
 // Pelni: tarif per-kg berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch.
 // Fungsi ini dipakai sebagai estimasi tampilan; server akan menghitung ulang
 // dengan benar setelah paket disimpan.
@@ -132,20 +142,10 @@ function getTotalShipping(
   weight: number | null | undefined,
 ): number | null {
   if (!serviceType || !deliveryRoute || !weight || weight <= 0) return null;
+  // Pesawat: estimasi per-paket menggunakan aturan pembulatan.
+  // Server recalc berdasarkan total berat gabungan konsumen setelah disimpan.
   if (serviceType === "jastip pesawat" && deliveryRoute === "Jakarta → Manokwari") {
-    if (weight <= 0.2) return 15800;
-    if (weight <= 0.4) return 30800;
-    if (weight <= 0.5) return 38500;
-    if (weight <= 0.6) return 46200;
-    if (weight <= 0.7) return 53900;
-    if (weight <= 0.8) return 61600;
-    if (weight <= 0.9) return 69300;
-    if (weight <= 1) return 77000;
-    if (weight <= 2) return 154000;
-    if (weight <= 3) return 231000;
-    if (weight <= 5) return 385000;
-    if (weight <= 10) return 770000;
-    return Math.round(weight * 77000);
+    return Math.round(roundPesawatGroupWeight(weight) * 77000);
   }
   if (serviceType === "jastip hemat+" && deliveryRoute === "Surabaya → Manokwari") {
     return Math.max(10000, Math.round(weight * 10000));
@@ -362,6 +362,7 @@ export default function AdminPackagesNew() {
 
   const isKargo = serviceType === "jastip kargo";
   const isPelni = serviceType === "jastip pelni";
+  const isPesawat = serviceType === "jastip pesawat";
 
   const watchedUsedWeight = form.watch("usedWeight");
   const watchedVolumeWeight = form.watch("volumeWeight");
@@ -1316,6 +1317,18 @@ export default function AdminPackagesNew() {
                       ))}
                     </div>
 
+                    {/* Notif khusus Pesawat: hitung dari total berat gabungan konsumen */}
+                    {isPesawat && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 flex gap-3">
+                        <span className="text-blue-500 text-lg shrink-0">✈️</span>
+                        <div className="text-xs text-blue-800 space-y-1">
+                          <p className="font-bold">Pesawat: Ongkir dihitung dari total berat gabungan konsumen</p>
+                          <p>Sistem menjumlahkan berat semua paket konsumen ini dalam batch yang sama, baru dibulatkan dan dikalikan Rp77.000/kg. Nilai di bawah adalah estimasi — akan diperbarui otomatis setelah disimpan.</p>
+                          <p className="font-medium">Pembulatan: ≤0,20 kg→0,20 · ≤0,40 kg→0,40 · ≤0,50 kg→0,50 · &gt;0,50 kg→berat asli × Rp77.000</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Notif khusus Pelni: hitung dari total berat konsumen */}
                     {isPelni && (
                       <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 flex gap-3">
@@ -1331,7 +1344,7 @@ export default function AdminPackagesNew() {
                     {/* Auto-calculated summary */}
                     <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                        Kalkulasi Otomatis{isPelni ? " (estimasi paket ini)" : ""}
+                        Kalkulasi Otomatis{(isPelni || isPesawat) ? " (estimasi paket ini)" : ""}
                       </p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div>

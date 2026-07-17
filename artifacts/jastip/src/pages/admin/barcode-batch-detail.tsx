@@ -62,6 +62,16 @@ function groupPkgsByCustomer(pkgs: any[]) {
   return [...map.values()];
 }
 
+// Pesawat: pembulatan berat gabungan sesuai spec
+// 0.01–0.20→0.20 kg | 0.21–0.40→0.40 kg | 0.41–0.50→0.50 kg | >0.50→berat asli
+function roundPesawatGroupWeight(totalRealWeight: number): number {
+  if (totalRealWeight <= 0) return 0;
+  if (totalRealWeight <= 0.20) return 0.20;
+  if (totalRealWeight <= 0.40) return 0.40;
+  if (totalRealWeight <= 0.50) return 0.50;
+  return totalRealWeight;
+}
+
 // Pelni: tarif bertingkat berdasarkan total berat gabungan konsumen dalam batch
 function getPelniRateByTotalWeight(totalWeight: number, deliveryRoute: string): number | null {
   if (!deliveryRoute || !totalWeight || totalWeight <= 0) return null;
@@ -81,29 +91,52 @@ function getPelniRateByTotalWeight(totalWeight: number, deliveryRoute: string): 
   return null;
 }
 
-// Untuk Pelni: hitung total ongkir dari total berat gabungan × tarif
-// Untuk layanan lain: jumlahkan totalShipping per paket
+// Hitung total ongkir grup sesuai aturan masing-masing layanan:
+// - Pesawat: sum realWeight → bulatkan → × 77000
+// - Pelni  : sum usedWeight → tarif bertingkat → × rate
+// - Lain   : sum totalShipping per paket
 function calcGroupTotalShipping(pkgs: any[]): number {
   const first = pkgs[0];
-  if ((first?.serviceType || "").toLowerCase() === "jastip pelni") {
+  const svc = (first?.serviceType || "").toLowerCase();
+
+  if (svc === "jastip pesawat") {
+    const totalRealWeight = pkgs.reduce((s, p) => s + (Number(p.realWeight) || 0), 0);
+    const rounded = roundPesawatGroupWeight(totalRealWeight);
+    return Math.round(rounded * 77000);
+  }
+
+  if (svc === "jastip pelni") {
     const totalWeight = pkgs.reduce((s, p) => s + (Number(p.usedWeight) || Number(p.realWeight) || 0), 0);
     const rate = getPelniRateByTotalWeight(totalWeight, first?.deliveryRoute || "");
-    return rate ? Math.round(totalWeight * rate) : pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+    return rate ? Math.round(totalWeight * rate) : pkgs.reduce((s, p) => s + (Number(p.totalShipping) || 0), 0);
   }
-  return pkgs.reduce((s, p) => s + (p.totalShipping ?? 0), 0);
+
+  return pkgs.reduce((s, p) => s + (Number(p.totalShipping) || 0), 0);
 }
 
 function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
   const first = pkgs[0];
-  const isPelni = (first?.serviceType || "").toLowerCase() === "jastip pelni";
+  const svc = (first?.serviceType || "").toLowerCase();
+  const isPesawat = svc === "jastip pesawat";
+  const isPelni = svc === "jastip pelni";
   const totalWeight = pkgs.reduce((s, p) => s + (Number(p.usedWeight) || Number(p.realWeight) || 0), 0);
   const totalShipping = calcGroupTotalShipping(pkgs);
   const pelniRate = isPelni ? getPelniRateByTotalWeight(totalWeight, first?.deliveryRoute || "") : null;
+
+  // Pesawat: tampilkan total berat real dan berat dibulatkan
+  const pesawatTotalRealWeight = isPesawat
+    ? pkgs.reduce((s, p) => s + (Number(p.realWeight) || 0), 0)
+    : 0;
+  const pesawatRoundedWeight = isPesawat ? roundPesawatGroupWeight(pesawatTotalRealWeight) : 0;
+
   const batchRow = batchLabel
     ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
     : "";
   const pelniRateRow = isPelni && pelniRate
     ? `<div class="field"><div class="fl">Harga/Kg</div><div class="fv">Rp ${pelniRate.toLocaleString("id-ID")}</div></div>`
+    : "";
+  const pesawatRoundRow = isPesawat
+    ? `<div class="field"><div class="fl">Berat Dibulatkan</div><div class="fv">${pesawatRoundedWeight.toFixed(3)} Kg</div></div>`
     : "";
 
   const inner = `${qrSectionHtml(qrDataUrl, qrValue)}
@@ -111,8 +144,9 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
       <div class="cust">${first?.customerName || "-"}</div>
       <div class="grid">
         <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
-        <div class="field"><div class="fl">Total Berat</div><div class="fv">${totalWeight.toFixed(3)} Kg</div></div>
+        <div class="field"><div class="fl">Total Berat Real</div><div class="fv">${isPesawat ? pesawatTotalRealWeight.toFixed(3) : totalWeight.toFixed(3)} Kg</div></div>
         <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
+        ${pesawatRoundRow}
         ${pelniRateRow}
         <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShipping.toLocaleString("id-ID")}</div></div>
         <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
@@ -136,11 +170,18 @@ function GroupedBarcodeCard({
   const base = user?.role === "owner" ? "/owner" : "/admin";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const first = pkgs[0];
-  const isPelniCard = (first?.serviceType || "").toLowerCase() === "jastip pelni";
+  const svcCard = (first?.serviceType || "").toLowerCase();
+  const isPelniCard = svcCard === "jastip pelni";
+  const isPesawatCard = svcCard === "jastip pesawat";
   const qrValue = groupQrValue(pkgs);
   const totalWeight = pkgs.reduce((s, p) => s + (Number(p.usedWeight) || Number(p.realWeight) || 0), 0);
   const totalShipping = calcGroupTotalShipping(pkgs);
   const pelniRate = isPelniCard ? getPelniRateByTotalWeight(totalWeight, first?.deliveryRoute || "") : null;
+  // Pesawat: sum realWeight → bulatkan (untuk ditampilkan di kartu)
+  const pesawatTotalReal = isPesawatCard
+    ? pkgs.reduce((s, p) => s + (Number(p.realWeight) || 0), 0)
+    : 0;
+  const pesawatRounded = isPesawatCard ? roundPesawatGroupWeight(pesawatTotalReal) : 0;
   const allPending = pkgs.every((p) => p.status !== "diserahkan");
   const allDone = pkgs.every((p) => p.status === "diserahkan");
 
@@ -203,6 +244,11 @@ function GroupedBarcodeCard({
             </div>
           ))}
         </div>
+        {isPesawatCard && (
+          <div className="text-xs text-blue-600 mb-0.5">
+            ✈️ Real: {pesawatTotalReal.toFixed(3)} Kg → Dibulatkan: {pesawatRounded.toFixed(3)} Kg × Rp77.000
+          </div>
+        )}
         {isPelniCard && pelniRate && (
           <div className="text-xs text-indigo-600 mb-0.5">
             🚢 Harga/kg: {formatRp(pelniRate)} · Berat total: {totalWeight.toFixed(3)} Kg

@@ -1,0 +1,63 @@
+Arahan Perhitungan Ongkir Jastip Pesawat
+Untuk Pengembangan Sistem Jastip Anggun Jaya
+Tarif dasar: Rp77.000/kg | Perhitungan berdasarkan total berat gabungan dalam 1 batch
+
+1. Tujuan Aturan
+Aturan ini dibuat agar sistem menghitung ongkir Jastip Pesawat secara benar dan konsisten. Perhitungan tidak boleh dilakukan per paket satu per satu. Sistem harus menjumlahkan seluruh berat paket milik satu konsumen terlebih dahulu, dalam batch dan layanan yang sama, baru kemudian menentukan pembulatan berat.
+Prinsip utama:
+Pembulatan berat ditentukan setelah semua berat paket konsumen digabungkan. Bukan setiap paket dibulatkan masing-masing. Untuk layanan Jastip Pesawat, sistem harus menghitung ongkir berdasarkan total berat gabungan semua paket milik satu konsumen dalam satu batch. Jangan membulatkan berat per paket. Jumlahkan seluruh berat paket terlebih dahulu, baru tentukan pembulatan: 0,01-0,20 kg menjadi 0,20 kg; 0,21-0,40 kg menjadi 0,40 kg; 0,41-0,50 kg menjadi 0,50 kg; di atas 0,50 kg pakai berat asli. Total ongkir = berat digunakan x Rp77.000.
+2. Kriteria Penggabungan Paket
+Sistem harus menggabungkan berat paket berdasarkan kombinasi berikut:
+Kriteria	Penjelasan
+batch_id	Paket harus berada dalam batch pengiriman yang sama.
+jenis_jastip	Hanya paket layanan Jastip Pesawat yang digabungkan.
+nama_konsumen / customer_id	Paket digabungkan berdasarkan pemilik paket yang sama.
+Catatan: Jika nama konsumen sama tetapi batch berbeda, jangan digabung. Jika nama konsumen sama tetapi jenis jastip berbeda, jangan digabung.
+3. Alur Perhitungan yang Benar
+1. Ambil semua paket milik satu konsumen dalam 1 batch Jastip Pesawat.
+2. Jumlahkan seluruh berat real paket tersebut.
+3. Tentukan berat yang digunakan berdasarkan aturan pembulatan.
+4. Kalikan berat yang digunakan dengan tarif Rp77.000/kg.
+5. Simpan hasil total berat gabungan, berat digunakan, dan total ongkir pada ringkasan pembayaran konsumen.
+4. Aturan Pembulat
+an Berat
+Total Berat Gabungan	Berat Digunakan	Keterangan
+0,01 kg sampai 0,20 kg	0,20 kg	Dibulatkan menjadi 0,20 kg
+0,21 kg sampai 0,40 kg	0,40 kg	Dibulatkan menjadi 0,40 kg
+0,41 kg sampai 0,50 kg	0,50 kg	Dibulatkan menjadi 0,50 kg
+Di atas 0,50 kg	Berat asli	Tidak dibulatkan ke atas
+5. Contoh Perhitungan
+Contoh	Daftar Paket	Total Berat	Berat Digunakan	Ongkir
+Contoh 1	Paket 1: 0,10 kg; Paket 2: 0,08 kg	0,18 kg	0,20 kg	0,20 x 77.000 = Rp15.400
+Contoh 2	Paket 1: 0,10 kg; Paket 2: 0,12 kg; Paket 3: 0,13 kg	0,35 kg	0,40 kg	0,40 x 77.000 = Rp30.800
+Contoh 3	Paket 1: 0,25 kg; Paket 2: 0,22 kg	0,47 kg	0,50 kg	0,50 x 77.000 = Rp38.500
+Contoh 4	Paket 1: 0,20 kg; Paket 2: 0,25 kg; Paket 3: 0,15 kg	0,60 kg	0,60 kg	0,60 x 77.000 = Rp46.200
+6. Cara Hitung yang Tidak Boleh Dipakai
+Sistem tidak boleh menghitung dengan cara membulatkan berat setiap paket satu per satu lalu menjumlahkannya. Cara tersebut akan membuat ongkir menjadi lebih mahal dan tidak sesuai aturan Jastip Pesawat.
+Salah	Benar
+Paket 1 dibulatkan sendiri, paket 2 dibulatkan sendiri, lalu dijumlahkan.	Semua paket dijumlahkan dulu, kemudian total beratnya baru dibulatkan.
+7. Rumus Logika untuk Tim IT
+total_berat = SUM(berat_real) berdasarkan batch_id + jenis_jastip + customer_id
+
+IF total_berat > 0 AND total_berat <= 0.20:
+    berat_digunakan = 0.20
+ELSE IF total_berat > 0.20 AND total_berat <= 0.40:
+    berat_digunakan = 0.40
+ELSE IF total_berat > 0.40 AND total_berat <= 0.50:
+    berat_digunakan = 0.50
+ELSE:
+    berat_digunakan = total_berat
+
+total_ongkir = berat_digunakan * 77000
+
+8. Kriteria Berhasil / Acceptance Criteria
+☐ Jika satu konsumen memiliki beberapa paket dalam batch Jastip Pesawat yang sama, sistem menampilkan total berat gabungan.
+☐ Pembulatan berat dilakukan setelah total berat gabungan didapatkan.
+☐ Paket dengan nama sama tetapi batch berbeda tidak ikut tergabung.
+☐ Paket dengan nama sama tetapi jenis jastip berbeda tidak ikut tergabung.
+☐ Total ongkir yang muncul sama dengan berat digunakan x Rp77.000.
+☐ Hasil hitung muncul konsisten di menu Label Barcode, Verifikasi Paket, Scan Pembayaran, dan Riwayat Pembayaran.
+
+9. Export Data
+ 
+Mohon perbaiki export Jastip Pesawat. Total ongkir tidak boleh dihitung dari ongkir per paket. Sistem harus menjumlahkan dulu seluruh berat paket milik konsumen dalam satu batch, lalu menentukan berat yang digunakan, kemudian dikalikan Rp77.000/kg. Contoh Geela memiliki 2 paket dengan berat 0,1 kg dan 0,3 kg. Total berat gabungan 0,4 kg, maka total ongkir seharusnya 0,4 x 77.000 = Rp30.800, bukan Rp46.600.
