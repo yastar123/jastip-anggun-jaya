@@ -242,7 +242,6 @@ function SingleBarcodeCard({
           {pkg.itemName && (
             <p className="text-xs text-muted-foreground truncate" title={pkg.itemName}>{pkg.itemName}</p>
           )}
-          <p className="text-xs text-orange-600 font-semibold mt-0.5">🚛 Kargo — 1 paket</p>
         </div>
         <div className="flex justify-center bg-white border rounded-lg p-2 mb-2">
           <canvas ref={canvasRef} />
