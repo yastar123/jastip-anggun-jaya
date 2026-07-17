@@ -151,7 +151,7 @@ function getShippingRate(
   if (!serviceType || !weight || weight <= 0) return null;
   if (serviceType === "jastip pesawat") return 77000;
   if (serviceType === "jastip hemat+") return 10000;
-  if (serviceType === "jastip kargo") return 7000;
+  // Kargo: tidak ada tarif per-kg — ongkir diambil langsung dari data per paket
   // Pelni: gunakan getPelniRateByTotalWeight (tarif berdasarkan total berat konsumen)
   // Fungsi ini hanya dipakai sebagai estimasi awal; recalcPelniCustomerOngkir akan
   // menghitung ulang dengan benar setelah semua paket tersimpan.
@@ -177,9 +177,7 @@ function getTotalShipping(
     return Math.round(weight * 10000);
   }
 
-  if (serviceType === "jastip kargo" && deliveryRoute === "Jakarta/Surabaya → Manokwari") {
-    return Math.round(weight * 7000);
-  }
+  // Kargo: ongkir tidak dihitung dari berat — diambil langsung dari data per paket
 
   if (serviceType === "jastip pelni") {
     const rate = getPelniRateByTotalWeight(weight, deliveryRoute);
@@ -477,6 +475,7 @@ router.post(
             realWeight, length, width, height, packagingType,
             shippingRate, totalWeight, price, notes, packageDate,
             serviceType, deliveryRoute, packageMode,
+            totalShipping: totalShippingRow,
           } = row;
 
           if (!resiNumber || !customerName) {
@@ -495,7 +494,14 @@ router.post(
             effectiveRealWeight !== null && volumeWeight !== null
               ? Math.max(effectiveRealWeight, volumeWeight)
               : (effectiveRealWeight ?? volumeWeight);
-          const totalShipping = getTotalShipping(serviceType, deliveryRoute, usedWeight);
+
+          // Kargo: gunakan ongkir dari data row jika tersedia, bukan rumus berat × tarif
+          let totalShipping: number | null;
+          if (totalShippingRow !== undefined && totalShippingRow !== null && totalShippingRow !== "") {
+            totalShipping = Number(totalShippingRow);
+          } else {
+            totalShipping = getTotalShipping(serviceType, deliveryRoute, usedWeight);
+          }
 
           const barcode = generateBarcode();
           const inserted = await db.insert(packagesTable).values({
@@ -728,6 +734,7 @@ router.patch(
         resiNumber, packageNumber, customerName, itemName,
         serviceType, deliveryRoute, packagingType, packageDate,
         realWeight, length, width, height,
+        totalShipping: totalShippingInput,
       } = req.body;
 
       const updateData: any = { updatedAt: new Date() };
@@ -745,6 +752,11 @@ router.patch(
       if (deliveryRoute !== undefined) updateData.deliveryRoute = deliveryRoute || null;
       if (packagingType !== undefined) updateData.packagingType = packagingType || null;
       if (packageDate !== undefined) updateData.packageDate = packageDate ? new Date(packageDate) : null;
+
+      // Kargo: izinkan update ongkir langsung dari body
+      if (totalShippingInput !== undefined && totalShippingInput !== null && totalShippingInput !== "") {
+        updateData.totalShipping = String(Number(totalShippingInput));
+      }
 
       const hasPhysical = realWeight !== undefined || length !== undefined || width !== undefined || height !== undefined;
       const hasService = serviceType !== undefined || deliveryRoute !== undefined;
@@ -777,8 +789,13 @@ router.patch(
 
         const rate = getShippingRate(effService, effRoute, uw ?? undefined);
         updateData.shippingRate = rate != null ? String(rate) : null;
-        const total = getTotalShipping(effService, effRoute, uw ?? undefined);
-        updateData.totalShipping = total != null ? String(total) : null;
+
+        // Untuk Cargo: jangan timpa ongkir dengan kalkulasi otomatis
+        // gunakan nilai dari body jika ada, atau biarkan nilai tersimpan tetap
+        if (effService !== "jastip kargo" || totalShippingInput !== undefined) {
+          const total = getTotalShipping(effService, effRoute, uw ?? undefined);
+          if (total != null) updateData.totalShipping = String(total);
+        }
       }
 
       const updated = await db

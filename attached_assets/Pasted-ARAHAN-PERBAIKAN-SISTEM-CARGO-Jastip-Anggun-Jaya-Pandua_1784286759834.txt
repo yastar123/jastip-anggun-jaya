@@ -1,0 +1,146 @@
+ARAHAN PERBAIKAN SISTEM CARGO
+Jastip Anggun Jaya — Panduan Teknis untuk Tim IT
+Prinsip Utama Cargo
+Untuk layanan Jastip Cargo, aturan sistem harus berbeda dari Pesawat, Pelni, dan Hemat. Prinsipnya: 1 paket = 1 barcode = 1 harga/ongkir. Setiap barang Cargo berdiri sendiri sebagai satu data paket.
+
+Ringkasan Masalah yang Harus Diperbaiki
+•	Cargo tidak boleh menggunakan grup barcode atau barcode gabungan per nama konsumen.
+•	Setiap paket Cargo harus memiliki barcode sendiri.
+•	Cargo tidak boleh dihitung menggunakan rumus berat x Rp7.000.
+•	Berat paket tidak wajib untuk layanan Cargo.
+•	Harga/ongkir Cargo diambil langsung dari data per paket, baik dari import Excel maupun input manual.
+•	Bug kolom Pakai (m3) harus diperbaiki, karena nilai 0.01 saat ini terbaca menjadi 10.
+•	Export Cargo untuk konsumen harus menampilkan data lengkap per paket tanpa kolom berat.
+1. Cargo Tidak Boleh Menggunakan Grup Barcode
+Saat ini sistem masih membuat barcode berdasarkan grup/nama konsumen. Untuk layanan Cargo, ini tidak sesuai karena barang Cargo biasanya berupa barang besar dan tidak dipacking menjadi satu.
+Contoh kasus:
+Nama Konsumen: AIS
+Jumlah Paket : 4 paket
+
+Maka sistem harus membuat:
+Paket 1 = 1 barcode
+Paket 2 = 1 barcode
+Paket 3 = 1 barcode
+Paket 4 = 1 barcode
+
+Jadi total barcode yang dicetak adalah 4 barcode berbeda. Sistem tidak boleh membuat 1 barcode gabungan untuk 4 paket tersebut.
+2. Hilangkan Fitur Grup Paket Khusus Cargo
+Pada layanan Cargo, tombol atau mode berikut sebaiknya tidak digunakan:
+Grup Paket
+Grup Barcode
+Barcode Gabungan
+
+Untuk Cargo, tampilan Label Barcode harus langsung menampilkan daftar paket satu per satu.
+Tampilan yang Benar	Tampilan yang Salah
+AIS - Paket 1 - Barcode 001
+AIS - Paket 2 - Barcode 002
+AIS - Paket 3 - Barcode 003
+AIS - Paket 4 - Barcode 004	AIS - 4 Paket - 1 Barcode Grup
+
+3. Cargo Tidak Dihitung Menggunakan Berat x Rp7.000
+Untuk layanan Cargo, sistem tidak perlu menghitung ongkir menggunakan rumus berat x Rp7.000. Rumus ini harus dinonaktifkan khusus untuk Cargo.
+Rumus yang harus dinonaktifkan untuk Cargo:
+Berat x 7.000
+
+Cargo tidak memakai tarif berat seperti itu. Harga atau ongkir Cargo langsung diambil dari data yang diinput atau diimport.
+Nama Konsumen : AIS
+Jenis Barang  : Lemari
+Pakai (m3)    : 0.10
+Ongkir Paket  : Rp70.000
+
+Maka ongkir yang digunakan adalah Rp70.000, bukan hasil dari berat x 7.000.
+4. Berat Paket Tidak Wajib untuk Cargo
+Untuk Cargo, kolom berat tidak perlu diwajibkan. Jika tetap ingin ditampilkan sebagai informasi internal, kolom berat boleh ada, tetapi jangan dijadikan dasar perhitungan ongkir Cargo.
+Kolom Wajib untuk Cargo	Kolom Tidak Wajib untuk Cargo
+Tanggal
+Batch Pengiriman
+Nama Konsumen
+No Resi
+No Paket / Kode Paket
+Jenis Barang
+Ukuran Barang
+Kubik yang di Pakai (m3)
+Ongkir / Harga Paket
+Status Paket	Berat Real
+Berat Volume
+Panjang
+Lebar
+Tinggi
+Tarif per Kg
+
+5. Harga Cargo Diambil dari Data Per Paket
+Sumber harga Cargo harus berasal dari data import Excel atau input manual admin. Jika di file Excel ada kolom harga/ongkir, sistem harus mengambil nilai itu sebagai ongkir final per paket.
+AIS - Paket 1 - Ongkir Rp70.000
+AIS - Paket 2 - Ongkir Rp90.000
+AIS - Paket 3 - Ongkir Rp120.000
+AIS - Paket 4 - Ongkir Rp80.000
+
+Total tagihan AIS boleh ditampilkan sebagai penjumlahan seluruh ongkir paket:
+Rp70.000 + Rp90.000 + Rp120.000 + Rp80.000 = Rp360.000
+
+Namun detail paket dan barcode tetap harus per paket, bukan digabung menjadi satu barcode.
+6. Perbaiki Bug Kolom Pakai (m3)
+Masalah saat ini: nilai 0.01 terbaca menjadi 10. Ini salah besar karena data m3 menjadi tidak sesuai.
+Seharusnya:
+0.01 tetap terbaca 0.01
+0,01 tetap terbaca 0.01
+0.10 tetap terbaca 0.10
+1.25 tetap terbaca 1.25
+
+Kemungkinan penyebab bug:
+•	Sistem membaca angka desimal sebagai integer.
+•	Sistem menghapus tanda titik.
+•	Sistem salah membaca format koma/titik dari Excel.
+•	Sistem menggunakan parseInt, bukan decimal/float.
+Solusi teknis: kolom Pakai (m3) harus disimpan sebagai DECIMAL, bukan INTEGER.
+Contoh tipe data:
+pakai_m3 DECIMAL(10,4)
+
+Normalisasi saat import Excel:
+0,01 -> 0.01
+0.01 -> 0.01
+
+8. Tambahkan Tombol Hapus Batch
+Di menu Batch Pengiriman, tambahkan tombol Hapus Batch. Fungsinya agar jika admin salah upload data Cargo, batch tersebut bisa dihapus lalu diupload ulang.
+Namun penghapusan harus aman. Jangan langsung hapus permanen dari database. Gunakan sistem soft delete, artinya data tidak benar-benar hilang, tetapi disembunyikan dari tampilan aktif.
+10. Export Cargo untuk Konsumen
+File export Cargo yang akan dibagikan ke grup konsumen harus menampilkan data lengkap per paket dan tidak perlu menampilkan kolom berat.
+Kolom yang Disarankan	Kolom yang Tidak Perlu Ditampilkan
+No
+Nama Konsumen
+Tanggal Masuk
+No Resi
+No Paket
+Jenis Barang
+Ukuran Barang
+Kubik yang di Pakai (m3)
+Ongkir Paket
+Status	Berat Real
+Berat Volume
+Tarif per Kg
+Rumus Berat x Tarif
+
+11. Catatan Penting untuk Tim IT
+Untuk layanan Cargo, sistem harus menggunakan aturan khusus berikut:
+Jika jenis_jastip = Cargo:
+- Jangan buat grup barcode
+- Jangan hitung berat x tarif
+- Jangan wajibkan input berat
+- Jangan gabungkan barcode per nama
+- Harga diambil langsung dari ongkir per paket
+- Barcode dibuat satu per paket
+- Export tidak perlu menampilkan berat
+
+Layanan lain seperti Pesawat, Pelni, dan Hemat boleh memakai aturan masing-masing, tetapi logika Cargo harus dipisahkan agar tidak terjadi salah perhitungan.
+12. Target Akhir yang Diharapkan
+•	1 paket Cargo punya 1 barcode sendiri.
+•	1 paket Cargo punya harga/ongkir sendiri.
+•	Harga Cargo tidak dihitung dari berat.
+•	Kolom Pakai (m3) terbaca benar sebagai angka desimal.
+•	Batch yang salah upload bisa dihapus secara aman.
+•	Export Cargo tampil lengkap per paket tanpa kolom berat.
+Kalimat Singkat untuk Tim IT
+Untuk layanan Cargo, mohon sistem dibuat berbeda dari layanan lain. Cargo tidak menggunakan grup barcode dan tidak dihitung berdasarkan berat x Rp7.000. Setiap paket Cargo harus memiliki barcode sendiri dan harga/ongkir sendiri. Jika konsumen AIS memiliki 4 paket, maka sistem harus membuat 4 barcode berbeda. Harga Cargo langsung diambil dari data import Excel atau input manual per paket. Kolom berat tidak wajib untuk Cargo. Perbaiki juga bug kolom Pakai (m3), karena nilai 0.01 saat ini terbaca menjadi 10. Kolom Pakai (m3) harus disimpan sebagai decimal, bukan integer.
+
+
+

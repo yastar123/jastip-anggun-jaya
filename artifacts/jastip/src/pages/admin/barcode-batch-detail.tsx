@@ -168,6 +168,9 @@ function SingleBarcodeCard({
   pkg: any;
   batchLabel?: string;
 }) {
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const base = user?.role === "owner" ? "/owner" : "/admin";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
   const isDone = pkg.status === "diserahkan";
@@ -249,7 +252,7 @@ function SingleBarcodeCard({
         <div className="text-xs font-semibold text-primary mb-2">
           Ongkir: {pkg.totalShipping != null ? `Rp ${Number(pkg.totalShipping).toLocaleString("id-ID")}` : "-"}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 mb-1.5">
           <Button size="sm" variant="outline" className="flex-1 min-w-0 px-2 text-xs" onClick={printBarcode}>
             <Printer className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Cetak</span>
           </Button>
@@ -257,6 +260,14 @@ function SingleBarcodeCard({
             <Download className="w-3 h-3 mr-1 shrink-0" /> <span className="truncate">Unduh</span>
           </Button>
         </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+          onClick={() => setLocation(`${base}/packages/${pkg.id}`)}
+        >
+          <Eye className="w-3 h-3 mr-1" /> Detail / Edit Paket
+        </Button>
       </CardContent>
     </Card>
   );
