@@ -350,9 +350,9 @@ function fmtDate(d: string) {
 function groupPkgsByCustomer(pkgs: any[]) {
   const map = new Map<string, any[]>();
   for (const p of pkgs) {
-    // Paket Cargo (packageMode "single") tidak digabung — tiap paket jadi kartu sendiri
-    const key = p.packageMode === "single"
-      ? `__single__|${p.id}`
+    // Paket Cargo (jastip kargo) tidak digabung — tiap paket jadi kartu sendiri
+    const key = (p.serviceType || "").toLowerCase() === "jastip kargo"
+      ? `__kargo__|${p.id}`
       : [
           (p.customerName || "").trim().toLowerCase(),
           (p.serviceType || "").toLowerCase(),
@@ -552,9 +552,9 @@ function NoBatchSection({
             ) : (
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {groups.map((pkgs) =>
-                  pkgs[0]?.packageMode === "single" ? (
+                  (pkgs[0]?.serviceType || "").toLowerCase() === "jastip kargo" ? (
                     <BarcodeItem
-                      key={`single|${pkgs[0].id}`}
+                      key={`kargo|${pkgs[0].id}`}
                       pkg={pkgs[0]}
                       onEdit={onEdit}
                       onDelete={onDelete}

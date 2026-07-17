@@ -51,9 +51,9 @@ function batchStatusLabel(status: string) {
 function groupPkgsByCustomer(pkgs: any[]) {
   const map = new Map<string, any[]>();
   for (const p of pkgs) {
-    // Paket Cargo (packageMode "single") tidak digabung — tiap paket jadi kartu sendiri
-    const key = p.packageMode === "single"
-      ? `__single__|${p.id}`
+    // Paket Cargo (jastip kargo) tidak digabung — tiap paket jadi kartu sendiri
+    const key = (p.serviceType || "").toLowerCase() === "jastip kargo"
+      ? `__kargo__|${p.id}`
       : [
           (p.customerName || "").trim().toLowerCase(),
           (p.serviceType || "").toLowerCase(),
@@ -603,9 +603,9 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
             <>
               <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {paginatedGroups.map((pkgs: any[]) =>
-                  pkgs[0]?.packageMode === "single" ? (
+                  (pkgs[0]?.serviceType || "").toLowerCase() === "jastip kargo" ? (
                     <SingleBarcodeCard
-                      key={`single|${pkgs[0].id}`}
+                      key={`kargo|${pkgs[0].id}`}
                       pkg={pkgs[0]}
                       batchLabel={batchLabel}
                     />
