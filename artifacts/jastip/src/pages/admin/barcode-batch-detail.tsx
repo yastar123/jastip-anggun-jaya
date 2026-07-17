@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useListPackages, useListBatches } from "@workspace/api-client-react";
+import { useListPackages, useListBatches, getListPackagesQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import {
   ArrowLeft, Printer, Download, Ship, CheckCircle2, Lock, Archive,
-  QrCode, Pencil, Search, Eye,
+  QrCode, Pencil, Search, Eye, RefreshCw, Save,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Pagination } from "@/components/pagination";
@@ -410,10 +415,18 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [search, setSearch] = useState("");
   const [filterServiceType, setFilterServiceType] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedServiceType, setSelectedServiceType] = useState<string | null>(null);
+
+  // ── Sinkronisasi ongkir Kargo ─────────────────────────────────────────────
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncRows, setSyncRows] = useState<{ id: number; customerName: string; resiNumber: string; packageNumber: string; itemName: string; currentOngkir: string; newOngkir: string }[]>([]);
+  const [syncing, setSyncing] = useState(false);
 
   const { data: batches } = useListBatches();
   const { data: packages, isLoading } = useListPackages();
@@ -469,6 +482,54 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleFilter(v: string) { setFilterServiceType(v); setPage(1); }
+
+  // ── Sinkronisasi ongkir Kargo ─────────────────────────────────────────────
+  function openSync() {
+    const kargoPkgs = batchPkgs.filter((p: any) => (p.serviceType || "").toLowerCase() === "jastip kargo");
+    setSyncRows(
+      kargoPkgs
+        .slice()
+        .sort((a: any, b: any) => (a.customerName || "").localeCompare(b.customerName || ""))
+        .map((p: any) => ({
+          id: p.id,
+          customerName: p.customerName || "-",
+          resiNumber: p.resiNumber || "-",
+          packageNumber: p.packageNumber || "",
+          itemName: p.itemName || "",
+          currentOngkir: p.totalShipping != null ? String(p.totalShipping) : "",
+          newOngkir: p.totalShipping != null ? String(p.totalShipping) : "",
+        }))
+    );
+    setSyncOpen(true);
+  }
+
+  async function saveSync() {
+    const changed = syncRows.filter(r => r.newOngkir !== r.currentOngkir && r.newOngkir !== "");
+    if (!changed.length) {
+      toast({ title: "Tidak ada perubahan", description: "Semua ongkir sudah sesuai." });
+      return;
+    }
+    setSyncing(true);
+    let ok = 0; let fail = 0;
+    for (const row of changed) {
+      try {
+        const res = await fetch(`/api/packages/${row.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ totalShipping: Number(row.newOngkir) }),
+        });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
+    }
+    await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
+    setSyncing(false);
+    setSyncOpen(false);
+    toast({
+      title: fail ? `Selesai (${fail} gagal)` : "Sinkronisasi berhasil",
+      description: `${ok} paket ongkir berhasil diperbarui.`,
+      variant: fail ? "destructive" : "default",
+    });
+  }
 
   // ── Print All ────────────────────────────────────────────────────────────────
   async function printAll() {
@@ -587,6 +648,16 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
             </Button>
             <span className="text-base font-bold">{selectedSvcLabel}</span>
             <Badge variant="secondary">{filtered.length} paket</Badge>
+            {selectedServiceType === "jastip kargo" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto border-orange-300 text-orange-700 hover:bg-orange-50 gap-1.5"
+                onClick={openSync}
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Sinkronisasi Ongkir
+              </Button>
+            )}
           </div>
 
           <div className="relative max-w-sm">
@@ -639,6 +710,87 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
           )}
         </>
       )}
+
+      {/* ── Dialog Sinkronisasi Ongkir Kargo ─────────────────────────────── */}
+      <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-orange-600" />
+              Sinkronisasi Ongkir — Jastip Kargo
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Edit ongkir per paket sesuai harga sebenarnya, lalu klik <b>Simpan Semua</b>.
+              Kolom <span className="text-orange-700 font-semibold">Ongkir Baru</span> yang diubah akan disimpan ke database.
+            </p>
+          </DialogHeader>
+
+          <div className="overflow-y-auto flex-1 -mx-6 px-6">
+            <table className="w-full text-sm border-collapse">
+              <thead className="sticky top-0 bg-background z-10">
+                <tr className="border-b bg-muted/40">
+                  <th className="text-left py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Konsumen</th>
+                  <th className="text-left py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Resi / Paket</th>
+                  <th className="text-left py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Jenis Barang</th>
+                  <th className="text-right py-2 px-3 font-medium text-xs text-muted-foreground uppercase">Ongkir Saat Ini</th>
+                  <th className="py-2 px-3 font-medium text-xs text-orange-700 uppercase text-right">Ongkir Baru (Rp)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {syncRows.map((row, i) => {
+                  const changed = row.newOngkir !== row.currentOngkir && row.newOngkir !== "";
+                  return (
+                    <tr key={row.id} className={`border-b ${i % 2 === 0 ? "" : "bg-muted/20"} ${changed ? "bg-orange-50" : ""}`}>
+                      <td className="py-2 px-3 font-medium">{row.customerName}</td>
+                      <td className="py-2 px-3 font-mono text-xs">
+                        <div>{row.resiNumber}</div>
+                        {row.packageNumber && <div className="text-muted-foreground">#{row.packageNumber}</div>}
+                      </td>
+                      <td className="py-2 px-3 text-muted-foreground truncate max-w-[140px]" title={row.itemName}>{row.itemName || "-"}</td>
+                      <td className="py-2 px-3 text-right text-muted-foreground">
+                        {row.currentOngkir ? `Rp ${Number(row.currentOngkir).toLocaleString("id-ID")}` : "-"}
+                      </td>
+                      <td className="py-2 px-3">
+                        <Input
+                          type="number"
+                          min={0}
+                          className={`h-8 text-right text-sm w-36 ml-auto ${changed ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
+                          value={row.newOngkir}
+                          onChange={e => setSyncRows(rows => rows.map((r, j) => j === i ? { ...r, newOngkir: e.target.value } : r))}
+                          placeholder="0"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {syncRows.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">Tidak ada paket Cargo di batch ini.</div>
+            )}
+          </div>
+
+          <div className="border-t pt-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">
+              {syncRows.filter(r => r.newOngkir !== r.currentOngkir && r.newOngkir !== "").length} paket akan diubah
+              · Total baru: <span className="font-semibold text-primary">
+                {formatRp(syncRows.reduce((s, r) => s + (r.newOngkir !== "" ? Number(r.newOngkir) : Number(r.currentOngkir || 0)), 0))}
+              </span>
+            </p>
+            <DialogFooter className="flex-row gap-2 pt-0">
+              <Button variant="outline" onClick={() => setSyncOpen(false)} disabled={syncing}>Batal</Button>
+              <Button
+                onClick={saveSync}
+                disabled={syncing || syncRows.filter(r => r.newOngkir !== r.currentOngkir && r.newOngkir !== "").length === 0}
+                className="gap-2 bg-orange-600 hover:bg-orange-700"
+              >
+                <Save className="w-4 h-4" />
+                {syncing ? "Menyimpan..." : "Simpan Semua"}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
