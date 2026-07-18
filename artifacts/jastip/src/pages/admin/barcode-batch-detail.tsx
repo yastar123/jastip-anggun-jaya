@@ -122,7 +122,8 @@ function calcGroupTotalShipping(pkgs: any[]): number {
   return pkgs.reduce((s, p) => s + (Number(p.totalShipping) || 0), 0);
 }
 
-function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
+// Returns the labelPageHtml string (one page) for a group — shared by single-card print and printAll.
+function buildGroupedPage(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string): string {
   const first = pkgs[0];
   const svc = (first?.serviceType || "").toLowerCase();
   const isPesawat = svc === "jastip pesawat";
@@ -161,7 +162,12 @@ function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, 
         ${batchRow}
       </div>
     </div>`;
-  return labelDocumentHtml(`Label Grup - ${first?.customerName}`, labelPageHtml(inner));
+  return labelPageHtml(inner);
+}
+
+function buildGroupedPrintHtml(pkgs: any[], qrDataUrl: string, qrValue: string, batchLabel?: string) {
+  const first = pkgs[0];
+  return labelDocumentHtml(`Label Grup - ${first?.customerName}`, buildGroupedPage(pkgs, qrDataUrl, qrValue, batchLabel));
 }
 
 // ── SingleBarcodeCard — Cargo (packageMode: "single") ────────────────────────
@@ -562,32 +568,50 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
   }
 
   // ── Print All ────────────────────────────────────────────────────────────────
+  // Prints one label per GROUP (same grouping as the cards), not one per package.
   async function printAll() {
     if (!batchPkgs.length) return;
+    const groups = groupPkgsByCustomer(batchPkgs);
     const pages: string[] = [];
-    for (const pkg of batchPkgs) {
-      const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
-      let qrDataUrl = "";
-      try {
-        qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3 });
-      } catch { continue; }
-      const pkgDate = pkg.packageDate
-        ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
-        : "-";
-      pages.push(labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
-        <div class="info">
-          <div class="cust">${pkg.customerName || "-"}</div>
-          <div class="grid">
-            <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
-            <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
-            <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
-            <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${pkg.serviceType ? pkg.serviceType.replace("jastip ", "Jastip ") : "-"}</div></div>
-            <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
-            <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${pkg.usedWeight != null ? pkg.usedWeight + " Kg" : "-"}</div></div>
-            <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
-            <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
-          </div>
-        </div>`));
+    for (const pkgs of groups) {
+      const first = pkgs[0];
+      const svc = (first?.serviceType || "").toLowerCase();
+      const isKargo = svc === "jastip kargo";
+
+      if (isKargo) {
+        // Kargo: single-package label (same as SingleBarcodeCard)
+        const pkg = first;
+        const qrValue = pkg.barcode || pkg.resiNumber || String(pkg.id);
+        let qrDataUrl = "";
+        try {
+          qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+        } catch { continue; }
+        const pkgDate = pkg.packageDate
+          ? new Date(pkg.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })
+          : "-";
+        pages.push(labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
+          <div class="info">
+            <div class="cust">${pkg.customerName || "-"}</div>
+            <div class="grid">
+              <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
+              <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${pkg.packageNumber || "-"}</div></div>
+              <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
+              <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">Jastip Kargo</div></div>
+              <div class="field full"><div class="fl">Jenis Barang</div><div class="fv">${pkg.itemName || "-"}</div></div>
+              <div class="field full"><div class="fl">Rute</div><div class="fv">${pkg.deliveryRoute || "-"}</div></div>
+              <div class="field"><div class="fl">Ongkir Paket</div><div class="fv red">${pkg.totalShipping != null ? "Rp " + Number(pkg.totalShipping).toLocaleString("id-ID") : "-"}</div></div>
+              <div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>
+            </div>
+          </div>`));
+      } else {
+        // Grouped services (Pesawat, Pelni, Hemat+, dll): one group label per customer
+        const qrValue = groupQrValue(pkgs);
+        let qrDataUrl = "";
+        try {
+          qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
+        } catch { continue; }
+        pages.push(buildGroupedPage(pkgs, qrDataUrl, qrValue, batchLabel));
+      }
     }
     if (!pages.length) return;
     const html = labelDocumentHtml(`Print Barcode — ${batchLabel}`, pages.join(""));
