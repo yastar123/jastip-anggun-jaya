@@ -75,6 +75,64 @@ async function recalcPesawatCustomerOngkir(
   }
 }
 
+// ── Hemat+: hitung ongkir berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch
+// Aturan:
+//   - 1 paket & total_berat < 1 kg  → berat_digunakan = 1 kg
+//   - 1 paket & total_berat >= 1 kg → berat_digunakan = total_berat
+//   - >1 paket                       → berat_digunakan = total_berat (TANPA pembulatan per paket)
+// Total ongkir = berat_digunakan × Rp10.000, didistribusikan proporsional ke tiap paket.
+async function recalcHematCustomerOngkir(
+  batchId: number,
+  customerName: string,
+): Promise<void> {
+  if (!batchId || !customerName) return;
+
+  const allBatchHemat = await db
+    .select()
+    .from(packagesTable)
+    .where(and(eq(packagesTable.batchId, batchId), eq(packagesTable.serviceType, "jastip hemat+")));
+
+  const customerLower = customerName.trim().toLowerCase();
+  const customerPkgs = allBatchHemat.filter(
+    (p) => (p.customerName || "").trim().toLowerCase() === customerLower,
+  );
+  if (!customerPkgs.length) return;
+
+  const jumlahPaket = customerPkgs.length;
+  const totalBerat = customerPkgs.reduce((s, p) => s + (Number(p.usedWeight) || 0), 0);
+
+  let beratDigunakan: number;
+  if (jumlahPaket === 1 && totalBerat < 1) {
+    beratDigunakan = 1;
+  } else {
+    beratDigunakan = totalBerat; // >1 paket: jumlah langsung, tanpa pembulatan per paket
+  }
+
+  const totalGroupOngkir = Math.round(beratDigunakan * 10000);
+
+  // Distribusi proporsional ke tiap paket agar sum = totalGroupOngkir
+  let distributed = 0;
+  for (let i = 0; i < customerPkgs.length; i++) {
+    const pkg = customerPkgs[i];
+    let pkgOngkir: number;
+    if (customerPkgs.length === 1) {
+      pkgOngkir = totalGroupOngkir;
+    } else if (i === customerPkgs.length - 1) {
+      pkgOngkir = totalGroupOngkir - distributed;
+    } else {
+      pkgOngkir =
+        totalBerat > 0
+          ? Math.round(((Number(pkg.usedWeight) || 0) / totalBerat) * totalGroupOngkir)
+          : Math.round(totalGroupOngkir / customerPkgs.length);
+      distributed += pkgOngkir;
+    }
+    await db
+      .update(packagesTable)
+      .set({ shippingRate: "10000", totalShipping: String(pkgOngkir), updatedAt: new Date() })
+      .where(eq(packagesTable.id, pkg.id));
+  }
+}
+
 // ── Pelni: tarif per-kg berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch
 // (bukan berdasarkan berat per paket)
 function getPelniRateByTotalWeight(
@@ -419,6 +477,13 @@ router.post(
         if (refreshed[0]) pkg = refreshed[0];
       }
 
+      // Hemat+: hitung ulang ongkir berdasarkan total berat gabungan konsumen dalam batch
+      if (serviceType === "jastip hemat+" && pkg.batchId && pkg.customerName) {
+        await recalcHematCustomerOngkir(pkg.batchId, pkg.customerName);
+        const refreshed = await db.select().from(packagesTable).where(eq(packagesTable.id, pkg.id)).limit(1);
+        if (refreshed[0]) pkg = refreshed[0];
+      }
+
       const adminMap = new Map<number, any>();
       if (pkg.adminId) {
         const admin = await db
@@ -567,6 +632,18 @@ router.post(
         }
         for (const { customerName, deliveryRoute } of pelniGroups.values()) {
           await recalcPelniCustomerOngkir(Number(batchId), customerName, deliveryRoute);
+        }
+      }
+
+      // Hemat+: setelah semua paket diinsert, hitung ulang ongkir per konsumen
+      const hematRows = (rows as any[]).filter((r: any) => r.serviceType === "jastip hemat+");
+      if (hematRows.length > 0) {
+        const hematCustomers = new Set<string>();
+        for (const r of hematRows) {
+          if (r.customerName) hematCustomers.add(String(r.customerName));
+        }
+        for (const customerName of hematCustomers) {
+          await recalcHematCustomerOngkir(Number(batchId), customerName);
         }
       }
 
@@ -822,6 +899,13 @@ router.patch(
       // Pelni: hitung ulang ongkir berdasarkan total berat gabungan konsumen dalam batch
       if (pkg.serviceType === "jastip pelni" && pkg.batchId && pkg.customerName && pkg.deliveryRoute) {
         await recalcPelniCustomerOngkir(pkg.batchId, pkg.customerName, pkg.deliveryRoute);
+        const refreshed = await db.select().from(packagesTable).where(eq(packagesTable.id, pkg.id)).limit(1);
+        if (refreshed[0]) pkg = refreshed[0];
+      }
+
+      // Hemat+: hitung ulang ongkir berdasarkan total berat gabungan konsumen dalam batch
+      if (pkg.serviceType === "jastip hemat+" && pkg.batchId && pkg.customerName) {
+        await recalcHematCustomerOngkir(pkg.batchId, pkg.customerName);
         const refreshed = await db.select().from(packagesTable).where(eq(packagesTable.id, pkg.id)).limit(1);
         if (refreshed[0]) pkg = refreshed[0];
       }
