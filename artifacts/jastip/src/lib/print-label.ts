@@ -34,22 +34,22 @@ export const LABEL_STYLES = `
     background: #cc0000; color: #fff; font-size: 7pt; font-weight: 900;
     padding: 1.2mm 4mm; border-radius: 2px; letter-spacing: 0.5px; margin-bottom: 3mm;
   }
-  .qr-img { width: 42mm; height: 42mm; display: block; }
+  .qr-img { width: 36mm; height: 36mm; display: block; }
   .qr-txt {
     font-size: 5pt; color: #888; font-family: monospace; text-align: center;
-    margin-top: 2mm; word-break: break-all; max-width: 80mm; line-height: 1.2;
+    margin-top: 1.5mm; word-break: break-all; max-width: 80mm; line-height: 1.2;
   }
-  .info { flex: 1; padding: 3mm 4.5mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+  .info { flex: 1; padding: 2.5mm 4.5mm; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; }
   .cust {
-    font-size: 21pt; font-weight: 900; color: #111; margin-bottom: 3mm; text-align: center;
-    border-bottom: 0.5px solid #eee; padding-bottom: 2mm; line-height: 1.1;
+    font-size: 17pt; font-weight: 900; color: #111; margin-bottom: 2.5mm; text-align: center;
+    border-bottom: 0.5px solid #eee; padding-bottom: 1.5mm; line-height: 1.1;
   }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 3.5mm; }
-  .field { display: flex; flex-direction: column; gap: 0.9mm; }
-  .fl { font-size: 8pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
-  .fv { font-size: 14.5pt; font-weight: 700; color: #222; line-height: 1.15; }
-  .fv.mono { font-family: monospace; font-size: 13pt; }
-  .fv.red { color: #cc0000; font-size: 16.5pt; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 3.5mm; }
+  .field { display: flex; flex-direction: column; gap: 0.7mm; }
+  .fl { font-size: 7pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
+  .fv { font-size: 12pt; font-weight: 700; color: #222; line-height: 1.15; }
+  .fv.mono { font-family: monospace; font-size: 11pt; }
+  .fv.red { color: #cc0000; font-size: 13.5pt; }
   .full { grid-column: 1 / -1; }
   .status { display: inline-block; padding: 0.8mm 2.5mm; border-radius: 3mm; font-size: 7.5pt; font-weight: 700; }
   .footer {
