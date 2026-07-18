@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Pencil, Trash2, Printer, Package, QrCode, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { labelDocumentHtml, labelPageHtml, qrSectionHtml } from "@/lib/print-label";
+import { labelDocumentHtml, labelPageHtml, qrSectionHtml, groupQrValue } from "@/lib/print-label";
 
 function formatRp(n: any) {
   if (n == null) return "-";
@@ -180,37 +180,48 @@ export default function BarcodeGroupDetail() {
     const pkgs = groupPackages;
     if (!pkgs.length) return;
 
-    const qrDataUrls: string[] = await Promise.all(
-      pkgs.map((p: any) =>
-        QRCode.toDataURL(p.barcode || p.resiNumber || String(p.id), { width: 300, margin: 2 }).catch(() => "")
-      )
-    );
+    // Generate a single GROUP QR code (encodes all package IDs when >1 package)
+    const qrValue = groupQrValue(pkgs);
+    const qrDataUrl = await QRCode.toDataURL(qrValue, { width: 300, margin: 2 }).catch(() => "");
+
+    // Fetch batch name for display
+    let batchLabel = filterBatchId ? String(filterBatchId) : "";
+    try {
+      const token = localStorage.getItem("jaj_token");
+      const r = await fetch(`/api/batches/${filterBatchId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.namaBatch) batchLabel = data.namaBatch;
+      }
+    } catch {}
+
+    const first = pkgs[0] as any;
+    const totalRealWeight = pkgs.reduce((s: number, p: any) => s + (Number(p.realWeight) || 0), 0);
+    const totalShippingSum = pkgs.reduce((s: number, p: any) => s + (Number(p.totalShipping) || 0), 0);
+    const svcType = first?.serviceType ? first.serviceType.replace("jastip ", "Jastip ") : "-";
+
+    const batchRow = batchLabel
+      ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
+      : "";
+
+    const inner = `${qrSectionHtml(qrDataUrl, qrValue)}
+      <div class="info">
+        <div class="cust">${first?.customerName || groupName || "-"}</div>
+        <div class="grid">
+          <div class="field"><div class="fl">Total Paket</div><div class="fv">${pkgs.length} pkt</div></div>
+          <div class="field"><div class="fl">Total Berat Real</div><div class="fv">${totalRealWeight.toFixed(3)} Kg</div></div>
+          <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
+          <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">Rp ${totalShippingSum.toLocaleString("id-ID")}</div></div>
+          <div class="field full"><div class="fl">Rute</div><div class="fv">${first?.deliveryRoute || "-"}</div></div>
+          ${batchRow}
+        </div>
+      </div>`;
 
     const win = window.open("", "_blank");
     if (!win) return;
-
-    const pages = pkgs.map((p: any, i: number) => {
-      const qrValue = p.barcode || p.resiNumber || String(p.id);
-      const pkgDate = p.packageDate ? new Date(p.packageDate).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-";
-      const svcType = p.serviceType ? p.serviceType.replace("jastip ", "Jastip ") : "-";
-      const ongkir = p.totalShipping != null ? "Rp " + Number(p.totalShipping).toLocaleString("id-ID") : "-";
-      return labelPageHtml(`${qrSectionHtml(qrDataUrls[i], qrValue)}
-        <div class="info">
-          <div class="cust">${p.customerName || "-"}</div>
-          <div class="grid">
-            <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${p.resiNumber || "-"}</div></div>
-            <div class="field"><div class="fl">No. Paket</div><div class="fv mono">${p.packageNumber || "-"}</div></div>
-            <div class="field"><div class="fl">Tanggal</div><div class="fv">${pkgDate}</div></div>
-            <div class="field"><div class="fl">Jenis Jastip</div><div class="fv">${svcType}</div></div>
-            <div class="field full"><div class="fl">Rute</div><div class="fv">${p.deliveryRoute || "-"}</div></div>
-            <div class="field"><div class="fl">Berat Real</div><div class="fv">${p.realWeight != null ? p.realWeight + " Kg" : "-"}</div></div>
-            <div class="field"><div class="fl">Berat Digunakan</div><div class="fv">${p.usedWeight != null ? p.usedWeight + " Kg" : "-"}</div></div>
-            <div class="field"><div class="fl">Total Ongkir</div><div class="fv red">${ongkir}</div></div>
-          </div>
-        </div>`);
-    }).join("");
-
-    win.document.write(labelDocumentHtml(`Label — ${groupName || "Grup Paket"}`, pages));
+    win.document.write(labelDocumentHtml(`Label Grup — ${groupName || "Grup Paket"}`, labelPageHtml(inner)));
     win.document.close();
   }
 
