@@ -690,12 +690,17 @@ export default function AdminScan() {
                 <span>Jumlah Paket</span>
                 <span className="font-semibold text-foreground">{items.length} paket</span>
               </div>
-              {items.map((item) => (
-                <div key={item.id} className="flex justify-between text-xs text-muted-foreground">
-                  <span className="truncate max-w-[180px]">{item.customerName} ({item.resiNumber || item.barcode})</span>
-                  <span className="shrink-0 ml-2">{formatRp(item.totalShipping)}</span>
-                </div>
-              ))}
+              <div
+                className="overflow-y-auto max-h-48 space-y-1 [&::-webkit-scrollbar]:hidden"
+                style={{ scrollbarWidth: "none" }}
+              >
+                {items.map((item) => (
+                  <div key={item.id} className="flex justify-between text-xs text-muted-foreground">
+                    <span className="truncate max-w-[180px]">{item.customerName} ({item.resiNumber || item.barcode})</span>
+                    <span className="shrink-0 ml-2">{formatRp(item.totalShipping)}</span>
+                  </div>
+                ))}
+              </div>
               <div className="border-t pt-2 flex justify-between items-center">
                 <span className="font-semibold text-sm text-muted-foreground">Total Ongkir</span>
                 <span className="font-bold text-foreground">{formatRp(totalTagihan)}</span>
