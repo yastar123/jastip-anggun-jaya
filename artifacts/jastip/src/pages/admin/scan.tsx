@@ -691,7 +691,7 @@ export default function AdminScan() {
                 <span className="font-semibold text-foreground">{items.length} paket</span>
               </div>
               <div
-                className="overflow-y-auto max-h-18 space-y-1 [&::-webkit-scrollbar]:hidden"
+                className="overflow-y-auto max-h-8 space-y-1 [&::-webkit-scrollbar]:hidden"
                 style={{ scrollbarWidth: "none" }}
               >
                 {items.map((item) => (
