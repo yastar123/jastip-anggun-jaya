@@ -1098,7 +1098,7 @@ export default function AdminPackagesNew() {
                       name="totalShipping"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Ongkir Paket <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>Ongkir/M3 <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
@@ -1119,7 +1119,7 @@ export default function AdminPackagesNew() {
                     />
                     {watchedTotalShipping != null && watchedTotalShipping > 0 && (
                       <div className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ongkir Paket</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ongkir/M3</p>
                         <p className="text-2xl font-black text-primary mt-1">{formatRp(watchedTotalShipping)}</p>
                       </div>
                     )}
@@ -1398,7 +1398,7 @@ export default function AdminPackagesNew() {
                       </p>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div>
-                          <p className="text-xs text-muted-foreground">Berat Volume (Kg)</p>
+                          <p className="text-xs text-muted-foreground">Berat Kubikasi</p>
                           <p className="font-semibold">{watchedVolumeWeight != null ? watchedVolumeWeight.toFixed(3) : "-"}</p>
                           {serviceType && volumeDivisor[serviceType] && (
                             <p className="text-xs text-muted-foreground mt-0.5">

@@ -391,7 +391,7 @@ export default function AdminPackagesDetail() {
                   </div>
                   {isKargo && (
                     <div>
-                      <Label>Ongkir Paket (Rp)</Label>
+                      <Label>Ongkir/M3 (Rp)</Label>
                       <Input
                         className="mt-1"
                         type="number"
@@ -481,7 +481,7 @@ export default function AdminPackagesDetail() {
                 </div>
                 {isKargo && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ongkir Paket</span>
+                    <span className="text-muted-foreground">Ongkir/M3</span>
                     <span className="font-bold text-primary">{formatRp((pkg as any).totalShipping)}</span>
                   </div>
                 )}
