@@ -414,13 +414,17 @@ router.post(
         effectiveRealWeight !== null && volumeWeight !== null
           ? Math.max(effectiveRealWeight, volumeWeight)
           : (effectiveRealWeight ?? volumeWeight);
-      const effectiveShippingRate =
-        getShippingRate(serviceType, deliveryRoute, usedWeight) ??
-        (shippingRate ? Number(shippingRate) : null);
+      // Kargo: shippingRate diisi user (tarif/M3), bukan hardcoded 7000
+      const effectiveShippingRate = serviceType === "jastip kargo"
+        ? (shippingRate ? Number(shippingRate) : null)
+        : (getShippingRate(serviceType, deliveryRoute, usedWeight) ?? (shippingRate ? Number(shippingRate) : null));
 
       let totalShipping: number | null = null;
       if (totalShippingInput !== undefined && totalShippingInput !== null && totalShippingInput !== "") {
         totalShipping = Number(totalShippingInput);
+      } else if (serviceType === "jastip kargo" && volumeWeight !== null && effectiveShippingRate !== null) {
+        // Kargo: totalShipping = Berat Kubikasi × Ongkir/M3
+        totalShipping = Math.round(volumeWeight * effectiveShippingRate);
       } else {
         totalShipping = getTotalShipping(serviceType, deliveryRoute, usedWeight);
       }
@@ -867,14 +871,20 @@ router.patch(
           : (rw ?? vw);
         updateData.usedWeight = uw != null ? String(uw) : null;
 
-        const rate = getShippingRate(effService, effRoute, uw ?? undefined);
+        // Kargo: gunakan shippingRate dari body (tarif/M3 user-input), bukan hardcoded 7000
+        const rate = effService === "jastip kargo"
+          ? (shippingRate !== undefined ? (shippingRate ? Number(shippingRate) : null) : toNum(e.shippingRate))
+          : getShippingRate(effService, effRoute, uw ?? undefined);
         updateData.shippingRate = rate != null ? String(rate) : null;
 
-        // Untuk Cargo: jangan timpa ongkir dengan kalkulasi otomatis
-        // gunakan nilai dari body jika ada, atau biarkan nilai tersimpan tetap
-        if (effService !== "jastip kargo" || totalShippingInput !== undefined) {
+        if (effService !== "jastip kargo") {
           const total = getTotalShipping(effService, effRoute, uw ?? undefined);
           if (total != null) updateData.totalShipping = String(total);
+        } else if (totalShippingInput === undefined || totalShippingInput === null || totalShippingInput === "") {
+          // Kargo: recalculate totalShipping = volumeWeight × shippingRate
+          if (vw != null && rate != null) {
+            updateData.totalShipping = String(Math.round(vw * rate));
+          }
         }
       }
 
