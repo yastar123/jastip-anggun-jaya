@@ -309,9 +309,30 @@ export default function AdminPackagesImport() {
           const val = row[idx];
           return val !== undefined && val !== null ? String(val).trim() : "";
         };
-        // Normalisasi desimal: ganti koma dengan titik, lalu parseFloat
+        // Normalisasi angka: hapus prefix "Rp", tangani pemisah ribuan (titik/koma)
         const num = (key: string) => {
-          const v = get(key).replace(",", ".");
+          // Hapus "Rp", spasi, dan karakter mata uang
+          let v = get(key).replace(/^Rp\.?\s*/i, "").replace(/\s/g, "").trim();
+          // Format "1.234,56" atau "38.000" (titik=ribuan, koma=desimal)
+          if (v.includes(".") && v.includes(",")) {
+            v = v.replace(/\./g, "").replace(",", ".");
+          } else if (v.includes(",") && !v.includes(".")) {
+            const parts = v.split(",");
+            // "38,000" → koma sebagai ribuan (3 digit setelah koma)
+            if (parts.length === 2 && parts[1].length === 3) {
+              v = v.replace(",", "");
+            } else {
+              // "1,5" → koma sebagai desimal
+              v = v.replace(",", ".");
+            }
+          } else if (v.includes(".") && !v.includes(",")) {
+            const parts = v.split(".");
+            // "38.000" atau "1.234.000" → titik sebagai ribuan (semua bagian setelah titik = 3 digit)
+            if (parts.length > 1 && parts.slice(1).every((p) => p.length === 3)) {
+              v = v.replace(/\./g, "");
+            }
+            // else "1.5" → desimal biasa, biarkan
+          }
           const n = parseFloat(v);
           return isNaN(n) ? null : n;
         };
