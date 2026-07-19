@@ -58,10 +58,10 @@ const packageSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Berat real wajib diisi", path: ["realWeight"] });
     }
   }
-  // Cargo: ongkir paket wajib diisi langsung
+  // Cargo: tarif Ongkir/M3 wajib diisi (totalShipping dihitung otomatis)
   if (data.serviceType === "jastip kargo") {
-    if (!data.totalShipping || Number(data.totalShipping) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ongkir paket wajib diisi untuk Cargo", path: ["totalShipping"] });
+    if (!data.shippingRate || Number(data.shippingRate) <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ongkir/M3 wajib diisi untuk Cargo", path: ["shippingRate"] });
     }
   }
 });
@@ -402,7 +402,7 @@ export default function AdminPackagesNew() {
     const uw = Math.max(real, volume);
     form.setValue("usedWeight", uw > 0 ? uw : null, { shouldDirty: true });
 
-    // Kargo: ongkir diisi manual, tidak dihitung dari berat × tarif
+    // Kargo: shippingRate diisi manual, totalShipping dihitung di effect terpisah
     if (serviceType === "jastip kargo") return;
 
     const effectiveRoute = currentRoute || deliveryRoute;
@@ -411,6 +411,16 @@ export default function AdminPackagesNew() {
     form.setValue("shippingRate", rate ?? null, { shouldDirty: true });
     form.setValue("totalShipping", total ?? null, { shouldDirty: true });
   }, [serviceType, deliveryRoute, realWeight, length, width, height]);
+
+  // Kargo: auto-hitung totalShipping = Berat Kubikasi × Ongkir/M3
+  useEffect(() => {
+    if (serviceType !== "jastip kargo") return;
+    if (watchedVolumeWeight != null && watchedVolumeWeight > 0 && watchedShippingRate != null && watchedShippingRate > 0) {
+      form.setValue("totalShipping", Math.round(watchedVolumeWeight * watchedShippingRate), { shouldDirty: true });
+    } else {
+      form.setValue("totalShipping", null, { shouldDirty: true });
+    }
+  }, [watchedVolumeWeight, watchedShippingRate, serviceType]);
 
   async function onSubmit(values: PackageFormValues) {
     // Require customerName for all modes
@@ -1092,13 +1102,13 @@ export default function AdminPackagesNew() {
                       </div>
                     )}
 
-                    {/* Ongkir Paket (input langsung, bukan berat × tarif) */}
+                    {/* Ongkir/M3 — tarif per M³ (user-input), totalShipping dihitung otomatis */}
                     <FormField
                       control={form.control}
-                      name="totalShipping"
+                      name="shippingRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Ongkir/M3 <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>Ongkir/M3 (Tarif per M³) <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">Rp</span>
@@ -1111,7 +1121,7 @@ export default function AdminPackagesNew() {
                             </div>
                           </FormControl>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Ongkir diisi langsung per paket — tidak dihitung dari berat × tarif
+                            Total ongkir dihitung otomatis: Berat Kubikasi × Ongkir/M3
                           </p>
                           <FormMessage />
                         </FormItem>
@@ -1119,8 +1129,13 @@ export default function AdminPackagesNew() {
                     />
                     {watchedTotalShipping != null && watchedTotalShipping > 0 && (
                       <div className="rounded-lg border-2 border-primary/30 bg-primary/5 px-4 py-3">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ongkir/M3</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total Ongkir (otomatis)</p>
                         <p className="text-2xl font-black text-primary mt-1">{formatRp(watchedTotalShipping)}</p>
+                        {watchedVolumeWeight != null && watchedShippingRate != null && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {watchedVolumeWeight.toFixed(4)} M³ × {formatRp(watchedShippingRate)} = {formatRp(watchedTotalShipping)}
+                          </p>
+                        )}
                       </div>
                     )}
 
