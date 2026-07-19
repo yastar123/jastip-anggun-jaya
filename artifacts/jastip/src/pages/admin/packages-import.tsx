@@ -342,7 +342,7 @@ export default function AdminPackagesImport() {
         const realWeightVal = num("realWeight");
         const ongkirPaketVal = tplType === "kargo" ? num("ongkirPaket") : null;
         let error: string | undefined;
-        if (!customerName) error = "Nama Konsumen kosong";
+        if (!customerName && tplType === "standard") error = "Nama Konsumen kosong";
         else if (tplType === "standard" && !resiNumber) error = "No Resi kosong";
         else if (tplType === "standard" && (realWeightVal === null || realWeightVal <= 0)) error = "Berat Real wajib diisi";
         // Kargo: berat tidak wajib, tapi ongkir paket wajib
@@ -496,7 +496,7 @@ export default function AdminPackagesImport() {
       const kargoMode = templateType === "kargo" ? "single" : "grup";
 
       const payload = valid.map((r) => ({
-        customerName:  r.customerName,
+        customerName:  r.customerName || "-",
         customerPhone: "",
         resiNumber:    r.resiNumber || "-",
         packageNumber: r.packageNumber || undefined,
