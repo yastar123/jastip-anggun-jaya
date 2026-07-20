@@ -782,13 +782,13 @@ export default function AdminPackagesImport() {
                           <SelectTrigger>
                             <SelectValue placeholder="Pilih batch pengiriman" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-w-[350px]">
                             {openBatches.map((b: any) => (
-                              <SelectItem key={b.id} value={String(b.id)}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{b.namaKapal || `Batch #${b.id}`}</span>
+                              <SelectItem key={b.id} value={String(b.id)} className="flex-col items-start py-3">
+                                <div className="flex flex-col w-full">
+                                  <span className="font-medium text-sm truncate">{b.namaKapal || `Batch #${b.id}`}</span>
                                   {(b.kotaAsal || b.tujuan) && (
-                                    <span className="text-xs text-muted-foreground">{b.kotaAsal} → {b.tujuan}</span>
+                                    <span className="text-xs text-muted-foreground truncate">{b.kotaAsal} → {b.tujuan}</span>
                                   )}
                                 </div>
                               </SelectItem>
