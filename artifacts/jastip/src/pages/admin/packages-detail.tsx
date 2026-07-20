@@ -213,9 +213,10 @@ export default function AdminPackagesDetail() {
         body.totalShipping = Number(form.totalShipping);
       }
 
+      const token = localStorage.getItem("jaj_token");
       const res = await fetch(`/api/packages/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -236,7 +237,11 @@ export default function AdminPackagesDetail() {
   async function deletePackage() {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/packages/${id}`, { method: "DELETE" });
+      const token = localStorage.getItem("jaj_token");
+      const res = await fetch(`/api/packages/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Gagal menghapus");

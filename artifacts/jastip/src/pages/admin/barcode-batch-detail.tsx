@@ -486,7 +486,8 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
       (p.barcode || "").toLowerCase().includes(search.toLowerCase()) ||
       (p.resiNumber || "").toLowerCase().includes(search.toLowerCase()) ||
       (p.packageNumber || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.customerName || "").toLowerCase().includes(search.toLowerCase()))
+      (p.customerName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (p.itemName || "").toLowerCase().includes(search.toLowerCase()))
   );
 
   const groupedFiltered = groupPkgsByCustomer(filtered);
@@ -547,11 +548,12 @@ export default function BarcodeBatchDetail({ params }: { params: { id: string } 
     }
     setSyncing(true);
     let ok = 0; let fail = 0;
+    const token = localStorage.getItem("jaj_token");
     for (const row of changed) {
       try {
         const res = await fetch(`/api/packages/${row.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ totalShipping: Number(row.newOngkir) }),
         });
         if (res.ok) ok++; else fail++;
