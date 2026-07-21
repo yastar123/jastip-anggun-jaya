@@ -131,6 +131,15 @@ export default function BarcodeGroupDetail() {
     ? idsParam.split(",").map(Number).filter(Boolean)
     : null;
 
+  const backToBatchUrl = (() => {
+    const params = new URLSearchParams();
+    if (filterServiceType) params.set("serviceType", filterServiceType);
+    const query = params.toString();
+    return filterBatchId
+      ? `${base}/barcode/batch/${filterBatchId}${query ? `?${query}` : ""}`
+      : `${base}/barcode`;
+  })();
+
   const { data: packages, isLoading } = useListPackages();
 
   const groupPackages = (packages || []).filter((p: any) => {
@@ -368,16 +377,7 @@ export default function BarcodeGroupDetail() {
           <p className="text-sm mt-1">
             Nama "{groupName}" tidak memiliki paket terdaftar
           </p>
-          <Button
-            className="mt-4"
-            onClick={() =>
-              setLocation(
-                filterBatchId
-                  ? `${base}/barcode/batch/${filterBatchId}`
-                  : `${base}/barcode`,
-              )
-            }
-          >
+          <Button className="mt-4" onClick={() => setLocation(backToBatchUrl)}>
             Kembali ke Barcode
           </Button>
         </div>
