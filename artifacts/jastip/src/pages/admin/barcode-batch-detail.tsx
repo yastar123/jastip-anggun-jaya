@@ -275,7 +275,12 @@ function SingleBarcodeCard({
           size="sm"
           variant="outline"
           className="w-full text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
-          onClick={() => setLocation(`${base}/packages/${pkg.id}`)}
+          onClick={() => {
+            const params = new URLSearchParams({ name: pkg.customerName || "" });
+            if (pkg.serviceType) params.set("serviceType", pkg.serviceType);
+            if (pkg.batchId != null) params.set("batchId", String(pkg.batchId));
+            setLocation(`${base}/barcode-group?${params.toString()}`);
+          }}
         >
           <Eye className="w-3 h-3 mr-1" /> Detail / Edit Paket
         </Button>
