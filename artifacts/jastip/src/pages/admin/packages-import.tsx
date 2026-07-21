@@ -328,10 +328,12 @@ export default function AdminPackagesImport() {
           } else if (v.includes(".") && !v.includes(",")) {
             const parts = v.split(".");
             // "38.000" atau "1.234.000" → titik sebagai ribuan (semua bagian setelah titik = 3 digit)
-            if (parts.length > 1 && parts.slice(1).every((p) => p.length === 3)) {
+            // PENGECUALIAN: jika bagian integer adalah 0 (mis. "0.192"), pasti desimal — bukan ribuan
+            const intPart = parseInt(parts[0], 10);
+            if (parts.length > 1 && parts.slice(1).every((p) => p.length === 3) && intPart !== 0) {
               v = v.replace(/\./g, "");
             }
-            // else "1.5" → desimal biasa, biarkan
+            // else "1.5" atau "0.192" → desimal biasa, biarkan
           }
           const n = parseFloat(v);
           return isNaN(n) ? null : n;
