@@ -1,4 +1,4 @@
-import { useListPackages, PackageStatus } from "@workspace/api-client-react";
+import { useListPackages, PackageStatus, getListPackagesQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,15 @@ import { StatusBadge } from "@/components/status-badge";
 import { Pagination } from "@/components/pagination";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, Download, ScanLine, CheckCircle2, XCircle, AlertCircle, Hash } from "lucide-react";
+import { Search, Download, ScanLine, CheckCircle2, XCircle, AlertCircle, Hash, Trash2, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import * as XLSX from "xlsx";
 
 const PAGE_SIZE = 10;
@@ -32,6 +38,8 @@ export default function OwnerPackages() {
   const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   // Scan verification state
   const [scanInput, setScanInput] = useState("");
@@ -79,6 +87,28 @@ export default function OwnerPackages() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Monitor Paket");
     XLSX.writeFile(wb, `monitor-paket-${new Date().toISOString().split("T")[0]}.xlsx`);
+  }
+
+  async function deletePackage(id: number, resiNumber: string) {
+    setDeletingId(id);
+    try {
+      const token = localStorage.getItem("jaj_token");
+      const res = await fetch(`/api/packages/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Gagal menghapus");
+      }
+      await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
+      await queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      toast({ title: "Paket dihapus", description: `Paket ${resiNumber} berhasil dihapus.` });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Gagal menghapus", description: e.message });
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function doScan(code: string) {
@@ -290,6 +320,31 @@ export default function OwnerPackages() {
                     {(pkg as any).usedWeight && <span>{(pkg as any).usedWeight} Kg</span>}
                   </div>
                   <span className="font-bold text-primary text-sm mt-1 block">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</span>
+                  <div className="mt-2">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 w-full" disabled={deletingId === pkg.id}>
+                          <Trash2 className="w-3.5 h-3.5" /> {deletingId === pkg.id ? "Menghapus..." : "Hapus"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-red-500" /> Hapus paket ini?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Data paket <span className="font-semibold">{pkg.resiNumber}</span> akan dihapus permanen dan tidak bisa dikembalikan.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Batal</AlertDialogCancel>
+                          <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => deletePackage(pkg.id, pkg.resiNumber || String(pkg.id))}>
+                            Ya, Hapus
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
               ))}
             </div>
@@ -302,8 +357,8 @@ export default function OwnerPackages() {
           <table className="w-full text-sm min-w-[1400px]">
             <thead>
               <tr className="border-b bg-muted/30">
-                {["Tanggal","No Resi","No Paket","Nama Konsumen","Jenis Jastip","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Jenis Paking","Berat Digunakan","Ongkir/Kg","Total Berat","Total Ongkir","Status"].map(h => (
-                  <th key={h} className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {["Tanggal","No Resi","No Paket","Nama Konsumen","Jenis Jastip","Berat Real (Kg)","P (cm)","L (cm)","T (cm)","Berat Volume","Jenis Paking","Berat Digunakan","Ongkir/Kg","Total Berat","Total Ongkir","Status",""].map((h, i) => (
+                  <th key={i} className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -332,10 +387,35 @@ export default function OwnerPackages() {
                     <td className="py-3 px-3 whitespace-nowrap text-right">{(pkg as any).totalWeight ?? "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap text-right font-semibold text-primary">{(pkg as any).totalShipping ? formatRp((pkg as any).totalShipping) : "-"}</td>
                     <td className="py-3 px-3 whitespace-nowrap"><StatusBadge status={pkg.status} /></td>
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50" disabled={deletingId === pkg.id}>
+                            <Trash2 className="w-3.5 h-3.5" /> {deletingId === pkg.id ? "..." : "Hapus"}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="flex items-center gap-2">
+                              <AlertTriangle className="w-5 h-5 text-red-500" /> Hapus paket ini?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Data paket <span className="font-semibold">{pkg.resiNumber}</span> akan dihapus permanen dan tidak bisa dikembalikan.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Batal</AlertDialogCancel>
+                            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => deletePackage(pkg.id, pkg.resiNumber || String(pkg.id))}>
+                              Ya, Hapus
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={16} className="h-32 text-center text-muted-foreground">Data paket tidak ditemukan.</td></tr>
+                <tr><td colSpan={17} className="h-32 text-center text-muted-foreground">Data paket tidak ditemukan.</td></tr>
               )}
             </tbody>
           </table>
