@@ -337,13 +337,7 @@ export default function BarcodeGroupDetail() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() =>
-            setLocation(
-              filterBatchId
-                ? `${base}/barcode/batch/${filterBatchId}`
-                : `${base}/barcode`,
-            )
-          }
+          onClick={() => setLocation(backToBatchUrl)}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>

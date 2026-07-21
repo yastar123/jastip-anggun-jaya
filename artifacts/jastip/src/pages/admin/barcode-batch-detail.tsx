@@ -611,6 +611,14 @@ export default function BarcodeBatchDetail({
     initialServiceTypeFromUrl,
   );
 
+  useEffect(() => {
+    const nextServiceType = batchQuery.get("serviceType") || null;
+    const nextSearch = batchQuery.get("search") || "";
+    setSelectedServiceType(nextServiceType);
+    setSearch(nextSearch);
+    setPage(1);
+  }, [location]);
+
   // ── Sinkronisasi ongkir Kargo ─────────────────────────────────────────────
   const KARGO_RATE = 7000;
   const [syncOpen, setSyncOpen] = useState(false);
