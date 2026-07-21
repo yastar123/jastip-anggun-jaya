@@ -160,13 +160,24 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
 
   // Filter groups
   const filteredGroups = allGroups.filter((g) => {
-    if (filterServiceType !== "all" && (g.serviceType || "").toLowerCase() !== filterServiceType) return false;
+    const q = searchGroup.trim().toLowerCase();
+    // When there's a search query, bypass service-type filter so all types are searched
+    if (!q && filterServiceType !== "all" && (g.serviceType || "").toLowerCase() !== filterServiceType) return false;
     if (filterVerified === "verified" && g.packages.some((p) => p.statusVerifikasi !== "SUDAH_DIVERIFIKASI")) {
       // keep only if ALL are verified
       if (!g.packages.every((p) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI")) return false;
     }
     if (filterVerified === "unverified" && g.packages.every((p) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI")) return false;
-    if (searchGroup && !g.customerName.toLowerCase().includes(searchGroup.toLowerCase())) return false;
+    if (q) {
+      const nameMatch = g.customerName.toLowerCase().includes(q);
+      const resiMatch = g.packages.some(
+        (p) =>
+          (p.resiNumber || "").toLowerCase().includes(q) ||
+          (p.barcode || "").toLowerCase().includes(q) ||
+          (p.packageNumber || "").toLowerCase().includes(q)
+      );
+      if (!nameMatch && !resiMatch) return false;
+    }
     return true;
   });
 
@@ -421,7 +432,7 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
             <div className="relative flex-1 min-w-[180px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Cari nama penerima..."
+                placeholder="Cari nama atau nomor resi..."
                 className="pl-9"
                 value={searchGroup}
                 onChange={(e) => { setSearchGroup(e.target.value); setGroupPage(1); }}
