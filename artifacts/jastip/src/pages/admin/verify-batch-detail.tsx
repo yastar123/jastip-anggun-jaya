@@ -309,7 +309,7 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Button variant="outline" size="icon" onClick={() => { changeGroup(); setLocation(`${base}/verify`); }}>
+        <Button variant="outline" size="icon" onClick={() => { if (selectedGroup) { changeGroup(); } else { setLocation(`${base}/verify`); } }}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
