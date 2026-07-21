@@ -276,7 +276,7 @@ function SingleBarcodeCard({
           variant="outline"
           className="w-full text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
           onClick={() => {
-            const params = new URLSearchParams({ name: pkg.customerName || "" });
+            const params = new URLSearchParams({ ids: String(pkg.id), name: pkg.customerName || "" });
             if (pkg.serviceType) params.set("serviceType", pkg.serviceType);
             if (pkg.batchId != null) params.set("batchId", String(pkg.batchId));
             setLocation(`${base}/barcode-group?${params.toString()}`);
