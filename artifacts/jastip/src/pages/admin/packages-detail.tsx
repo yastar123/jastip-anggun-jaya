@@ -249,7 +249,7 @@ export default function AdminPackagesDetail() {
       await queryClient.invalidateQueries({ queryKey: getListPackagesQueryKey() });
       await queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       toast({ title: "Paket dihapus" });
-      setLocation(-1 as any);
+      setLocation(`/admin/barcode/batch/${(pkg as any).batchId}`);
     } catch (e: any) {
       toast({ variant: "destructive", title: "Gagal menghapus", description: e.message });
       setDeleting(false);
@@ -263,7 +263,7 @@ export default function AdminPackagesDetail() {
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 print:hidden">
-        <Button variant="outline" size="icon" onClick={() => setLocation(-1 as any)}>
+        <Button variant="outline" size="icon" onClick={() => setLocation(`/admin/barcode/batch/${(pkg as any).batchId}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
