@@ -648,17 +648,26 @@ export default function AdminPackages() {
             <div className="space-y-1.5">
               <Label>Batch Pengiriman</Label>
               <Select value={pdfBatchId} onValueChange={(v) => { setPdfBatchId(v); setPdfJenis("all"); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih batch pengiriman" />
+                <SelectTrigger className="w-full overflow-hidden">
+                  <span className="truncate block text-left">
+                    {pdfBatchId
+                      ? (() => { const b = sortedBatches.find((b: any) => String(b.id) === pdfBatchId); return b ? `${b.namaKapal} · ${b.kotaAsal} → ${b.tujuan}` : "Pilih batch pengiriman"; })()
+                      : "Pilih batch pengiriman"}
+                  </span>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-[260px] overflow-y-auto max-w-[420px]">
                   {sortedBatches.length === 0 && (
                     <div className="px-3 py-2 text-xs text-muted-foreground">Belum ada batch pengiriman.</div>
                   )}
                   {sortedBatches.map((b: any) => (
-                    <SelectItem key={b.id} value={String(b.id)}>
-                      {b.namaKapal} · {b.kotaAsal} → {b.tujuan}
-                      {b.statusBatch === "OPEN" ? " (Aktif)" : b.statusBatch === "CLOSED" ? " (Ditutup)" : " (Arsip)"}
+                    <SelectItem key={b.id} value={String(b.id)} className="flex-col items-start">
+                      <div className="flex flex-col w-full">
+                        <span className="font-medium text-sm truncate max-w-[360px]">{b.namaKapal}</span>
+                        <span className="text-xs text-muted-foreground truncate max-w-[360px]">
+                          {b.kotaAsal} → {b.tujuan}
+                          {b.statusBatch === "OPEN" ? " · Aktif" : b.statusBatch === "CLOSED" ? " · Ditutup" : " · Arsip"}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
