@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 import { useGetPackage, getListPackagesQueryKey, getGetPackageQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,6 +171,8 @@ export default function AdminPackagesDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isOwner = user?.role === "owner";
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -277,33 +280,35 @@ export default function AdminPackagesDetail() {
                 <Pencil className="w-4 h-4" /> Edit
               </Button>
             )}
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="gap-2 border-red-300 text-red-600 hover:bg-red-50">
-                  <Trash2 className="w-4 h-4" /> Hapus
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-500" /> Hapus paket ini?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Data paket <span className="font-semibold">{(pkg as any).resiNumber}</span> akan dihapus permanen dan tidak bisa dikembalikan.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Batal</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-red-600 hover:bg-red-700"
-                    onClick={deletePackage}
-                    disabled={deleting}
-                  >
-                    {deleting ? "Menghapus..." : "Ya, Hapus"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {isOwner && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="gap-2 border-red-300 text-red-600 hover:bg-red-50">
+                    <Trash2 className="w-4 h-4" /> Hapus
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-red-500" /> Hapus paket ini?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Data paket <span className="font-semibold">{(pkg as any).resiNumber}</span> akan dihapus permanen dan tidak bisa dikembalikan.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-red-600 hover:bg-red-700"
+                      onClick={deletePackage}
+                      disabled={deleting}
+                    >
+                      {deleting ? "Menghapus..." : "Ya, Hapus"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         ) : (
           <div className="flex gap-2">
