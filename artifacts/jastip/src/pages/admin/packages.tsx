@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Pagination } from "@/components/pagination";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { Search, FileDown, X, Filter } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -20,7 +21,7 @@ import autoTable from "jspdf-autotable";
 const PAGE_SIZE = 10;
 
 const JENIS_JASTIP = [
-  "Jastip Cargo",
+  "Jastip Kargo",
   "Jastip Hemat+",
   "Jastip Pelni",
   "Jastip Pesawat",
@@ -45,7 +46,7 @@ function formatDate(d: string | null | undefined) {
 function serviceTypeLabel(t: string | null | undefined) {
   if (!t) return "-";
   const map: Record<string, string> = {
-    "jastip cargo": "Jastip Cargo",
+    "jastip kargo": "Jastip Kargo",
     "jastip hemat+": "Jastip Hemat+",
     "jastip pelni": "Jastip Pelni",
     "jastip pesawat": "Jastip Pesawat",
@@ -68,6 +69,7 @@ export default function AdminPackages() {
   const [filterDateTo, setFilterDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfBatchId, setPdfBatchId] = useState<string>("");
@@ -162,7 +164,7 @@ export default function AdminPackages() {
 
   function exportPdfKargo() {
     const filtered = getFilteredPackages();
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) { toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket yang cocok dengan filter yang dipilih." }); return; }
 
     filtered.sort((a: any, b: any) =>
       (a.customerName || "").localeCompare(b.customerName || "", "id")
@@ -241,7 +243,7 @@ export default function AdminPackages() {
 
   function exportPdfGrouped() {
     const filtered = getFilteredPackages();
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) { toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket yang cocok dengan filter yang dipilih." }); return; }
 
     filtered.sort((a: any, b: any) =>
       (a.customerName || "").localeCompare(b.customerName || "", "id")
@@ -392,7 +394,7 @@ export default function AdminPackages() {
 
   function exportPdfFlat() {
     const filtered = getFilteredPackages();
-    if (filtered.length === 0) return;
+    if (filtered.length === 0) { toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket yang cocok dengan filter yang dipilih." }); return; }
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const judul = pdfJenis !== "all" ? pdfJenis : "Semua Jenis Jastip";
