@@ -782,7 +782,7 @@ export default function AdminPackagesImport() {
                           <SelectTrigger>
                             <SelectValue placeholder="Pilih batch pengiriman" />
                           </SelectTrigger>
-                          <SelectContent className="max-w-[350px]">
+                          <SelectContent className="max-w-[350px] max-h-[280px] overflow-y-auto">
                             {openBatches.map((b: any) => (
                               <SelectItem key={b.id} value={String(b.id)} className="flex-col items-start py-3">
                                 <div className="flex flex-col w-full">

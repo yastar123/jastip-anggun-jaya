@@ -879,7 +879,7 @@ export default function AdminPackagesNew() {
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih batch pengiriman..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[280px] overflow-y-auto">
                         {openBatches.map((b: any) => (
                           <SelectItem key={b.id} value={String(b.id)}>
                             {b.label}
