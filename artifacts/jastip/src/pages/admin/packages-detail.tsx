@@ -263,7 +263,7 @@ export default function AdminPackagesDetail() {
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 print:hidden">
-        <Button variant="outline" size="icon" onClick={() => setLocation(`/admin/barcode/batch/${(pkg as any).batchId}`)}>
+        <Button variant="outline" size="icon" onClick={() => setLocation("/admin/packages")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
