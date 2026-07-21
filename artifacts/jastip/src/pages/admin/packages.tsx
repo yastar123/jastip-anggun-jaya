@@ -190,7 +190,7 @@ export default function AdminPackages() {
 
     const head = [[
       "No", "Nama Konsumen", "Tgl Masuk", "No Resi / Kurir",
-      "No Paket", "Jenis Barang", "Ukuran (cm)",
+      "Total Koli", "Koli", "Jenis Barang", "Ukuran (cm)",
       "Pakai (M³)", "Ongkir Paket", "Status",
     ]];
 
@@ -200,6 +200,7 @@ export default function AdminPackages() {
       formatDate(p.packageDate || p.createdAt),
       p.resiNumber || "-",
       p.packageNumber || "-",
+      p.packagingType || "-",
       p.itemName || "-",
       (p.length && p.width && p.height) ? `${p.length}×${p.width}×${p.height}` : "-",
       p.usedWeight != null ? Number(p.usedWeight).toFixed(4) : "-",
@@ -216,15 +217,16 @@ export default function AdminPackages() {
       alternateRowStyles: { fillColor: [255, 247, 237] },
       columnStyles: {
         0:  { cellWidth: 8,  halign: "center" },
-        1:  { cellWidth: 30 },
-        2:  { cellWidth: 18 },
-        3:  { cellWidth: 30 },
-        4:  { cellWidth: 18 },
-        5:  { cellWidth: 30 },
-        6:  { cellWidth: 22, halign: "center" },
-        7:  { cellWidth: 18, halign: "right" },
-        8:  { cellWidth: 25, halign: "right" },
-        9:  { cellWidth: 18, halign: "center" },
+        1:  { cellWidth: 28 },
+        2:  { cellWidth: 16 },
+        3:  { cellWidth: 28 },
+        4:  { cellWidth: 14, halign: "center" },
+        5:  { cellWidth: 20 },
+        6:  { cellWidth: 25 },
+        7:  { cellWidth: 20, halign: "center" },
+        8:  { cellWidth: 16, halign: "right" },
+        9:  { cellWidth: 23, halign: "right" },
+        10: { cellWidth: 16, halign: "center" },
       },
       margin: { left: margin, right: margin },
     });
