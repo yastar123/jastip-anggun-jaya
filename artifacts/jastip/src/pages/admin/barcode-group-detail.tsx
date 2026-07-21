@@ -219,7 +219,7 @@ export default function BarcodeGroupDetail() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => setLocation(`${base}/barcode`)}>
+        <Button variant="outline" size="icon" onClick={() => setLocation(filterBatchId ? `${base}/barcode/batch/${filterBatchId}` : `${base}/barcode`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -247,7 +247,7 @@ export default function BarcodeGroupDetail() {
           <QrCode className="w-12 h-12 mx-auto mb-3 opacity-20" />
           <p className="font-medium">Tidak ada paket ditemukan</p>
           <p className="text-sm mt-1">Nama "{groupName}" tidak memiliki paket terdaftar</p>
-          <Button className="mt-4" onClick={() => setLocation(`${base}/barcode`)}>Kembali ke Barcode</Button>
+          <Button className="mt-4" onClick={() => setLocation(filterBatchId ? `${base}/barcode/batch/${filterBatchId}` : `${base}/barcode`)}>Kembali ke Barcode</Button>
         </div>
       ) : (
         <div className="space-y-3">
