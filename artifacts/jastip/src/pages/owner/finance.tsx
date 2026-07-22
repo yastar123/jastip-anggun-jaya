@@ -307,12 +307,6 @@ export default function OwnerFinance() {
       const ids: number[] = p.packageIds ?? [];
       const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
 
-      // Total shipping for ALL packages in this payment (used as denominator)
-      const allShipping = ids.reduce(
-        (s, id) => s + Number(pkgMap.get(id)?.totalShipping || 0),
-        0,
-      );
-
       // Shipping per service type, only for packages matching active filters
       const svcShipping: Record<string, number> = {};
       ids.forEach((id) => {
@@ -327,9 +321,16 @@ export default function OwnerFinance() {
           (svcShipping[pkg.serviceType] || 0) + ship;
       });
 
+      // Match the card: allocate the full payment across packages in scope.
+      const relevantShipping = Object.values(svcShipping).reduce(
+        (sum, shipping) => sum + shipping,
+        0,
+      );
+
       // Attribute a proportional share of the payment to each service type
       Object.entries(svcShipping).forEach(([svc, ship]) => {
-        const portion = allShipping > 0 ? (ship / allShipping) * totalPaid : 0;
+        const portion =
+          relevantShipping > 0 ? (ship / relevantShipping) * totalPaid : 0;
         map[svc] = (map[svc] || 0) + portion;
       });
     });
