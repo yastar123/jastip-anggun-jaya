@@ -310,7 +310,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
   const kpi = useMemo(() => {
     const dibayar = filteredPayments
       .filter(p => p.paymentType !== "piutang")
-      .reduce((s, p) => s + Number(p.totalAmount ?? 0), 0);
+      .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0);
     const belumDibayar = filteredPackages
       .filter((p: any) => !(p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"))
       .reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
