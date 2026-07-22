@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useListPackages, useListBatches } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Download, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
@@ -21,43 +27,65 @@ function isoDateOf(d: string | null | undefined) {
 }
 function formatDateLabel(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("id-ID", {
-    day: "numeric", month: "long", year: "numeric",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const SERVICE_SLUG: Record<string, string> = {
   "jastip pesawat": "pesawat",
-  "jastip hemat+":  "hemat",
-  "jastip kargo":   "kargo",
-  "jastip pelni":   "pelni",
+  "jastip hemat+": "hemat",
+  "jastip kargo": "kargo",
+  "jastip pelni": "pelni",
 };
 
 const SERVICE_LABELS: Record<string, string> = {
   "jastip pesawat": "Pesawat",
-  "jastip hemat+":  "Hemat+",
-  "jastip kargo":   "Kargo",
-  "jastip pelni":   "Pelni",
+  "jastip hemat+": "Hemat+",
+  "jastip kargo": "Kargo",
+  "jastip pelni": "Pelni",
 };
 
 // ─── KPI Card (solid colored background) ─────────────────────────────────────
 
 function KpiCard({
-  title, subtitle, value, sub, bg, onClick,
+  title,
+  subtitle,
+  value,
+  sub,
+  bg,
+  onClick,
 }: {
-  title: string; subtitle?: string; value: string; sub: string;
-  bg: string; onClick?: () => void;
+  title: string;
+  subtitle?: string;
+  value: string;
+  sub: string;
+  bg: string;
+  onClick?: () => void;
 }) {
   return (
     <div
       className={`rounded-xl px-5 py-4 cursor-pointer select-none transition-opacity hover:opacity-90 ${bg}`}
       onClick={onClick}
     >
-      <p className="text-[11px] font-bold uppercase tracking-widest opacity-80 leading-tight">{title}</p>
-      {subtitle && <p className="text-[10px] opacity-60 leading-tight mt-0.5">{subtitle}</p>}
-      <p className="text-2xl font-black tracking-tight leading-none mt-2">{value}</p>
+      <p className="text-[11px] font-bold uppercase tracking-widest opacity-80 leading-tight">
+        {title}
+      </p>
+      {subtitle && (
+        <p className="text-[10px] opacity-60 leading-tight mt-0.5">
+          {subtitle}
+        </p>
+      )}
+      <p className="text-2xl font-black tracking-tight leading-none mt-2">
+        {value}
+      </p>
       <p className="text-xs opacity-70 mt-1">{sub}</p>
     </div>
   );
@@ -66,16 +94,24 @@ function KpiCard({
 // ─── Method Card ──────────────────────────────────────────────────────────────
 
 function MethodCard({
-  label, amount, count, onClick,
+  label,
+  amount,
+  count,
+  onClick,
 }: {
-  label: string; amount: number; count: number; onClick?: () => void;
+  label: string;
+  amount: number;
+  count: number;
+  onClick?: () => void;
 }) {
   return (
     <div
       className="bg-white border rounded-xl px-5 py-4 cursor-pointer hover:shadow-sm transition-shadow"
       onClick={onClick}
     >
-      <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{label}</p>
+      <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+        {label}
+      </p>
       <p className="text-xl font-black">{formatRp(amount)}</p>
       <p className="text-xs text-muted-foreground mt-1">{count} transaksi</p>
     </div>
@@ -88,48 +124,54 @@ export default function OwnerFinance() {
   const [, setLocation] = useLocation();
 
   // ── Filters ──────────────────────────────────────────────────────────────
-  const [dateFrom,      setDateFrom]      = useState(todayIso());
-  const [dateTo,        setDateTo]        = useState(todayIso());
-  const [adminFilter,   setAdminFilter]   = useState("all");
-  const [batchFilter,   setBatchFilter]   = useState("all");
-  const [metodeFilter,  setMetodeFilter]  = useState("all");
+  const [dateFrom, setDateFrom] = useState(todayIso());
+  const [dateTo, setDateTo] = useState(todayIso());
+  const [adminFilter, setAdminFilter] = useState("all");
+  const [batchFilter, setBatchFilter] = useState("all");
+  const [metodeFilter, setMetodeFilter] = useState("all");
   const [layananFilter, setLayananFilter] = useState("all");
 
   // ── Raw data ─────────────────────────────────────────────────────────────
   const { data: packages, isLoading: pkgLoading } = useListPackages();
   const { data: batches } = useListBatches();
-  const [payments,    setPayments]    = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [pengeluaran, setPengeluaran] = useState<any[]>([]);
-  const [loadingPay,  setLoadingPay]  = useState(true);
+  const [loadingPay, setLoadingPay] = useState(true);
 
   // UI state
   const [showTrxDetail, setShowTrxDetail] = useState(false);
-  const [activeMethod,  setActiveMethod]  = useState<string | null>(null);
+  const [activeMethod, setActiveMethod] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("jaj_token");
     const headers = { Authorization: `Bearer ${token}` };
     Promise.all([
-      fetch("/api/payments",    { headers }).then(r => r.ok ? r.json() : []),
-      fetch("/api/pengeluaran", { headers }).then(r => r.ok ? r.json() : []),
-    ]).then(([pay, pen]) => {
-      setPayments(pay);
-      setPengeluaran(pen);
-      setLoadingPay(false);
-    }).catch(() => setLoadingPay(false));
+      fetch("/api/payments", { headers }).then((r) => (r.ok ? r.json() : [])),
+      fetch("/api/pengeluaran", { headers }).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+    ])
+      .then(([pay, pen]) => {
+        setPayments(pay);
+        setPengeluaran(pen);
+        setLoadingPay(false);
+      })
+      .catch(() => setLoadingPay(false));
   }, []);
 
   // ── Derived: unique admin list from payments ──────────────────────────────
   const adminList = useMemo(() => {
     const names = new Set<string>();
-    payments.forEach(p => { if (p.adminName) names.add(p.adminName); });
+    payments.forEach((p) => {
+      if (p.adminName) names.add(p.adminName);
+    });
     return [...names].sort();
   }, [payments]);
 
   // ── Package map: id → pkg ─────────────────────────────────────────────────
   const pkgMap = useMemo(() => {
     const m = new Map<number, any>();
-    (packages || []).forEach(p => m.set(p.id, p));
+    (packages || []).forEach((p) => m.set(p.id, p));
     return m;
   }, [packages]);
 
@@ -137,31 +179,43 @@ export default function OwnerFinance() {
   function paymentInBatch(p: any, batchId: string) {
     if (batchId === "all") return true;
     const ids: number[] = p.packageIds || [];
-    return ids.some(id => String(pkgMap.get(id)?.batchId) === batchId);
+    return ids.some((id) => String(pkgMap.get(id)?.batchId) === batchId);
   }
 
   // ── Filtered payments ─────────────────────────────────────────────────────
   const filteredPayments = useMemo(() => {
-    return payments.filter(p => {
+    return payments.filter((p) => {
       const d = isoDateOf(p.createdAt);
       if (dateFrom && d < dateFrom) return false;
-      if (dateTo   && d > dateTo)   return false;
-      if (adminFilter  !== "all" && p.adminName !== adminFilter) return false;
-      if (metodeFilter !== "all" && p.paymentType !== metodeFilter) return false;
-      if (batchFilter  !== "all" && !paymentInBatch(p, batchFilter)) return false;
+      if (dateTo && d > dateTo) return false;
+      if (adminFilter !== "all" && p.adminName !== adminFilter) return false;
+      if (metodeFilter !== "all" && p.paymentType !== metodeFilter)
+        return false;
+      if (batchFilter !== "all" && !paymentInBatch(p, batchFilter))
+        return false;
       if (layananFilter !== "all") {
         const ids: number[] = p.packageIds || [];
-        if (!ids.some(id => pkgMap.get(id)?.serviceType === layananFilter)) return false;
+        if (!ids.some((id) => pkgMap.get(id)?.serviceType === layananFilter))
+          return false;
       }
       return true;
     });
-  }, [payments, dateFrom, dateTo, adminFilter, batchFilter, metodeFilter, layananFilter, pkgMap]);
+  }, [
+    payments,
+    dateFrom,
+    dateTo,
+    adminFilter,
+    batchFilter,
+    metodeFilter,
+    layananFilter,
+    pkgMap,
+  ]);
 
   // ── Filtered pengeluaran ──────────────────────────────────────────────────
   const filteredPengeluaran = useMemo(() => {
-    return pengeluaran.filter(e => {
+    return pengeluaran.filter((e) => {
       if (dateFrom && e.tanggal < dateFrom) return false;
-      if (dateTo   && e.tanggal > dateTo)   return false;
+      if (dateTo && e.tanggal > dateTo) return false;
       return true;
     });
   }, [pengeluaran, dateFrom, dateTo]);
@@ -170,106 +224,139 @@ export default function OwnerFinance() {
   const filteredPackages = useMemo(() => {
     return (packages || []).filter((p: any) => {
       const d = isoDateOf(p.packageDate || p.createdAt);
-      if (dateFrom      && d < dateFrom) return false;
-      if (dateTo        && d > dateTo)   return false;
-      if (layananFilter !== "all" && p.serviceType !== layananFilter) return false;
-      if (batchFilter   !== "all" && String(p.batchId) !== batchFilter) return false;
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+      if (layananFilter !== "all" && p.serviceType !== layananFilter)
+        return false;
+      if (batchFilter !== "all" && String(p.batchId) !== batchFilter)
+        return false;
       return true;
     });
   }, [packages, dateFrom, dateTo, layananFilter, batchFilter]);
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
-    const nonPiutang = filteredPayments.filter(p => p.paymentType !== "piutang");
-    const pembayaranDiterima = nonPiutang.reduce((s, p) =>
-      s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0);
+    const nonPiutang = filteredPayments.filter(
+      (p) => p.paymentType !== "piutang",
+    );
+    const pembayaranDiterima = nonPiutang.reduce(
+      (s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0),
+      0,
+    );
 
-    const totalPengeluaran = filteredPengeluaran.reduce((s, e) =>
-      s + Number(e.nominal ?? 0), 0);
+    const totalPengeluaran = filteredPengeluaran.reduce(
+      (s, e) => s + Number(e.nominal ?? 0),
+      0,
+    );
 
     const arusKas = pembayaranDiterima - totalPengeluaran;
 
     // Piutang terbuka: all-time, but respect admin/layanan/batch filters
-    const piutangPayments = payments.filter(p => {
+    const piutangPayments = payments.filter((p) => {
       if (p.paymentType !== "piutang") return false;
-      if (adminFilter  !== "all" && p.adminName !== adminFilter) return false;
-      if (batchFilter  !== "all" && !paymentInBatch(p, batchFilter)) return false;
+      if (adminFilter !== "all" && p.adminName !== adminFilter) return false;
+      if (batchFilter !== "all" && !paymentInBatch(p, batchFilter))
+        return false;
       if (layananFilter !== "all") {
         const ids: number[] = p.packageIds || [];
-        if (!ids.some(id => pkgMap.get(id)?.serviceType === layananFilter)) return false;
+        if (!ids.some((id) => pkgMap.get(id)?.serviceType === layananFilter))
+          return false;
       }
       return true;
     });
-    const piutangTerbuka = piutangPayments.reduce((s, p) =>
-      s + Number(p.totalAmount ?? 0), 0);
+    const piutangTerbuka = piutangPayments.reduce(
+      (s, p) => s + Number(p.totalAmount ?? 0),
+      0,
+    );
 
     return { pembayaranDiterima, totalPengeluaran, arusKas, piutangTerbuka };
-  }, [filteredPayments, filteredPengeluaran, payments, adminFilter, batchFilter, layananFilter, pkgMap]);
+  }, [
+    filteredPayments,
+    filteredPengeluaran,
+    payments,
+    adminFilter,
+    batchFilter,
+    layananFilter,
+    pkgMap,
+  ]);
 
   // ── Method breakdown ──────────────────────────────────────────────────────
   const byMethod = useMemo(() => {
     const m: Record<string, { amount: number; count: number }> = {
-      tunai:    { amount: 0, count: 0 },
+      tunai: { amount: 0, count: 0 },
       transfer: { amount: 0, count: 0 },
-      piutang:  { amount: 0, count: 0 },
+      piutang: { amount: 0, count: 0 },
     };
-    filteredPayments.forEach(p => {
+    filteredPayments.forEach((p) => {
       const key = p.paymentType as string;
       if (!m[key]) m[key] = { amount: 0, count: 0 };
       m[key].amount += Number(p.paidAmount ?? p.totalAmount ?? 0);
-      m[key].count  += 1;
+      m[key].count += 1;
     });
     return m;
   }, [filteredPayments]);
 
-  // ── All-time total paid by service (ignores date filter) ──
+  // ── Total paid by service (uses the same received payments as the KPI) ──
   // Distributes each payment's amount proportionally across service types
   // by totalShipping, so cross-service-type payments don't double-count.
-  const allTimePaidByService = useMemo(() => {
+  const paidByService = useMemo(() => {
     const map: Record<string, number> = {};
-    (payments as any[]).forEach(p => {
-      if (batchFilter !== "all" && !paymentInBatch(p, batchFilter)) return;
-      if (adminFilter !== "all" && p.adminName !== adminFilter) return;
+    filteredPayments
+      .filter((p) => p.paymentType !== "piutang")
+      .forEach((p) => {
+        const ids: number[] = p.packageIds ?? [];
+        const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
 
-      const ids: number[] = p.packageIds ?? [];
-      const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
+        // Total shipping for ALL packages in this payment (used as denominator)
+        const allShipping = ids.reduce(
+          (s, id) => s + Number(pkgMap.get(id)?.totalShipping || 0),
+          0,
+        );
 
-      // Total shipping for ALL packages in this payment (used as denominator)
-      const allShipping = ids.reduce((s, id) =>
-        s + Number(pkgMap.get(id)?.totalShipping || 0), 0);
+        // Shipping per service type, only for packages matching active filters
+        const svcShipping: Record<string, number> = {};
+        ids.forEach((id) => {
+          const pkg = pkgMap.get(id);
+          if (!pkg?.serviceType) return;
+          if (batchFilter !== "all" && String(pkg.batchId) !== batchFilter)
+            return;
+          if (layananFilter !== "all" && pkg.serviceType !== layananFilter)
+            return;
+          const ship = Number(pkg.totalShipping || 0);
+          svcShipping[pkg.serviceType] =
+            (svcShipping[pkg.serviceType] || 0) + ship;
+        });
 
-      // Shipping per service type, only for packages matching active filters
-      const svcShipping: Record<string, number> = {};
-      ids.forEach(id => {
-        const pkg = pkgMap.get(id);
-        if (!pkg?.serviceType) return;
-        if (batchFilter !== "all" && String(pkg.batchId) !== batchFilter) return;
-        if (layananFilter !== "all" && pkg.serviceType !== layananFilter) return;
-        const ship = Number(pkg.totalShipping || 0);
-        svcShipping[pkg.serviceType] = (svcShipping[pkg.serviceType] || 0) + ship;
+        // Attribute a proportional share of the payment to each service type
+        Object.entries(svcShipping).forEach(([svc, ship]) => {
+          const portion =
+            allShipping > 0 ? (ship / allShipping) * totalPaid : 0;
+          map[svc] = (map[svc] || 0) + portion;
+        });
       });
-
-      // Attribute a proportional share of the payment to each service type
-      Object.entries(svcShipping).forEach(([svc, ship]) => {
-        const portion = allShipping > 0 ? (ship / allShipping) * totalPaid : 0;
-        map[svc] = (map[svc] || 0) + portion;
-      });
-    });
     return map;
-  }, [payments, pkgMap, layananFilter, batchFilter, adminFilter]);
+  }, [filteredPayments, pkgMap, layananFilter, batchFilter]);
 
   // ── Service table ─────────────────────────────────────────────────────────
   const serviceRows = useMemo(() => {
-    const svcMap: Record<string, {
-      sisa: number; diserahkan: number; totalPkg: number;
-    }> = {};
+    const svcMap: Record<
+      string,
+      {
+        sisa: number;
+        diserahkan: number;
+        totalPkg: number;
+      }
+    > = {};
 
     filteredPackages.forEach((p: any) => {
       const svc = p.serviceType || "lainnya";
       if (!svcMap[svc]) svcMap[svc] = { sisa: 0, diserahkan: 0, totalPkg: 0 };
       const ship = Number(p.totalShipping || 0);
       svcMap[svc].totalPkg += 1;
-      if (p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") {
+      if (
+        p.statusPengambilan === "SUDAH_DIAMBIL" ||
+        p.status === "diserahkan"
+      ) {
         svcMap[svc].diserahkan += 1;
       } else {
         svcMap[svc].sisa += ship;
@@ -278,7 +365,7 @@ export default function OwnerFinance() {
 
     return Object.entries(svcMap)
       .map(([svc, d]) => {
-        const totalPaid = allTimePaidByService[svc] || 0;
+        const totalPaid = paidByService[svc] || 0;
         return {
           svc,
           label: SERVICE_LABELS[svc] || svc,
@@ -288,66 +375,100 @@ export default function OwnerFinance() {
         };
       })
       .sort((a, b) => b.tagihan - a.tagihan);
-  }, [filteredPackages, allTimePaidByService]);
+  }, [filteredPackages, paidByService]);
 
   // ── Transactions for detail panel ─────────────────────────────────────────
   const detailTrx = useMemo(() => {
     return [...filteredPayments]
-      .filter(p => activeMethod === null || p.paymentType === activeMethod)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      .filter((p) => activeMethod === null || p.paymentType === activeMethod)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
   }, [filteredPayments, activeMethod]);
 
   // ── Export Excel ──────────────────────────────────────────────────────────
   function exportExcel() {
     const wb = XLSX.utils.book_new();
-    const rangeStr = !dateFrom && !dateTo ? "Semua" : `${dateFrom || "—"} s/d ${dateTo || "—"}`;
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ["Laporan Keuangan Jastip Anggun Jaya"],
-      ["Periode", rangeStr],
-      ["Admin",   adminFilter === "all" ? "Semua" : adminFilter],
-      ["Layanan", layananFilter === "all" ? "Semua" : (SERVICE_LABELS[layananFilter] || layananFilter)],
-      [],
-      ["PEMBAYARAN DITERIMA", kpi.pembayaranDiterima],
-      ["PENGELUARAN",         kpi.totalPengeluaran],
-      ["ARUS KAS BERSIH",     kpi.arusKas],
-      ["PIUTANG TERBUKA",     kpi.piutangTerbuka],
-    ]), "Ringkasan");
+    const rangeStr =
+      !dateFrom && !dateTo
+        ? "Semua"
+        : `${dateFrom || "—"} s/d ${dateTo || "—"}`;
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.aoa_to_sheet([
+        ["Laporan Keuangan Jastip Anggun Jaya"],
+        ["Periode", rangeStr],
+        ["Admin", adminFilter === "all" ? "Semua" : adminFilter],
+        [
+          "Layanan",
+          layananFilter === "all"
+            ? "Semua"
+            : SERVICE_LABELS[layananFilter] || layananFilter,
+        ],
+        [],
+        ["PEMBAYARAN DITERIMA", kpi.pembayaranDiterima],
+        ["PENGELUARAN", kpi.totalPengeluaran],
+        ["ARUS KAS BERSIH", kpi.arusKas],
+        ["PIUTANG TERBUKA", kpi.piutangTerbuka],
+      ]),
+      "Ringkasan",
+    );
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(serviceRows.map(r => ({
-      Layanan: r.label,
-      "Tagihan (Rp)":        r.tagihan,
-      "Total yang sudah dibayar (Rp)": r.totalPaid,
-      "Sisa Tagihan (Rp)":   r.sisa,
-      "Paket Diserahkan":    r.diserahkan,
-      "Total Paket":         r.totalPkg,
-    }))), "Per Jenis Jastip");
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        serviceRows.map((r) => ({
+          Layanan: r.label,
+          "Tagihan (Rp)": r.tagihan,
+          "Total yang sudah dibayar (Rp)": r.totalPaid,
+          "Sisa Tagihan (Rp)": r.sisa,
+          "Paket Diserahkan": r.diserahkan,
+          "Total Paket": r.totalPkg,
+        })),
+      ),
+      "Per Jenis Jastip",
+    );
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredPayments.map(p => ({
-      Waktu:               formatTime(p.createdAt),
-      Admin:               p.adminName || "-",
-      Metode:              p.paymentType,
-      "Total Tagihan (Rp)": Number(p.totalAmount  || 0),
-      "Dibayar (Rp)":      Number(p.paidAmount    || p.totalAmount || 0),
-      Keterangan:          p.notes || "",
-    }))), "Transaksi");
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        filteredPayments.map((p) => ({
+          Waktu: formatTime(p.createdAt),
+          Admin: p.adminName || "-",
+          Metode: p.paymentType,
+          "Total Tagihan (Rp)": Number(p.totalAmount || 0),
+          "Dibayar (Rp)": Number(p.paidAmount || p.totalAmount || 0),
+          Keterangan: p.notes || "",
+        })),
+      ),
+      "Transaksi",
+    );
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredPengeluaran.map(e => ({
-      Tanggal:           e.tanggal,
-      Kategori:          e.kategori,
-      "Nominal (Rp)":    Number(e.nominal || 0),
-      Metode:            e.metodePembayaran,
-      Keterangan:        e.keterangan || "",
-    }))), "Pengeluaran");
+    XLSX.utils.book_append_sheet(
+      wb,
+      XLSX.utils.json_to_sheet(
+        filteredPengeluaran.map((e) => ({
+          Tanggal: e.tanggal,
+          Kategori: e.kategori,
+          "Nominal (Rp)": Number(e.nominal || 0),
+          Metode: e.metodePembayaran,
+          Keterangan: e.keterangan || "",
+        })),
+      ),
+      "Pengeluaran",
+    );
 
     XLSX.writeFile(wb, `keuangan-${dateFrom || "all"}_${dateTo || "all"}.xlsx`);
   }
 
   const isLoading = pkgLoading || loadingPay;
-  const dateLabel = !dateFrom && !dateTo
-    ? "Semua tanggal"
-    : dateFrom === dateTo
-    ? formatDateLabel(dateFrom)
-    : `${dateFrom} — ${dateTo}`;
+  const dateLabel =
+    !dateFrom && !dateTo
+      ? "Semua tanggal"
+      : dateFrom === dateTo
+        ? formatDateLabel(dateFrom)
+        : `${dateFrom} — ${dateTo}`;
 
   // Batches that have at least one payment — same logic as riwayat-pembayaran
   const batchList = useMemo(() => {
@@ -362,23 +483,31 @@ export default function OwnerFinance() {
     }
     return [...(batches || [])]
       .filter((b: any) => activeBatchIds.has(b.id))
-      .sort((a: any, b: any) =>
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime(),
       );
   }, [batches, payments, pkgMap]);
 
   return (
     <div className="space-y-5">
-
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Laporan Keuangan</h1>
+          <h1 className="text-2xl font-black tracking-tight">
+            Laporan Keuangan
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Seluruh penerimaan, pengeluaran, piutang, dan status closing
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportExcel} className="gap-2 self-start">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportExcel}
+          className="gap-2 self-start"
+        >
           <Download className="w-4 h-4" /> Export Excel
         </Button>
       </div>
@@ -387,25 +516,32 @@ export default function OwnerFinance() {
       <div className="flex flex-wrap gap-x-4 gap-y-2 items-center border-b pb-3">
         {/* Date range */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Dari</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Dari
+          </span>
           <input
             type="date"
             className="text-sm font-medium border rounded-md px-2 py-1 bg-background h-8 focus:outline-none focus:ring-2 focus:ring-primary/30"
             value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
+            onChange={(e) => setDateFrom(e.target.value)}
           />
           <span className="text-xs text-muted-foreground">s/d</span>
           <input
             type="date"
             className="text-sm font-medium border rounded-md px-2 py-1 bg-background h-8 focus:outline-none focus:ring-2 focus:ring-primary/30"
             value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
+            onChange={(e) => setDateTo(e.target.value)}
           />
           {(dateFrom || dateTo) && (
             <button
               className="text-xs text-primary hover:underline"
-              onClick={() => { setDateFrom(""); setDateTo(""); }}
-            >Semua</button>
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+            >
+              Semua
+            </button>
           )}
         </div>
 
@@ -413,19 +549,29 @@ export default function OwnerFinance() {
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Admin</span>
           <Select value={adminFilter} onValueChange={setAdminFilter}>
-            <SelectTrigger className="h-8 text-sm w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua</SelectItem>
-              {adminList.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+              {adminList.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {k}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
         {/* Batch Pengiriman */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Batch Pengiriman</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Batch Pengiriman
+          </span>
           <Select value={batchFilter} onValueChange={setBatchFilter}>
-            <SelectTrigger className="h-8 text-sm w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua</SelectItem>
               {batchList.map((b: any) => (
@@ -441,7 +587,9 @@ export default function OwnerFinance() {
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Metode</span>
           <Select value={metodeFilter} onValueChange={setMetodeFilter}>
-            <SelectTrigger className="h-8 text-sm w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua</SelectItem>
               <SelectItem value="tunai">Tunai</SelectItem>
@@ -453,9 +601,13 @@ export default function OwnerFinance() {
 
         {/* Jenis Jastip */}
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Jenis Jastip</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Jenis Jastip
+          </span>
           <Select value={layananFilter} onValueChange={setLayananFilter}>
-            <SelectTrigger className="h-8 text-sm w-[120px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua</SelectItem>
               <SelectItem value="jastip pesawat">Pesawat</SelectItem>
@@ -470,7 +622,9 @@ export default function OwnerFinance() {
       {isLoading ? (
         <div className="animate-pulse space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 bg-muted rounded-xl" />)}
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-muted rounded-xl" />
+            ))}
           </div>
         </div>
       ) : (
@@ -481,9 +635,12 @@ export default function OwnerFinance() {
               title="Pembayaran Diterima"
               subtitle="uang benar-benar diterima"
               value={formatRp(kpi.pembayaranDiterima)}
-              sub={`${filteredPayments.filter(p => p.paymentType !== "piutang").length} transaksi`}
+              sub={`${filteredPayments.filter((p) => p.paymentType !== "piutang").length} transaksi`}
               bg="bg-emerald-500 text-white"
-              onClick={() => { setActiveMethod(null); setShowTrxDetail(true); }}
+              onClick={() => {
+                setActiveMethod(null);
+                setShowTrxDetail(true);
+              }}
             />
             <KpiCard
               title="Pengeluaran"
@@ -498,15 +655,23 @@ export default function OwnerFinance() {
               subtitle="penerimaan − pengeluaran − refund"
               value={formatRp(kpi.arusKas)}
               sub={kpi.arusKas >= 0 ? "positif" : "defisit"}
-              bg={kpi.arusKas >= 0 ? "bg-blue-500 text-white" : "bg-red-500 text-white"}
+              bg={
+                kpi.arusKas >= 0
+                  ? "bg-blue-500 text-white"
+                  : "bg-red-500 text-white"
+              }
             />
             <KpiCard
               title="Piutang Terbuka"
               subtitle="belum lunas/sebagian"
               value={formatRp(kpi.piutangTerbuka)}
-              sub={`${payments.filter(p => p.paymentType === "piutang").length} transaksi`}
+              sub={`${payments.filter((p) => p.paymentType === "piutang").length} transaksi`}
               bg="bg-amber-400 text-amber-950"
-              onClick={() => { setMetodeFilter("piutang"); setDateFrom(""); setDateTo(""); }}
+              onClick={() => {
+                setMetodeFilter("piutang");
+                setDateFrom("");
+                setDateTo("");
+              }}
             />
           </div>
 
@@ -520,19 +685,28 @@ export default function OwnerFinance() {
                 label="Tunai"
                 amount={byMethod.tunai?.amount ?? 0}
                 count={byMethod.tunai?.count ?? 0}
-                onClick={() => { setActiveMethod("tunai"); setShowTrxDetail(true); }}
+                onClick={() => {
+                  setActiveMethod("tunai");
+                  setShowTrxDetail(true);
+                }}
               />
               <MethodCard
                 label="Transfer"
                 amount={byMethod.transfer?.amount ?? 0}
                 count={byMethod.transfer?.count ?? 0}
-                onClick={() => { setActiveMethod("transfer"); setShowTrxDetail(true); }}
+                onClick={() => {
+                  setActiveMethod("transfer");
+                  setShowTrxDetail(true);
+                }}
               />
               <MethodCard
                 label="Piutang"
                 amount={byMethod.piutang?.amount ?? 0}
                 count={byMethod.piutang?.count ?? 0}
-                onClick={() => { setActiveMethod("piutang"); setShowTrxDetail(true); }}
+                onClick={() => {
+                  setActiveMethod("piutang");
+                  setShowTrxDetail(true);
+                }}
               />
             </div>
           </div>
@@ -547,56 +721,101 @@ export default function OwnerFinance() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Jenis Jastip</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tagihan</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Total yang sudah dibayar</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Sisa Tagihan</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Paket diserahkan</th>
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                        Jenis Jastip
+                      </th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                        Tagihan
+                      </th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                        Total yang sudah dibayar
+                      </th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                        Sisa Tagihan
+                      </th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                        Paket diserahkan
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {serviceRows.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-muted-foreground text-sm">
+                        <td
+                          colSpan={5}
+                          className="py-12 text-center text-muted-foreground text-sm"
+                        >
                           Belum ada data untuk periode ini
                         </td>
                       </tr>
-                    ) : serviceRows.map(row => (
-                      <tr
-                        key={row.svc}
-                        className="border-b hover:bg-muted/20 cursor-pointer transition-colors"
-                        onClick={() => setLocation(`/owner/finance/${SERVICE_SLUG[row.svc] || encodeURIComponent(row.svc)}`)}
-                      >
-                        <td className="py-3 px-4 font-medium whitespace-nowrap">{row.label}</td>
-                        <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
-                          {formatRp(row.tagihan)}
-                        </td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {row.totalPaid > 0
-                            ? <span className="font-semibold">{formatRp(row.totalPaid)}</span>
-                            : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {row.sisa > 0
-                            ? <span className="font-semibold">{formatRp(row.sisa)}</span>
-                            : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <span className={`font-bold ${row.diserahkan > 0 ? "" : "text-muted-foreground"}`}>
-                            {row.diserahkan}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    ) : (
+                      serviceRows.map((row) => (
+                        <tr
+                          key={row.svc}
+                          className="border-b hover:bg-muted/20 cursor-pointer transition-colors"
+                          onClick={() =>
+                            setLocation(
+                              `/owner/finance/${SERVICE_SLUG[row.svc] || encodeURIComponent(row.svc)}`,
+                            )
+                          }
+                        >
+                          <td className="py-3 px-4 font-medium whitespace-nowrap">
+                            {row.label}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
+                            {formatRp(row.tagihan)}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            {row.totalPaid > 0 ? (
+                              <span className="font-semibold">
+                                {formatRp(row.totalPaid)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            {row.sisa > 0 ? (
+                              <span className="font-semibold">
+                                {formatRp(row.sisa)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <span
+                              className={`font-bold ${row.diserahkan > 0 ? "" : "text-muted-foreground"}`}
+                            >
+                              {row.diserahkan}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                   {serviceRows.length > 0 && (
                     <tfoot>
                       <tr className="border-t-2 bg-muted/10 font-bold">
                         <td className="py-3 px-4">Total</td>
-                        <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.tagihan, 0))}</td>
-                        <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.totalPaid, 0))}</td>
-                        <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.sisa, 0))}</td>
-                        <td className="py-3 px-4 text-right">{serviceRows.reduce((s, r) => s + r.diserahkan, 0)}</td>
+                        <td className="py-3 px-4 text-right">
+                          {formatRp(
+                            serviceRows.reduce((s, r) => s + r.tagihan, 0),
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {formatRp(
+                            serviceRows.reduce((s, r) => s + r.totalPaid, 0),
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {formatRp(
+                            serviceRows.reduce((s, r) => s + r.sisa, 0),
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {serviceRows.reduce((s, r) => s + r.diserahkan, 0)}
+                        </td>
                       </tr>
                     </tfoot>
                   )}
@@ -609,17 +828,31 @@ export default function OwnerFinance() {
           <div>
             <button
               className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors mb-2.5"
-              onClick={() => setShowTrxDetail(v => !v)}
+              onClick={() => setShowTrxDetail((v) => !v)}
             >
-              {showTrxDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {showTrxDetail ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
               Detail Transaksi Pembayaran
               {activeMethod && (
                 <span className="ml-1 px-1.5 py-0.5 rounded bg-muted text-[10px] normal-case font-normal capitalize">
                   {activeMethod}
-                  <button className="ml-1 opacity-60 hover:opacity-100" onClick={e => { e.stopPropagation(); setActiveMethod(null); }}>×</button>
+                  <button
+                    className="ml-1 opacity-60 hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveMethod(null);
+                    }}
+                  >
+                    ×
+                  </button>
                 </span>
               )}
-              <span className="ml-1 px-1.5 py-0.5 rounded border text-[10px] font-normal">{detailTrx.length} transaksi</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded border text-[10px] font-normal">
+                {detailTrx.length} transaksi
+              </span>
             </button>
 
             {showTrxDetail && (
@@ -628,56 +861,112 @@ export default function OwnerFinance() {
                   <table className="w-full text-sm min-w-[640px]">
                     <thead>
                       <tr className="border-b bg-muted/30">
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Jam</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Admin</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tagihan</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Dibayar</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Metode</th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                          Jam
+                        </th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                          Admin
+                        </th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                          Tagihan
+                        </th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                          Dibayar
+                        </th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">
+                          Metode
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {detailTrx.length === 0 ? (
-                        <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Belum ada transaksi</td></tr>
-                      ) : detailTrx.map((p, i) => {
-                        const isPiutang = p.paymentType === "piutang";
-                        return (
-                          <tr key={p.id} className={`border-b transition-colors ${i % 2 === 1 ? "bg-muted/5" : ""} hover:bg-muted/20`}>
-                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap font-mono text-xs">
-                              {formatTime(p.createdAt)}
-                            </td>
-                            <td className="py-2.5 px-3 font-medium whitespace-nowrap">{p.adminName || "—"}</td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">
-                              {formatRp(Number(p.totalAmount || 0))}
-                            </td>
-                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-semibold">
-                              {isPiutang
-                                ? <span className="text-amber-700">{formatRp(Number(p.paidAmount || 0))}</span>
-                                : <span className="text-green-700">{formatRp(Number(p.paidAmount ?? p.totalAmount ?? 0))}</span>}
-                            </td>
-                            <td className="py-2.5 px-3 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                                p.paymentType === "tunai"    ? "bg-green-100 text-green-800" :
-                                p.paymentType === "transfer" ? "bg-blue-100 text-blue-800" :
-                                "bg-amber-100 text-amber-800"
-                              }`}>
-                                {p.paymentType === "tunai" ? "Tunai" : p.paymentType === "transfer" ? "Transfer" : "Piutang"}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="py-10 text-center text-muted-foreground"
+                          >
+                            Belum ada transaksi
+                          </td>
+                        </tr>
+                      ) : (
+                        detailTrx.map((p, i) => {
+                          const isPiutang = p.paymentType === "piutang";
+                          return (
+                            <tr
+                              key={p.id}
+                              className={`border-b transition-colors ${i % 2 === 1 ? "bg-muted/5" : ""} hover:bg-muted/20`}
+                            >
+                              <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap font-mono text-xs">
+                                {formatTime(p.createdAt)}
+                              </td>
+                              <td className="py-2.5 px-3 font-medium whitespace-nowrap">
+                                {p.adminName || "—"}
+                              </td>
+                              <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">
+                                {formatRp(Number(p.totalAmount || 0))}
+                              </td>
+                              <td className="py-2.5 px-3 text-right whitespace-nowrap font-semibold">
+                                {isPiutang ? (
+                                  <span className="text-amber-700">
+                                    {formatRp(Number(p.paidAmount || 0))}
+                                  </span>
+                                ) : (
+                                  <span className="text-green-700">
+                                    {formatRp(
+                                      Number(
+                                        p.paidAmount ?? p.totalAmount ?? 0,
+                                      ),
+                                    )}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                    p.paymentType === "tunai"
+                                      ? "bg-green-100 text-green-800"
+                                      : p.paymentType === "transfer"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {p.paymentType === "tunai"
+                                    ? "Tunai"
+                                    : p.paymentType === "transfer"
+                                      ? "Transfer"
+                                      : "Piutang"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                     {detailTrx.length > 0 && (
                       <tfoot>
                         <tr className="border-t-2 bg-muted/10 font-bold">
-                          <td className="py-2.5 px-3" colSpan={2}>Total ({detailTrx.length} transaksi)</td>
+                          <td className="py-2.5 px-3" colSpan={2}>
+                            Total ({detailTrx.length} transaksi)
+                          </td>
                           <td className="py-2.5 px-3 text-right">
-                            {formatRp(detailTrx.reduce((s, p) => s + Number(p.totalAmount || 0), 0))}
+                            {formatRp(
+                              detailTrx.reduce(
+                                (s, p) => s + Number(p.totalAmount || 0),
+                                0,
+                              ),
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-right text-green-700">
-                            {formatRp(detailTrx
-                              .filter(p => p.paymentType !== "piutang")
-                              .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0))}
+                            {formatRp(
+                              detailTrx
+                                .filter((p) => p.paymentType !== "piutang")
+                                .reduce(
+                                  (s, p) =>
+                                    s +
+                                    Number(p.paidAmount ?? p.totalAmount ?? 0),
+                                  0,
+                                ),
+                            )}
                           </td>
                           <td colSpan={1} />
                         </tr>
