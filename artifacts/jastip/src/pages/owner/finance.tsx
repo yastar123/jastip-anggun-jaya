@@ -590,12 +590,11 @@ export default function OwnerFinance() {
                         <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tagihan</th>
                         <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Dibayar</th>
                         <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Metode</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Keterangan</th>
                       </tr>
                     </thead>
                     <tbody>
                       {detailTrx.length === 0 ? (
-                        <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">Belum ada transaksi</td></tr>
+                        <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Belum ada transaksi</td></tr>
                       ) : detailTrx.map((p, i) => {
                         const isPiutang = p.paymentType === "piutang";
                         return (
@@ -621,9 +620,6 @@ export default function OwnerFinance() {
                                 {p.paymentType === "tunai" ? "Tunai" : p.paymentType === "transfer" ? "Transfer" : "Piutang"}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 text-muted-foreground text-xs max-w-[160px] truncate">
-                              {p.notes || "—"}
-                            </td>
                           </tr>
                         );
                       })}
@@ -640,7 +636,7 @@ export default function OwnerFinance() {
                               .filter(p => p.paymentType !== "piutang")
                               .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0))}
                           </td>
-                          <td colSpan={2} />
+                          <td colSpan={1} />
                         </tr>
                       </tfoot>
                     )}
