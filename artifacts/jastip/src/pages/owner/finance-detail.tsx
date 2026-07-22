@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useListPackages } from "@workspace/api-client-react";
+import { useListPackages, useListBatches } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -213,12 +213,14 @@ export default function OwnerFinanceDetail({ params }: Props) {
   const [dateFrom, setDateFrom] = useState(todayIso());
   const [dateTo,   setDateTo]   = useState(todayIso());
   const [adminFilter,    setAdminFilter]    = useState("all");
+  const [batchFilter,    setBatchFilter]    = useState("all");
   const [statusBayar,    setStatusBayar]    = useState("all");
   const [statusPaket,    setStatusPaket]    = useState("all");
   const [activeTab, setActiveTab]           = useState<Tab>("Ringkasan");
 
   // ── Raw data ───────────────────────────────────────────────────────────────
   const { data: allPackages } = useListPackages();
+  const { data: batches }     = useListBatches();
   const [payments,   setPayments]   = useState<any[]>([]);
   const [loadingPay, setLoadingPay] = useState(true);
 
@@ -240,6 +242,32 @@ export default function OwnerFinanceDetail({ params }: Props) {
 
   const serviceKey = svc?.serviceKey || "";
 
+  // ── Batch helper ───────────────────────────────────────────────────────────
+  function paymentInBatch(p: any, batchId: string) {
+    if (batchId === "all") return true;
+    const ids: number[] = p.packageIds ?? [];
+    return ids.some(id => String(pkgMap.get(id)?.batchId) === batchId);
+  }
+
+  // ── Batch list (batches that have at least one payment for this service) ───
+  const batchList = useMemo(() => {
+    const activeBatchIds = new Set<number>();
+    for (const pmt of payments) {
+      const ids: number[] = pmt.packageIds ?? [];
+      for (const id of ids) {
+        const pkg = pkgMap.get(id);
+        if (pkg && pkg.serviceType === serviceKey && pkg.batchId != null) {
+          activeBatchIds.add(pkg.batchId);
+        }
+      }
+    }
+    return [...(batches || [])]
+      .filter((b: any) => activeBatchIds.has(b.id))
+      .sort((a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+  }, [batches, payments, pkgMap, serviceKey]);
+
   // Admin list
   const adminList = useMemo(() => {
     const names = new Set<string>();
@@ -254,6 +282,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
       if (dateFrom && d < dateFrom) return false;
       if (dateTo   && d > dateTo)   return false;
       if (adminFilter !== "all" && p.adminName !== adminFilter) return false;
+      if (!paymentInBatch(p, batchFilter)) return false;
 
       // Must include at least one package of this service type
       const ids: number[] = p.packageIds || [];
@@ -278,6 +307,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
       const d = isoDateOf(p.packageDate || p.createdAt);
       if (dateFrom && d < dateFrom) return false;
       if (dateTo   && d > dateTo)   return false;
+      if (batchFilter !== "all" && String(p.batchId) !== batchFilter) return false;
       if (statusPaket !== "all") {
         const isDiserahkan = p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan";
         if (statusPaket === "diserahkan" && !isDiserahkan) return false;
@@ -285,7 +315,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
       }
       return true;
     });
-  }, [allPackages, serviceKey, dateFrom, dateTo, statusPaket]);
+  }, [allPackages, serviceKey, dateFrom, dateTo, batchFilter, statusPaket]);
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
@@ -384,6 +414,26 @@ export default function OwnerFinanceDetail({ params }: Props) {
             <SelectContent>
               <SelectItem value="all">Semua</SelectItem>
               {adminList.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-px h-4 bg-border hidden sm:block" />
+
+        {/* Batch Pengiriman */}
+        <div className="flex items-center gap-1">
+          <span className="text-muted-foreground text-xs whitespace-nowrap">Batch Pengiriman:</span>
+          <Select value={batchFilter} onValueChange={setBatchFilter}>
+            <SelectTrigger className="h-7 border-0 text-xs font-medium w-auto gap-1 px-1 shadow-none focus:ring-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua</SelectItem>
+              {batchList.map((b: any) => (
+                <SelectItem key={b.id} value={String(b.id)}>
+                  {b.namaKapal || `Batch #${b.id}`}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
