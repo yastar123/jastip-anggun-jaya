@@ -755,7 +755,7 @@ export default function OwnerFinance() {
                           className="border-b hover:bg-muted/20 cursor-pointer transition-colors"
                           onClick={() =>
                             setLocation(
-                              `/owner/finance/${SERVICE_SLUG[row.svc] || encodeURIComponent(row.svc)}`,
+                              `/owner/finance/${SERVICE_SLUG[row.svc] || encodeURIComponent(row.svc)}${batchFilter !== "all" ? `?batch=${encodeURIComponent(batchFilter)}` : ""}`,
                             )
                           }
                         >

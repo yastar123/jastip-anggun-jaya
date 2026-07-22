@@ -319,13 +319,16 @@ interface Props {
 export default function OwnerFinanceDetail({ params }: Props) {
   const slug = params?.service || "";
   const svc = SERVICE_MAP[slug];
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const initialBatch = new URLSearchParams(location.split("?")[1] || "").get(
+    "batch",
+  );
 
   // ── Filters ────────────────────────────────────────────────────────────────
   const [dateFrom, setDateFrom] = useState(todayIso());
   const [dateTo, setDateTo] = useState(todayIso());
   const [adminFilter, setAdminFilter] = useState("all");
-  const [batchFilter, setBatchFilter] = useState("all");
+  const [batchFilter, setBatchFilter] = useState(initialBatch || "all");
   const [statusBayar, setStatusBayar] = useState("all");
   const [statusPaket, setStatusPaket] = useState("all");
   const [activeTab, setActiveTab] = useState<Tab>("Ringkasan");
