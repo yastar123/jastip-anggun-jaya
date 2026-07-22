@@ -33,8 +33,6 @@ app.use(express.urlencoded({
   limit: "100mb"
 }));
 
-
-
 app.use("/api", router);
 
 export default app;
