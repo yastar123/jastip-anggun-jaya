@@ -222,22 +222,38 @@ export default function OwnerFinance() {
     return m;
   }, [filteredPayments]);
 
-  // ── All-time total paid by service (ignores date filter, uses payment totalAmount) ──
+  // ── All-time total paid by service (ignores date filter) ──
+  // Distributes each payment's amount proportionally across service types
+  // by totalShipping, so cross-service-type payments don't double-count.
   const allTimePaidByService = useMemo(() => {
     const map: Record<string, number> = {};
     (payments as any[]).forEach(p => {
       if (batchFilter !== "all" && !paymentInBatch(p, batchFilter)) return;
       if (adminFilter !== "all" && p.adminName !== adminFilter) return;
+
       const ids: number[] = p.packageIds ?? [];
-      const amount = Number(p.totalAmount || 0);
-      const seen = new Set<string>();
+      const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
+
+      // Total shipping for ALL packages in this payment (used as denominator)
+      const allShipping = ids.reduce((s, id) =>
+        s + Number(pkgMap.get(id)?.totalShipping || 0), 0);
+
+      // Shipping per service type, only for packages matching active filters
+      const svcShipping: Record<string, number> = {};
       ids.forEach(id => {
         const pkg = pkgMap.get(id);
         if (!pkg?.serviceType) return;
+        if (batchFilter !== "all" && String(pkg.batchId) !== batchFilter) return;
         if (layananFilter !== "all" && pkg.serviceType !== layananFilter) return;
-        seen.add(pkg.serviceType);
+        const ship = Number(pkg.totalShipping || 0);
+        svcShipping[pkg.serviceType] = (svcShipping[pkg.serviceType] || 0) + ship;
       });
-      seen.forEach(svc => { map[svc] = (map[svc] || 0) + amount; });
+
+      // Attribute a proportional share of the payment to each service type
+      Object.entries(svcShipping).forEach(([svc, ship]) => {
+        const portion = allShipping > 0 ? (ship / allShipping) * totalPaid : 0;
+        map[svc] = (map[svc] || 0) + portion;
+      });
     });
     return map;
   }, [payments, pkgMap, layananFilter, batchFilter, adminFilter]);
