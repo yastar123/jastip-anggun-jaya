@@ -19,7 +19,7 @@ function toNum(val: any): number | null {
 }
 
 // ── Pesawat: pembulatan berat gabungan & recalc ongkir ──────────────────────
-// Spec: jumlahkan berat_real semua paket konsumen dalam 1 batch, baru bulatkan.
+// Spec: tiap paket gunakan max(berat_real, berat_volume), jumlahkan, baru bulatkan.
 // 0.01–0.20 → 0.20 kg | 0.21–0.40 → 0.40 kg | 0.41–0.50 → 0.50 kg | >0.50 → berat asli
 function roundPesawatGroupWeight(totalRealWeight: number): number {
   if (totalRealWeight <= 0) return 0;
@@ -47,15 +47,21 @@ async function recalcPesawatCustomerOngkir(
   );
   if (!customerPkgs.length) return;
 
-  // Sum berat_real (sesuai spec — bukan usedWeight)
-  const totalRealWeight = customerPkgs.reduce((s, p) => s + (Number(p.realWeight) || 0), 0);
-  const roundedWeight = roundPesawatGroupWeight(totalRealWeight);
+  // Tiap paket: gunakan max(berat_real, berat_volume) sebagai berat efektif
+  const pkgEffectiveWeights = customerPkgs.map((p) => {
+    const real = Number(p.realWeight) || 0;
+    const vol = Number(p.volumeWeight) || 0;
+    return Math.max(real, vol);
+  });
+  const totalEffectiveWeight = pkgEffectiveWeights.reduce((s, w) => s + w, 0);
+  const roundedWeight = roundPesawatGroupWeight(totalEffectiveWeight);
   const totalGroupOngkir = Math.round(roundedWeight * 77000);
 
   // Distribusi ongkir proporsional ke setiap paket agar sum = totalGroupOngkir
   let distributed = 0;
   for (let i = 0; i < customerPkgs.length; i++) {
     const pkg = customerPkgs[i];
+    const pkgEffWeight = pkgEffectiveWeights[i];
     let pkgOngkir: number;
     if (customerPkgs.length === 1) {
       pkgOngkir = totalGroupOngkir;
@@ -63,8 +69,8 @@ async function recalcPesawatCustomerOngkir(
       pkgOngkir = totalGroupOngkir - distributed; // sisa agar total tepat
     } else {
       pkgOngkir =
-        totalRealWeight > 0
-          ? Math.round(((Number(pkg.realWeight) || 0) / totalRealWeight) * totalGroupOngkir)
+        totalEffectiveWeight > 0
+          ? Math.round((pkgEffWeight / totalEffectiveWeight) * totalGroupOngkir)
           : Math.round(totalGroupOngkir / customerPkgs.length);
       distributed += pkgOngkir;
     }
