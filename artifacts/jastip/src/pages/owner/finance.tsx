@@ -211,6 +211,11 @@ export default function OwnerFinance() {
     pkgMap,
   ]);
 
+  const receivedPayments = useMemo(
+    () => filteredPayments.filter((p) => p.paymentType !== "piutang"),
+    [filteredPayments],
+  );
+
   // ── Filtered pengeluaran ──────────────────────────────────────────────────
   const filteredPengeluaran = useMemo(() => {
     return pengeluaran.filter((e) => {
@@ -236,10 +241,7 @@ export default function OwnerFinance() {
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
-    const nonPiutang = filteredPayments.filter(
-      (p) => p.paymentType !== "piutang",
-    );
-    const pembayaranDiterima = nonPiutang.reduce(
+    const pembayaranDiterima = receivedPayments.reduce(
       (s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0),
       0,
     );
@@ -271,7 +273,7 @@ export default function OwnerFinance() {
 
     return { pembayaranDiterima, totalPengeluaran, arusKas, piutangTerbuka };
   }, [
-    filteredPayments,
+    receivedPayments,
     filteredPengeluaran,
     payments,
     adminFilter,
@@ -301,41 +303,38 @@ export default function OwnerFinance() {
   // by totalShipping, so cross-service-type payments don't double-count.
   const paidByService = useMemo(() => {
     const map: Record<string, number> = {};
-    filteredPayments
-      .filter((p) => p.paymentType !== "piutang")
-      .forEach((p) => {
-        const ids: number[] = p.packageIds ?? [];
-        const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
+    receivedPayments.forEach((p) => {
+      const ids: number[] = p.packageIds ?? [];
+      const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
 
-        // Total shipping for ALL packages in this payment (used as denominator)
-        const allShipping = ids.reduce(
-          (s, id) => s + Number(pkgMap.get(id)?.totalShipping || 0),
-          0,
-        );
+      // Total shipping for ALL packages in this payment (used as denominator)
+      const allShipping = ids.reduce(
+        (s, id) => s + Number(pkgMap.get(id)?.totalShipping || 0),
+        0,
+      );
 
-        // Shipping per service type, only for packages matching active filters
-        const svcShipping: Record<string, number> = {};
-        ids.forEach((id) => {
-          const pkg = pkgMap.get(id);
-          if (!pkg?.serviceType) return;
-          if (batchFilter !== "all" && String(pkg.batchId) !== batchFilter)
-            return;
-          if (layananFilter !== "all" && pkg.serviceType !== layananFilter)
-            return;
-          const ship = Number(pkg.totalShipping || 0);
-          svcShipping[pkg.serviceType] =
-            (svcShipping[pkg.serviceType] || 0) + ship;
-        });
-
-        // Attribute a proportional share of the payment to each service type
-        Object.entries(svcShipping).forEach(([svc, ship]) => {
-          const portion =
-            allShipping > 0 ? (ship / allShipping) * totalPaid : 0;
-          map[svc] = (map[svc] || 0) + portion;
-        });
+      // Shipping per service type, only for packages matching active filters
+      const svcShipping: Record<string, number> = {};
+      ids.forEach((id) => {
+        const pkg = pkgMap.get(id);
+        if (!pkg?.serviceType) return;
+        if (batchFilter !== "all" && String(pkg.batchId) !== batchFilter)
+          return;
+        if (layananFilter !== "all" && pkg.serviceType !== layananFilter)
+          return;
+        const ship = Number(pkg.totalShipping || 0);
+        svcShipping[pkg.serviceType] =
+          (svcShipping[pkg.serviceType] || 0) + ship;
       });
+
+      // Attribute a proportional share of the payment to each service type
+      Object.entries(svcShipping).forEach(([svc, ship]) => {
+        const portion = allShipping > 0 ? (ship / allShipping) * totalPaid : 0;
+        map[svc] = (map[svc] || 0) + portion;
+      });
+    });
     return map;
-  }, [filteredPayments, pkgMap, layananFilter, batchFilter]);
+  }, [receivedPayments, pkgMap, layananFilter, batchFilter]);
 
   // ── Service table ─────────────────────────────────────────────────────────
   const serviceRows = useMemo(() => {
@@ -635,7 +634,7 @@ export default function OwnerFinance() {
               title="Pembayaran Diterima"
               subtitle="uang benar-benar diterima"
               value={formatRp(kpi.pembayaranDiterima)}
-              sub={`${filteredPayments.filter((p) => p.paymentType !== "piutang").length} transaksi`}
+              sub={`${receivedPayments.length} transaksi`}
               bg="bg-emerald-500 text-white"
               onClick={() => {
                 setActiveMethod(null);
