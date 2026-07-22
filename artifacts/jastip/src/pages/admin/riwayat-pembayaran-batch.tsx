@@ -173,9 +173,16 @@ export default function RiwayatPembayaranBatch({
   }, [batchPayments, pkgMap]);
 
   // Batch-level totals
-  const totalAll = batchPayments.reduce((s, p) => s + Number(p.totalAmount || 0), 0);
-  const totalTunai = batchPayments.filter(p => p.paymentType === "tunai").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
-  const totalTransfer = batchPayments.filter(p => p.paymentType === "transfer").reduce((s, p) => s + Number(p.totalAmount || 0), 0);
+  const totalAll = batchPayments.reduce(
+    (s, p) => s + Number(p.totalAmount || 0),
+    0,
+  );
+  const totalTunai = batchPayments
+    .filter((p) => p.paymentType === "tunai")
+    .reduce((s, p) => s + Number(p.totalAmount || 0), 0);
+  const totalTransfer = batchPayments
+    .filter((p) => p.paymentType === "transfer")
+    .reduce((s, p) => s + Number(p.totalAmount || 0), 0);
   const totalPiutang = batchPayments
     .filter((p) => p.paymentType === "piutang")
     .reduce((s, p) => s + Number(p.totalAmount || 0), 0);
