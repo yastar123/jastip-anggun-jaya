@@ -222,20 +222,33 @@ export default function OwnerFinance() {
     return m;
   }, [filteredPayments]);
 
+  // ── All-time total paid by service (ignores date filter) ─────────────────
+  const allTimePaidByService = useMemo(() => {
+    const map: Record<string, number> = {};
+    (packages || []).forEach((p: any) => {
+      if (layananFilter !== "all" && p.serviceType !== layananFilter) return;
+      if (batchFilter   !== "all" && String(p.batchId) !== batchFilter) return;
+      if (p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") {
+        const svc = p.serviceType || "lainnya";
+        map[svc] = (map[svc] || 0) + Number(p.totalShipping || 0);
+      }
+    });
+    return map;
+  }, [packages, layananFilter, batchFilter]);
+
   // ── Service table ─────────────────────────────────────────────────────────
   const serviceRows = useMemo(() => {
     const svcMap: Record<string, {
-      tagihan: number; dibayar: number; sisa: number; diserahkan: number; totalPkg: number;
+      tagihan: number; totalPaid: number; sisa: number; diserahkan: number; totalPkg: number;
     }> = {};
 
     filteredPackages.forEach((p: any) => {
       const svc = p.serviceType || "lainnya";
-      if (!svcMap[svc]) svcMap[svc] = { tagihan: 0, dibayar: 0, sisa: 0, diserahkan: 0, totalPkg: 0 };
+      if (!svcMap[svc]) svcMap[svc] = { tagihan: 0, totalPaid: 0, sisa: 0, diserahkan: 0, totalPkg: 0 };
       const ship = Number(p.totalShipping || 0);
       svcMap[svc].tagihan  += ship;
       svcMap[svc].totalPkg += 1;
       if (p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") {
-        svcMap[svc].dibayar    += ship;
         svcMap[svc].diserahkan += 1;
       } else {
         svcMap[svc].sisa += ship;
@@ -243,9 +256,14 @@ export default function OwnerFinance() {
     });
 
     return Object.entries(svcMap)
-      .map(([svc, d]) => ({ svc, label: SERVICE_LABELS[svc] || svc, ...d }))
+      .map(([svc, d]) => ({
+        svc,
+        label: SERVICE_LABELS[svc] || svc,
+        ...d,
+        totalPaid: allTimePaidByService[svc] || 0,
+      }))
       .sort((a, b) => b.tagihan - a.tagihan);
-  }, [filteredPackages]);
+  }, [filteredPackages, allTimePaidByService]);
 
   // ── Transactions for detail panel ─────────────────────────────────────────
   const detailTrx = useMemo(() => {
@@ -273,7 +291,7 @@ export default function OwnerFinance() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(serviceRows.map(r => ({
       Layanan: r.label,
       "Tagihan (Rp)":        r.tagihan,
-      "Dibayar hari ini (Rp)": r.dibayar,
+      "Total yang sudah dibayar (Rp)": r.totalPaid,
       "Sisa Tagihan (Rp)":   r.sisa,
       "Paket Diserahkan":    r.diserahkan,
       "Total Paket":         r.totalPkg,
@@ -506,7 +524,7 @@ export default function OwnerFinance() {
                     <tr className="border-b bg-muted/30">
                       <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Jenis Jastip</th>
                       <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tagihan</th>
-                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Dibayar hari ini</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Total yang sudah dibayar</th>
                       <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Sisa Tagihan</th>
                       <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Paket diserahkan</th>
                     </tr>
@@ -529,8 +547,8 @@ export default function OwnerFinance() {
                           {formatRp(row.tagihan)}
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {row.dibayar > 0
-                            ? <span className="font-semibold">{formatRp(row.dibayar)}</span>
+                          {row.totalPaid > 0
+                            ? <span className="font-semibold">{formatRp(row.totalPaid)}</span>
                             : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -551,7 +569,7 @@ export default function OwnerFinance() {
                       <tr className="border-t-2 bg-muted/10 font-bold">
                         <td className="py-3 px-4">Total</td>
                         <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.tagihan, 0))}</td>
-                        <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.dibayar, 0))}</td>
+                        <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.totalPaid, 0))}</td>
                         <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.sisa, 0))}</td>
                         <td className="py-3 px-4 text-right">{serviceRows.reduce((s, r) => s + r.diserahkan, 0)}</td>
                       </tr>
