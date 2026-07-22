@@ -34,6 +34,7 @@ import OwnerAdmins from "@/pages/owner/admins";
 import OwnerReports from "@/pages/owner/reports";
 import OwnerUsers from "@/pages/owner/users";
 import OwnerFinance from "@/pages/owner/finance";
+import OwnerFinanceDetail from "@/pages/owner/finance-detail";
 import OwnerSettings from "@/pages/owner/settings";
 import OwnerPengeluaran from "@/pages/owner/pengeluaran";
 import OwnerTarif from "@/pages/owner/tarif";
@@ -185,6 +186,9 @@ function Router() {
       </Route>
       <Route path="/owner/users">
         {(params) => <ProtectedRoute role="owner" component={OwnerUsers} params={params} />}
+      </Route>
+      <Route path="/owner/finance/:service">
+        {(params) => <ProtectedRoute role="owner" component={OwnerFinanceDetail} params={params} />}
       </Route>
       <Route path="/owner/finance">
         {(params) => <ProtectedRoute role="owner" component={OwnerFinance} params={params} />}

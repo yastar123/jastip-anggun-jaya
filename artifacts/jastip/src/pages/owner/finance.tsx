@@ -28,6 +28,13 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 }
 
+const SERVICE_SLUG: Record<string, string> = {
+  "jastip pesawat": "pesawat",
+  "jastip hemat+":  "hemat",
+  "jastip kargo":   "kargo",
+  "jastip pelni":   "pelni",
+};
+
 const SERVICE_LABELS: Record<string, string> = {
   "jastip pesawat": "Pesawat",
   "jastip hemat+":  "Hemat+",
@@ -81,7 +88,8 @@ export default function OwnerFinance() {
   const [, setLocation] = useLocation();
 
   // ── Filters ──────────────────────────────────────────────────────────────
-  const [selectedDate, setSelectedDate] = useState(todayIso());
+  const [dateFrom,      setDateFrom]      = useState(todayIso());
+  const [dateTo,        setDateTo]        = useState(todayIso());
   const [adminFilter,   setAdminFilter]   = useState("all");
   const [batchFilter,   setBatchFilter]   = useState("all");
   const [metodeFilter,  setMetodeFilter]  = useState("all");
@@ -135,7 +143,9 @@ export default function OwnerFinance() {
   // ── Filtered payments ─────────────────────────────────────────────────────
   const filteredPayments = useMemo(() => {
     return payments.filter(p => {
-      if (selectedDate !== "all" && isoDateOf(p.createdAt) !== selectedDate) return false;
+      const d = isoDateOf(p.createdAt);
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo   && d > dateTo)   return false;
       if (adminFilter  !== "all" && p.adminName !== adminFilter) return false;
       if (metodeFilter !== "all" && p.paymentType !== metodeFilter) return false;
       if (batchFilter  !== "all" && !paymentInBatch(p, batchFilter)) return false;
@@ -145,26 +155,28 @@ export default function OwnerFinance() {
       }
       return true;
     });
-  }, [payments, selectedDate, adminFilter, batchFilter, metodeFilter, layananFilter, pkgMap]);
+  }, [payments, dateFrom, dateTo, adminFilter, batchFilter, metodeFilter, layananFilter, pkgMap]);
 
   // ── Filtered pengeluaran ──────────────────────────────────────────────────
   const filteredPengeluaran = useMemo(() => {
     return pengeluaran.filter(e => {
-      if (selectedDate !== "all" && e.tanggal !== selectedDate) return false;
+      if (dateFrom && e.tanggal < dateFrom) return false;
+      if (dateTo   && e.tanggal > dateTo)   return false;
       return true;
     });
-  }, [pengeluaran, selectedDate]);
+  }, [pengeluaran, dateFrom, dateTo]);
 
   // ── Filtered packages (for service table) ────────────────────────────────
   const filteredPackages = useMemo(() => {
     return (packages || []).filter((p: any) => {
       const d = isoDateOf(p.packageDate || p.createdAt);
-      if (selectedDate  !== "all" && d !== selectedDate) return false;
+      if (dateFrom      && d < dateFrom) return false;
+      if (dateTo        && d > dateTo)   return false;
       if (layananFilter !== "all" && p.serviceType !== layananFilter) return false;
       if (batchFilter   !== "all" && String(p.batchId) !== batchFilter) return false;
       return true;
     });
-  }, [packages, selectedDate, layananFilter, batchFilter]);
+  }, [packages, dateFrom, dateTo, layananFilter, batchFilter]);
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
@@ -245,9 +257,10 @@ export default function OwnerFinance() {
   // ── Export Excel ──────────────────────────────────────────────────────────
   function exportExcel() {
     const wb = XLSX.utils.book_new();
+    const rangeStr = !dateFrom && !dateTo ? "Semua" : `${dateFrom || "—"} s/d ${dateTo || "—"}`;
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
       ["Laporan Keuangan Jastip Anggun Jaya"],
-      ["Tanggal", selectedDate === "all" ? "Semua" : formatDateLabel(selectedDate)],
+      ["Periode", rangeStr],
       ["Admin",   adminFilter === "all" ? "Semua" : adminFilter],
       ["Layanan", layananFilter === "all" ? "Semua" : (SERVICE_LABELS[layananFilter] || layananFilter)],
       [],
@@ -283,13 +296,15 @@ export default function OwnerFinance() {
       Keterangan:        e.keterangan || "",
     }))), "Pengeluaran");
 
-    XLSX.writeFile(wb, `keuangan-${selectedDate || "all"}.xlsx`);
+    XLSX.writeFile(wb, `keuangan-${dateFrom || "all"}_${dateTo || "all"}.xlsx`);
   }
 
   const isLoading = pkgLoading || loadingPay;
-  const dateLabel = selectedDate === "all"
+  const dateLabel = !dateFrom && !dateTo
     ? "Semua tanggal"
-    : formatDateLabel(selectedDate);
+    : dateFrom === dateTo
+    ? formatDateLabel(dateFrom)
+    : `${dateFrom} — ${dateTo}`;
 
   // Sorted batches for dropdown
   const batchList = useMemo(() => {
@@ -316,19 +331,26 @@ export default function OwnerFinance() {
 
       {/* ── Filter Bar ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 items-center border-b pb-3">
-        {/* Date */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Tanggal</span>
+        {/* Date range */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Dari</span>
           <input
             type="date"
             className="text-sm font-medium border rounded-md px-2 py-1 bg-background h-8 focus:outline-none focus:ring-2 focus:ring-primary/30"
-            value={selectedDate === "all" ? "" : selectedDate}
-            onChange={e => setSelectedDate(e.target.value || "all")}
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
           />
-          {selectedDate !== "all" && (
+          <span className="text-xs text-muted-foreground">s/d</span>
+          <input
+            type="date"
+            className="text-sm font-medium border rounded-md px-2 py-1 bg-background h-8 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+          />
+          {(dateFrom || dateTo) && (
             <button
               className="text-xs text-primary hover:underline"
-              onClick={() => setSelectedDate("all")}
+              onClick={() => { setDateFrom(""); setDateTo(""); }}
             >Semua</button>
           )}
         </div>
@@ -430,7 +452,7 @@ export default function OwnerFinance() {
               value={formatRp(kpi.piutangTerbuka)}
               sub={`${payments.filter(p => p.paymentType === "piutang").length} transaksi`}
               bg="bg-amber-400 text-amber-950"
-              onClick={() => { setMetodeFilter("piutang"); setSelectedDate("all"); }}
+              onClick={() => { setMetodeFilter("piutang"); setDateFrom(""); setDateTo(""); }}
             />
           </div>
 
@@ -489,7 +511,7 @@ export default function OwnerFinance() {
                       <tr
                         key={row.svc}
                         className="border-b hover:bg-muted/20 cursor-pointer transition-colors"
-                        onClick={() => setLocation(`/owner/packages?serviceType=${encodeURIComponent(row.svc)}`)}
+                        onClick={() => setLocation(`/owner/finance/${SERVICE_SLUG[row.svc] || encodeURIComponent(row.svc)}`)}
                       >
                         <td className="py-3 px-4 font-medium whitespace-nowrap">{row.label}</td>
                         <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
