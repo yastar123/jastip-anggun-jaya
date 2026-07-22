@@ -298,7 +298,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
 
       return true;
     });
-  }, [payments, dateFrom, dateTo, adminFilter, statusBayar, serviceKey, pkgMap]);
+  }, [payments, dateFrom, dateTo, adminFilter, batchFilter, statusBayar, serviceKey, pkgMap]);
 
   // ── Filtered packages (for this service + date + status filter) ───────────
   const filteredPackages = useMemo(() => {
@@ -322,7 +322,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
     const totalTagihan = filteredPackages.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
     const dibayar = filteredPayments
       .filter(p => p.paymentType !== "piutang")
-      .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0);
+      .reduce((s, p) => s + Number(p.totalAmount ?? 0), 0);
     const belumDibayar = Math.max(0, totalTagihan - dibayar);
     return { totalTagihan, dibayar, belumDibayar };
   }, [filteredPackages, filteredPayments]);

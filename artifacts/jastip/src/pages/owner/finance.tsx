@@ -222,19 +222,25 @@ export default function OwnerFinance() {
     return m;
   }, [filteredPayments]);
 
-  // ── All-time total paid by service (ignores date filter) ─────────────────
+  // ── All-time total paid by service (ignores date filter, uses payment totalAmount) ──
   const allTimePaidByService = useMemo(() => {
     const map: Record<string, number> = {};
-    (packages || []).forEach((p: any) => {
-      if (layananFilter !== "all" && p.serviceType !== layananFilter) return;
-      if (batchFilter   !== "all" && String(p.batchId) !== batchFilter) return;
-      if (p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") {
-        const svc = p.serviceType || "lainnya";
-        map[svc] = (map[svc] || 0) + Number(p.totalShipping || 0);
-      }
+    (payments as any[]).forEach(p => {
+      if (batchFilter !== "all" && !paymentInBatch(p, batchFilter)) return;
+      if (adminFilter !== "all" && p.adminName !== adminFilter) return;
+      const ids: number[] = p.packageIds ?? [];
+      const amount = Number(p.totalAmount || 0);
+      const seen = new Set<string>();
+      ids.forEach(id => {
+        const pkg = pkgMap.get(id);
+        if (!pkg?.serviceType) return;
+        if (layananFilter !== "all" && pkg.serviceType !== layananFilter) return;
+        seen.add(pkg.serviceType);
+      });
+      seen.forEach(svc => { map[svc] = (map[svc] || 0) + amount; });
     });
     return map;
-  }, [packages, layananFilter, batchFilter]);
+  }, [payments, pkgMap, layananFilter, batchFilter, adminFilter]);
 
   // ── Service table ─────────────────────────────────────────────────────────
   const serviceRows = useMemo(() => {
