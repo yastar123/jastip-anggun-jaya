@@ -159,7 +159,7 @@ function PaketTable({ packages }: { packages: any[] }) {
       <table className="w-full text-sm min-w-[640px]">
         <thead>
           <tr className="bg-slate-700 text-white">
-            {["Barcode / Resi", "Customer", "Berat (kg)", "Ongkir", "Status Paket", "Status Bayar"].map(h => (
+            {["Nomor Resi", "Customer", "Ongkir", "Status Paket"].map(h => (
               <th key={h} className="py-2.5 px-3 text-left text-xs font-semibold whitespace-nowrap">{h}</th>
             ))}
           </tr>
@@ -168,10 +168,9 @@ function PaketTable({ packages }: { packages: any[] }) {
           {packages.map((p: any, i: number) => (
             <tr key={p.id} className={`border-b ${i % 2 === 0 ? "bg-white" : "bg-slate-50"} hover:bg-blue-50 transition-colors`}>
               <td className="py-2.5 px-3 font-mono text-xs text-blue-700 whitespace-nowrap">
-                {p.barcodeJaj || p.noResi || `PKG-${p.id}`}
+                {p.noResi || "—"}
               </td>
               <td className="py-2.5 px-3 font-medium whitespace-nowrap">{p.customerName || "—"}</td>
-              <td className="py-2.5 px-3">{p.beratAsli ?? p.beratVolume ?? "—"}</td>
               <td className="py-2.5 px-3 whitespace-nowrap font-medium">{formatRp(Number(p.totalShipping || 0))}</td>
               <td className="py-2.5 px-3 whitespace-nowrap">
                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
@@ -180,16 +179,6 @@ function PaketTable({ packages }: { packages: any[] }) {
                     : "bg-slate-100 text-slate-700"
                 }`}>
                   {(p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") ? "Diserahkan" : "Pending"}
-                </span>
-              </td>
-              <td className="py-2.5 px-3 whitespace-nowrap">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                  p.statusPembayaran === "SUDAH_DIBAYAR" ? "bg-green-100 text-green-800" :
-                  p.statusPembayaran === "DP"            ? "bg-yellow-100 text-yellow-800" :
-                  "bg-orange-100 text-orange-800"
-                }`}>
-                  {p.statusPembayaran === "SUDAH_DIBAYAR" ? "Lunas" :
-                   p.statusPembayaran === "DP"            ? "DP"    : "Belum Bayar"}
                 </span>
               </td>
             </tr>
