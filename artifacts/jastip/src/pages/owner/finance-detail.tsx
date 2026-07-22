@@ -279,7 +279,7 @@ function PaketTable({ packages }: { packages: any[] }) {
               className={`border-b ${i % 2 === 0 ? "bg-white" : "bg-slate-50"} hover:bg-blue-50 transition-colors`}
             >
               <td className="py-2.5 px-3 font-mono text-xs text-blue-700 whitespace-nowrap">
-                {p.noResi || "—"}
+                {p.resiNumber || "—"}
               </td>
               <td className="py-2.5 px-3 font-medium whitespace-nowrap">
                 {p.customerName || "—"}
