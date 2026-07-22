@@ -310,10 +310,10 @@ export default function AdminPackagesImport() {
           return val !== undefined && val !== null ? String(val).trim() : "";
         };
         // Normalisasi angka: hapus prefix "Rp", tangani pemisah ribuan (titik/koma)
+        // Digunakan untuk kolom HARGA (ongkir, tarif) — menerapkan aturan 3-digit ribuan
         const num = (key: string) => {
-          // Hapus "Rp", spasi, dan karakter mata uang
           let v = get(key).replace(/^Rp\.?\s*/i, "").replace(/\s/g, "").trim();
-          // Format "1.234,56" atau "38.000" (titik=ribuan, koma=desimal)
+          // "1.234,56" atau "38.000,00" → titik=ribuan, koma=desimal
           if (v.includes(".") && v.includes(",")) {
             v = v.replace(/\./g, "").replace(",", ".");
           } else if (v.includes(",") && !v.includes(".")) {
@@ -339,9 +339,27 @@ export default function AdminPackagesImport() {
           return isNaN(n) ? null : n;
         };
 
+        // Digunakan untuk kolom BERAT & VOLUME — selalu perlakukan koma/titik tunggal sebagai desimal.
+        // Tidak ada paket yang beratnya 1903 kg, jadi "1,903" atau "1.903" pasti berarti 1.903 kg.
+        const numWeight = (key: string) => {
+          let v = get(key).replace(/\s/g, "").trim();
+          if (!v) return null;
+          // "1.234,56" → titik=ribuan, koma=desimal
+          if (v.includes(".") && v.includes(",")) {
+            v = v.replace(/\./g, "").replace(",", ".");
+          } else if (v.includes(",")) {
+            // "1,903" atau "1,5" → selalu desimal
+            v = v.replace(",", ".");
+          }
+          // "1.903" atau "38.000" dengan titik tunggal → desimal biasa (parseFloat sudah benar)
+          // Tidak ada konversi — "1.903" → 1.903, "38.000" → 38.0
+          const n = parseFloat(v);
+          return isNaN(n) ? null : n;
+        };
+
         const customerName = get("customerName");
         const resiNumber   = get("resiNumber");
-        const realWeightVal = num("realWeight");
+        const realWeightVal = numWeight("realWeight");
         const ongkirPaketVal = tplType === "kargo" ? num("ongkirPaket") : null;
         let error: string | undefined;
         if (!customerName && tplType === "standard") error = "Nama Konsumen kosong";
@@ -355,14 +373,14 @@ export default function AdminPackagesImport() {
           resiNumber,
           packageNumber: get("packageNumber"),
           itemName:      get("itemName"),
-          realWeight:    num("realWeight"),
+          realWeight:    numWeight("realWeight"),
           length:        num("length"),
           width:         num("width"),
           height:        num("height"),
           packagingType: get("packagingType"),
           kargoRate:     tplType === "kargo" ? num("kargoRate") : undefined,
           ongkirPaket:   tplType === "kargo" ? ongkirPaketVal : undefined,
-          pakaiM3:       tplType === "kargo" ? num("pakaiM3") : undefined,
+          pakaiM3:       tplType === "kargo" ? numWeight("pakaiM3") : undefined,
           error,
         };
       });
