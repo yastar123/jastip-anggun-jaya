@@ -179,7 +179,8 @@ export default function OwnerFinance() {
   function paymentInBatch(p: any, batchId: string) {
     if (batchId === "all") return true;
     const ids: number[] = p.packageIds || [];
-    return ids.some((id) => String(pkgMap.get(id)?.batchId) === batchId);
+    const firstPackage = ids.length ? pkgMap.get(ids[0]) : null;
+    return String(firstPackage?.batchId) === batchId;
   }
 
   // ── Filtered payments ─────────────────────────────────────────────────────
@@ -211,10 +212,7 @@ export default function OwnerFinance() {
     pkgMap,
   ]);
 
-  const receivedPayments = useMemo(
-    () => filteredPayments.filter((p) => p.paymentType !== "piutang"),
-    [filteredPayments],
-  );
+  const receivedPayments = filteredPayments;
 
   // ── Filtered pengeluaran ──────────────────────────────────────────────────
   const filteredPengeluaran = useMemo(() => {
@@ -242,7 +240,7 @@ export default function OwnerFinance() {
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
     const pembayaranDiterima = receivedPayments.reduce(
-      (s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0),
+      (s, p) => s + Number(p.totalAmount || 0),
       0,
     );
 
@@ -292,50 +290,28 @@ export default function OwnerFinance() {
     filteredPayments.forEach((p) => {
       const key = p.paymentType as string;
       if (!m[key]) m[key] = { amount: 0, count: 0 };
-      m[key].amount += Number(p.paidAmount ?? p.totalAmount ?? 0);
+      m[key].amount += Number(p.totalAmount || 0);
       m[key].count += 1;
     });
     return m;
   }, [filteredPayments]);
 
   // ── Total paid by service (uses the same received payments as the KPI) ──
-  // Distributes each payment's amount proportionally across service types
-  // by totalShipping, so cross-service-type payments don't double-count.
+  // Matches admin riwayat-pembayaran: the first package determines the service
+  // group and receives the full transaction amount.
   const paidByService = useMemo(() => {
     const map: Record<string, number> = {};
     receivedPayments.forEach((p) => {
       const ids: number[] = p.packageIds ?? [];
-      const totalPaid = Number(p.paidAmount ?? p.totalAmount ?? 0);
-
-      // Shipping per service type, only for packages matching active filters
-      const svcShipping: Record<string, number> = {};
-      ids.forEach((id) => {
-        const pkg = pkgMap.get(id);
-        if (!pkg?.serviceType) return;
-        if (batchFilter !== "all" && String(pkg.batchId) !== batchFilter)
-          return;
-        if (layananFilter !== "all" && pkg.serviceType !== layananFilter)
-          return;
-        const ship = Number(pkg.totalShipping || 0);
-        svcShipping[pkg.serviceType] =
-          (svcShipping[pkg.serviceType] || 0) + ship;
-      });
-
-      // Match the card: allocate the full payment across packages in scope.
-      const relevantShipping = Object.values(svcShipping).reduce(
-        (sum, shipping) => sum + shipping,
-        0,
-      );
-
-      // Attribute a proportional share of the payment to each service type
-      Object.entries(svcShipping).forEach(([svc, ship]) => {
-        const portion =
-          relevantShipping > 0 ? (ship / relevantShipping) * totalPaid : 0;
-        map[svc] = (map[svc] || 0) + portion;
-      });
+      const totalPaid = Number(p.totalAmount || 0);
+      const svc =
+        p.packageSummary?.[0]?.serviceType ||
+        (ids.length ? pkgMap.get(ids[0])?.serviceType : null);
+      if (!svc || (layananFilter !== "all" && svc !== layananFilter)) return;
+      map[svc] = (map[svc] || 0) + totalPaid;
     });
     return map;
-  }, [receivedPayments, pkgMap, layananFilter, batchFilter]);
+  }, [receivedPayments, pkgMap, layananFilter]);
 
   // ── Service table ─────────────────────────────────────────────────────────
   const serviceRows = useMemo(() => {
