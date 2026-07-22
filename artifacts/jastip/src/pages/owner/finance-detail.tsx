@@ -294,7 +294,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
       .filter(p => p.paymentType !== "piutang")
       .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0);
     const belumDibayar = Math.max(0, totalTagihan - dibayar);
-    return { totalTagihan, dibayar, belumDibayar, refund: 0 };
+    return { totalTagihan, dibayar, belumDibayar };
   }, [filteredPackages, filteredPayments]);
 
   // ── Method breakdown (for Pembayaran tab) ─────────────────────────────────
@@ -467,13 +467,6 @@ export default function OwnerFinanceDetail({ params }: Props) {
                 sub="piutang aktif"
                 textColor="text-orange-600"
                 borderColor="border-orange-400"
-              />
-              <KpiCard
-                label="Refund"
-                value={kpi.refund}
-                sub="tidak ada refund"
-                textColor="text-red-600"
-                borderColor="border-red-400"
               />
             </div>
 
