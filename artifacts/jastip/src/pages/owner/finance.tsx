@@ -245,14 +245,13 @@ export default function OwnerFinance() {
   // ── Service table ─────────────────────────────────────────────────────────
   const serviceRows = useMemo(() => {
     const svcMap: Record<string, {
-      tagihan: number; totalPaid: number; sisa: number; diserahkan: number; totalPkg: number;
+      sisa: number; diserahkan: number; totalPkg: number;
     }> = {};
 
     filteredPackages.forEach((p: any) => {
       const svc = p.serviceType || "lainnya";
-      if (!svcMap[svc]) svcMap[svc] = { tagihan: 0, totalPaid: 0, sisa: 0, diserahkan: 0, totalPkg: 0 };
+      if (!svcMap[svc]) svcMap[svc] = { sisa: 0, diserahkan: 0, totalPkg: 0 };
       const ship = Number(p.totalShipping || 0);
-      svcMap[svc].tagihan  += ship;
       svcMap[svc].totalPkg += 1;
       if (p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") {
         svcMap[svc].diserahkan += 1;
@@ -262,12 +261,16 @@ export default function OwnerFinance() {
     });
 
     return Object.entries(svcMap)
-      .map(([svc, d]) => ({
-        svc,
-        label: SERVICE_LABELS[svc] || svc,
-        ...d,
-        totalPaid: allTimePaidByService[svc] || 0,
-      }))
+      .map(([svc, d]) => {
+        const totalPaid = allTimePaidByService[svc] || 0;
+        return {
+          svc,
+          label: SERVICE_LABELS[svc] || svc,
+          ...d,
+          totalPaid,
+          tagihan: totalPaid + d.sisa,
+        };
+      })
       .sort((a, b) => b.tagihan - a.tagihan);
   }, [filteredPackages, allTimePaidByService]);
 

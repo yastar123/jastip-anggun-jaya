@@ -319,11 +319,13 @@ export default function OwnerFinanceDetail({ params }: Props) {
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
-    const totalTagihan = filteredPackages.reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
     const dibayar = filteredPayments
       .filter(p => p.paymentType !== "piutang")
       .reduce((s, p) => s + Number(p.totalAmount ?? 0), 0);
-    const belumDibayar = Math.max(0, totalTagihan - dibayar);
+    const belumDibayar = filteredPackages
+      .filter((p: any) => !(p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"))
+      .reduce((s: number, p: any) => s + Number(p.totalShipping || 0), 0);
+    const totalTagihan = dibayar + belumDibayar;
     return { totalTagihan, dibayar, belumDibayar };
   }, [filteredPackages, filteredPayments]);
 
