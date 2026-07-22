@@ -306,12 +306,23 @@ export default function OwnerFinance() {
     ? formatDateLabel(dateFrom)
     : `${dateFrom} — ${dateTo}`;
 
-  // Sorted batches for dropdown
+  // Batches that have at least one payment — same logic as riwayat-pembayaran
   const batchList = useMemo(() => {
-    return [...(batches || [])].sort((a: any, b: any) =>
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
-  }, [batches]);
+    // Collect batchIds that appear in payments (via packageIds → pkgMap)
+    const activeBatchIds = new Set<number>();
+    for (const pmt of payments as any[]) {
+      const ids: number[] = pmt.packageIds ?? [];
+      for (const id of ids) {
+        const bid = pkgMap.get(id)?.batchId;
+        if (bid != null) activeBatchIds.add(bid);
+      }
+    }
+    return [...(batches || [])]
+      .filter((b: any) => activeBatchIds.has(b.id))
+      .sort((a: any, b: any) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+  }, [batches, payments, pkgMap]);
 
   return (
     <div className="space-y-5">
@@ -376,7 +387,7 @@ export default function OwnerFinance() {
               <SelectItem value="all">Semua</SelectItem>
               {batchList.map((b: any) => (
                 <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name || `Batch #${b.id}`}
+                  {b.namaKapal || `Batch #${b.id}`}
                 </SelectItem>
               ))}
             </SelectContent>
