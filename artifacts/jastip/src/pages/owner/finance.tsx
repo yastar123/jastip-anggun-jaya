@@ -1,797 +1,764 @@
+import { useEffect, useMemo, useState } from "react";
 import { useListPackages } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, PackageCheck, TrendingUp, Layers, TrendingDown, ArrowUpCircle, ArrowDownCircle, Minus } from "lucide-react";
-import {
-  Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip,
-  CartesianGrid, Cell, Pie, PieChart, Legend,
-} from "recharts";
-import { useEffect, useMemo, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
+import {
+  Download, Wallet, TrendingDown, ArrowUpDown, AlertCircle,
+  Banknote, ArrowRightLeft, Clock, ChevronDown, ChevronUp, ExternalLink,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function formatRp(n: number) {
-  return `Rp ${n.toLocaleString("id-ID")}`;
+  return `Rp ${Math.round(n).toLocaleString("id-ID")}`;
 }
-function formatDate(d: string | null | undefined) {
-  if (!d) return "-";
-  return new Date(d).toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-function formatDateLong(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("id-ID", {
-    day: "numeric", month: "long", year: "numeric",
-  });
-}
-function formatDateShort(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("id-ID", {
-    day: "numeric", month: "short",
-  });
-}
-
-function getMonthKey(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-function getMonthLabel(key: string) {
-  const [y, m] = key.split("-");
-  return new Date(Number(y), Number(m) - 1).toLocaleDateString("id-ID", { month: "short", year: "2-digit" });
-}
-
-const PIE_COLORS = ["#ef4444", "#f97316", "#22c55e", "#6b7280"];
-const SERVICE_COLORS: Record<string, string> = {
-  "jastip pesawat": "#3b82f6",
-  "jastip hemat+": "#10b981",
-  "jastip kargo": "#f59e0b",
-  "jastip pelni": "#8b5cf6",
-};
-
-const serviceLabel: Record<string, string> = {
-  "jastip pesawat": "Jastip Pesawat",
-  "jastip hemat+": "Jastip Hemat+",
-  "jastip kargo": "Jastip Kargo",
-  "jastip pelni": "Jastip Pelni",
-};
-
-const PAGE_SIZE = 15;
-
 function todayIso() {
   return new Date().toISOString().split("T")[0];
 }
+function isoDateOf(d: string | null | undefined) {
+  if (!d) return "";
+  return (d.includes("T") ? d.split("T")[0] : d);
+}
+function formatDateLabel(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("id-ID", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+}
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+}
 
-// ── Custom tooltip for daily chart ───────────────────────────────────────────
-function DailyTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  const pendapatan = payload.find((p: any) => p.dataKey === "pendapatan")?.value ?? 0;
-  const pengeluaran = payload.find((p: any) => p.dataKey === "pengeluaran")?.value ?? 0;
-  const laba = pendapatan - pengeluaran;
+const SERVICE_LABELS: Record<string, string> = {
+  "jastip pesawat": "Pesawat",
+  "jastip hemat+":  "Hemat+",
+  "jastip kargo":   "Kargo",
+  "jastip pelni":   "Pelni",
+};
+const SERVICE_COLOR: Record<string, string> = {
+  "jastip pesawat": "bg-blue-500",
+  "jastip hemat+":  "bg-emerald-500",
+  "jastip kargo":   "bg-amber-500",
+  "jastip pelni":   "bg-purple-500",
+};
+const SERVICE_BORDER: Record<string, string> = {
+  "jastip pesawat": "border-l-blue-500",
+  "jastip hemat+":  "border-l-emerald-500",
+  "jastip kargo":   "border-l-amber-500",
+  "jastip pelni":   "border-l-purple-500",
+};
+
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+
+function KpiCard({
+  title, subtitle, value, sub, color, icon: Icon, onClick, clickable = false,
+}: {
+  title: string; subtitle?: string; value: string; sub: string;
+  color: string; icon: any; onClick?: () => void; clickable?: boolean;
+}) {
   return (
-    <div className="bg-white border rounded-lg shadow-lg p-3 text-sm min-w-[200px]">
-      <p className="font-semibold text-gray-700 mb-2">{label}</p>
-      <div className="space-y-1">
-        <div className="flex justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-green-700"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" />Pendapatan</span>
-          <span className="font-bold text-green-700">{formatRp(pendapatan)}</span>
+    <Card
+      className={`border-l-4 ${color} transition-all ${clickable ? "cursor-pointer hover:shadow-md hover:scale-[1.01]" : ""}`}
+      onClick={onClick}
+    >
+      <CardContent className="pt-5 pb-4 px-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1 min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">{title}</p>
+            {subtitle && <p className="text-[10px] text-muted-foreground/70 leading-tight">{subtitle}</p>}
+            <p className="text-2xl font-black tracking-tight leading-none pt-1">{value}</p>
+            <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+          </div>
+          <Icon className="w-5 h-5 text-muted-foreground/50 shrink-0 mt-0.5" />
         </div>
-        <div className="flex justify-between gap-4">
-          <span className="flex items-center gap-1.5 text-red-700"><span className="w-2.5 h-2.5 rounded-sm bg-red-400 inline-block" />Pengeluaran</span>
-          <span className="font-bold text-red-700">{formatRp(pengeluaran)}</span>
-        </div>
-        <div className="border-t pt-1 mt-1 flex justify-between gap-4">
-          <span className={laba >= 0 ? "text-blue-700 font-medium" : "text-orange-700 font-medium"}>Laba Bersih</span>
-          <span className={`font-black ${laba >= 0 ? "text-blue-700" : "text-orange-700"}`}>{formatRp(laba)}</span>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-export default function OwnerFinance() {
-  const { data: packages, isLoading } = useListPackages();
-  const [viewMonths, setViewMonths] = useState("6");
-  const [activeTab, setActiveTab] = useState("harian");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [detailPage, setDetailPage] = useState(1);
-  const [serviceFilter, setServiceFilter] = useState("all");
+// ─── Method Card ─────────────────────────────────────────────────────────────
 
-  // ── Pengeluaran data ────────────────────────────────────────────────────────
-  const [pengeluaranAll, setPengeluaranAll] = useState<any[]>([]);
+function MethodCard({
+  label, amount, count, color, icon: Icon, onClick,
+}: {
+  label: string; amount: number; count: number; color: string; icon: any; onClick?: () => void;
+}) {
+  return (
+    <Card
+      className={`border-t-4 ${color} cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all`}
+      onClick={onClick}
+    >
+      <CardContent className="pt-4 pb-4 px-5">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+          <Icon className="w-4 h-4 text-muted-foreground/50" />
+        </div>
+        <p className="text-xl font-black">{formatRp(amount)}</p>
+        <p className="text-xs text-muted-foreground mt-1">{count} transaksi</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function OwnerFinance() {
+  const [, setLocation] = useLocation();
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+  const [selectedDate, setSelectedDate] = useState(todayIso());
+  const [kasirFilter,   setKasirFilter]   = useState("all");
+  const [metodeFilter,  setMetodeFilter]  = useState("all");
+  const [layananFilter, setLayananFilter] = useState("all");
+
+  // ── Raw data ─────────────────────────────────────────────────────────────
+  const { data: packages, isLoading: pkgLoading } = useListPackages();
+  const [payments,     setPayments]     = useState<any[]>([]);
+  const [pengeluaran,  setPengeluaran]  = useState<any[]>([]);
+  const [loadingPay,   setLoadingPay]   = useState(true);
+
+  // UI state
+  const [showTrxDetail, setShowTrxDetail] = useState(false);
+  const [activeMethod,  setActiveMethod]  = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("jaj_token");
-    fetch("/api/pengeluaran", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then(setPengeluaranAll)
-      .catch(() => {});
+    const headers = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      fetch("/api/payments",     { headers }).then(r => r.ok ? r.json() : []),
+      fetch("/api/pengeluaran",  { headers }).then(r => r.ok ? r.json() : []),
+    ]).then(([pay, pen]) => {
+      setPayments(pay);
+      setPengeluaran(pen);
+      setLoadingPay(false);
+    }).catch(() => setLoadingPay(false));
   }, []);
 
-  // ── Today summary (always today, ignores filter) ────────────────────────────
-  const today = todayIso();
+  // ── Derived: unique kasir list from payments ──────────────────────────────
+  const kasirList = useMemo(() => {
+    const names = new Set<string>();
+    payments.forEach(p => { if (p.adminName) names.add(p.adminName); });
+    return [...names].sort();
+  }, [payments]);
 
-  const todayIncome = useMemo(() => {
-    return (packages || []).reduce((s, p: any) => {
-      const d = (p.packageDate || p.createdAt || "").split("T")[0];
-      return d === today ? s + (Number(p.totalShipping) || 0) : s;
-    }, 0);
-  }, [packages, today]);
+  // ── Package map: id → pkg (for payment attribution) ──────────────────────
+  const pkgMap = useMemo(() => {
+    const m = new Map<number, any>();
+    (packages || []).forEach(p => m.set(p.id, p));
+    return m;
+  }, [packages]);
 
-  const todayExpense = useMemo(() => {
-    return pengeluaranAll.reduce((s, e: any) => {
-      return e.tanggal === today ? s + Number(e.nominal) : s;
-    }, 0);
-  }, [pengeluaranAll, today]);
-
-  const todayNet = todayIncome - todayExpense;
-
-  // ── Filtered packages ───────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    const pkgs = packages || [];
-    return pkgs.filter((p: any) => {
-      const d = new Date(p.packageDate || p.createdAt);
-      if (dateFrom && d < new Date(dateFrom)) return false;
-      if (dateTo && d > new Date(dateTo + "T23:59:59")) return false;
-      if (serviceFilter !== "all" && p.serviceType !== serviceFilter) return false;
+  // ── Filtered payments ─────────────────────────────────────────────────────
+  const filteredPayments = useMemo(() => {
+    return payments.filter(p => {
+      const d = isoDateOf(p.createdAt);
+      if (selectedDate !== "all" && d !== selectedDate) return false;
+      if (kasirFilter !== "all" && p.adminName !== kasirFilter) return false;
+      if (metodeFilter !== "all" && p.paymentType !== metodeFilter) return false;
+      // layanan filter: check if any package in payment matches
+      if (layananFilter !== "all") {
+        const ids: number[] = p.packageIds || [];
+        const hasSvc = ids.some(id => pkgMap.get(id)?.serviceType === layananFilter);
+        if (!hasSvc) return false;
+      }
       return true;
     });
-  }, [packages, dateFrom, dateTo, serviceFilter]);
+  }, [payments, selectedDate, kasirFilter, metodeFilter, layananFilter, pkgMap]);
 
-  // ── Filtered pengeluaran (same date range) ──────────────────────────────────
+  // ── Filtered pengeluaran ──────────────────────────────────────────────────
   const filteredPengeluaran = useMemo(() => {
-    return pengeluaranAll.filter((e: any) => {
-      if (dateFrom && e.tanggal < dateFrom) return false;
-      if (dateTo && e.tanggal > dateTo) return false;
+    return pengeluaran.filter(e => {
+      if (selectedDate !== "all" && e.tanggal !== selectedDate) return false;
       return true;
     });
-  }, [pengeluaranAll, dateFrom, dateTo]);
+  }, [pengeluaran, selectedDate]);
 
-  // ── Daily stats ─────────────────────────────────────────────────────────────
-  const dailyStats = useMemo(() => {
-    const incomeByDay: Record<string, number> = {};
-    filtered.forEach((p: any) => {
-      const day = (p.packageDate || p.createdAt || "").split("T")[0];
-      if (day) incomeByDay[day] = (incomeByDay[day] || 0) + (Number(p.totalShipping) || 0);
+  // ── Filtered packages (for service table & billing totals) ────────────────
+  const filteredPackages = useMemo(() => {
+    return (packages || []).filter((p: any) => {
+      const d = isoDateOf(p.packageDate || p.createdAt);
+      if (selectedDate !== "all" && d !== selectedDate) return false;
+      if (layananFilter !== "all" && p.serviceType !== layananFilter) return false;
+      return true;
     });
+  }, [packages, selectedDate, layananFilter]);
 
-    const expenseByDay: Record<string, number> = {};
-    filteredPengeluaran.forEach((e: any) => {
-      if (e.tanggal) expenseByDay[e.tanggal] = (expenseByDay[e.tanggal] || 0) + Number(e.nominal);
+  // ── KPI computations ──────────────────────────────────────────────────────
+  const kpi = useMemo(() => {
+    // Pembayaran diterima = actual money received (non-piutang, use paidAmount)
+    const nonPiutang = filteredPayments.filter(p => p.paymentType !== "piutang");
+    const pembayaranDiterima = nonPiutang.reduce((s, p) =>
+      s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0);
+
+    const totalPengeluaran = filteredPengeluaran.reduce((s, e) =>
+      s + Number(e.nominal ?? 0), 0);
+
+    const arusKas = pembayaranDiterima - totalPengeluaran;
+
+    // Piutang terbuka = ALL piutang payments (accumulated, not filtered by date)
+    // but filter by kasir/layanan
+    const piutangPayments = payments.filter(p => {
+      if (p.paymentType !== "piutang") return false;
+      if (kasirFilter !== "all" && p.adminName !== kasirFilter) return false;
+      if (layananFilter !== "all") {
+        const ids: number[] = p.packageIds || [];
+        return ids.some(id => pkgMap.get(id)?.serviceType === layananFilter);
+      }
+      return true;
     });
+    const piutangTerbuka = piutangPayments.reduce((s, p) =>
+      s + Number(p.totalAmount ?? 0), 0);
 
-    const allDays = [...new Set([...Object.keys(incomeByDay), ...Object.keys(expenseByDay)])].sort();
+    return { pembayaranDiterima, totalPengeluaran, arusKas, piutangTerbuka };
+  }, [filteredPayments, filteredPengeluaran, payments, kasirFilter, layananFilter, pkgMap]);
 
-    const rows = allDays.map(day => ({
-      day,
-      label: formatDateShort(day),
-      pendapatan: incomeByDay[day] || 0,
-      pengeluaran: expenseByDay[day] || 0,
-      laba: (incomeByDay[day] || 0) - (expenseByDay[day] || 0),
-    }));
-
-    const chartData = rows.slice(-14);
-
-    const totalPendapatan = rows.reduce((s, r) => s + r.pendapatan, 0);
-    const totalPengeluaran = rows.reduce((s, r) => s + r.pengeluaran, 0);
-    const totalLaba = totalPendapatan - totalPengeluaran;
-
-    return { rows: [...rows].reverse(), chartData, totalPendapatan, totalPengeluaran, totalLaba };
-  }, [filtered, filteredPengeluaran]);
-
-  // ── Existing stats (ongkir summary) ────────────────────────────────────────
-  const stats = useMemo(() => {
-    const pkgs = filtered;
-    const totalOngkir = pkgs.reduce((s, p: any) => s + (Number(p.totalShipping) || 0), 0);
-    const pickedUp = pkgs.filter((p: any) => p.status === "diserahkan");
-    const ongkirCollected = pickedUp.reduce((s, p: any) => s + (Number(p.totalShipping) || 0), 0);
-    const pending = pkgs.filter((p: any) => p.status === "pending");
-    const ongkirPending = pending.reduce((s, p: any) => s + (Number(p.totalShipping) || 0), 0);
-    const avgOngkir = pkgs.length > 0 ? Math.round(totalOngkir / pkgs.length) : 0;
-
-    const monthMap: Record<string, { ongkir: number; count: number }> = {};
-    pkgs.forEach((p: any) => {
-      const key = getMonthKey(p.packageDate || p.createdAt);
-      if (!monthMap[key]) monthMap[key] = { ongkir: 0, count: 0 };
-      monthMap[key].ongkir += Number(p.totalShipping) || 0;
-      monthMap[key].count += 1;
-    });
-    const months = Object.keys(monthMap).sort().slice(-Number(viewMonths));
-    const monthlyData = months.map(k => ({
-      month: getMonthLabel(k),
-      ongkir: monthMap[k].ongkir,
-      paket: monthMap[k].count,
-    }));
-
-    const statusCount = { pending: 0, diserahkan: 0 };
-    pkgs.forEach((p: any) => { if (statusCount.hasOwnProperty(p.status)) (statusCount as any)[p.status]++; });
-    const pieData = [
-      { name: "Pending", value: statusCount.pending },
-      { name: "Diserahkan", value: statusCount.diserahkan },
-    ].filter(d => d.value > 0);
-
-    const serviceMap: Record<string, { count: number; ongkir: number; berat: number; diserahkan: number }> = {};
-    pkgs.forEach((p: any) => {
-      const svc = p.serviceType || "lainnya";
-      if (!serviceMap[svc]) serviceMap[svc] = { count: 0, ongkir: 0, berat: 0, diserahkan: 0 };
-      serviceMap[svc].count++;
-      serviceMap[svc].ongkir += Number(p.totalShipping) || 0;
-      serviceMap[svc].berat += Number(p.usedWeight) || 0;
-      if (p.status === "diserahkan") serviceMap[svc].diserahkan++;
-    });
-    const byService = Object.entries(serviceMap)
-      .map(([svc, d]) => ({ svc, label: serviceLabel[svc] || svc, ...d }))
-      .sort((a, b) => b.ongkir - a.ongkir);
-
-    return {
-      totalOngkir, ongkirCollected, ongkirPending, monthlyData, pieData,
-      totalPkgs: pkgs.length, pickedUpCount: pickedUp.length, pendingCount: pending.length,
-      avgOngkir, byService,
+  // ── Method breakdown ──────────────────────────────────────────────────────
+  const byMethod = useMemo(() => {
+    const m: Record<string, { amount: number; count: number }> = {
+      tunai: { amount: 0, count: 0 },
+      transfer: { amount: 0, count: 0 },
+      piutang: { amount: 0, count: 0 },
     };
-  }, [filtered, viewMonths]);
-
-  const detailPkgs = useMemo(() => {
-    return [...filtered].sort((a: any, b: any) => {
-      return new Date(b.packageDate || b.createdAt).getTime() - new Date(a.packageDate || a.createdAt).getTime();
+    filteredPayments.forEach(p => {
+      const key = p.paymentType as string;
+      if (!m[key]) m[key] = { amount: 0, count: 0 };
+      m[key].amount += Number(p.paidAmount ?? p.totalAmount ?? 0);
+      m[key].count += 1;
     });
-  }, [filtered]);
-  const detailTotal = detailPkgs.length;
-  const detailTotalPages = Math.ceil(detailTotal / PAGE_SIZE);
-  const detailPaginated = detailPkgs.slice((detailPage - 1) * PAGE_SIZE, detailPage * PAGE_SIZE);
+    return m;
+  }, [filteredPayments]);
 
+  // ── Service table ─────────────────────────────────────────────────────────
+  const serviceRows = useMemo(() => {
+    const svcMap: Record<string, {
+      tagihan: number; dibayar: number; sisa: number; diserahkan: number; totalPkg: number;
+    }> = {};
+
+    filteredPackages.forEach((p: any) => {
+      const svc = p.serviceType || "lainnya";
+      if (!svcMap[svc]) svcMap[svc] = { tagihan: 0, dibayar: 0, sisa: 0, diserahkan: 0, totalPkg: 0 };
+      const ship = Number(p.totalShipping || 0);
+      svcMap[svc].tagihan += ship;
+      svcMap[svc].totalPkg += 1;
+      if (p.status === "diserahkan") {
+        svcMap[svc].dibayar += ship;
+        svcMap[svc].diserahkan += 1;
+      } else {
+        svcMap[svc].sisa += ship;
+      }
+    });
+
+    return Object.entries(svcMap)
+      .map(([svc, d]) => ({ svc, label: SERVICE_LABELS[svc] || svc, ...d }))
+      .sort((a, b) => b.tagihan - a.tagihan);
+  }, [filteredPackages]);
+
+  // ── Per-kasir table ───────────────────────────────────────────────────────
+  const kasirRows = useMemo(() => {
+    const m: Record<string, { tunai: number; transfer: number; piutang: number; count: number }> = {};
+    filteredPayments.forEach(p => {
+      const kasir = p.adminName || "—";
+      if (!m[kasir]) m[kasir] = { tunai: 0, transfer: 0, piutang: 0, count: 0 };
+      const amt = Number(p.paidAmount ?? p.totalAmount ?? 0);
+      if (p.paymentType === "tunai") m[kasir].tunai += amt;
+      else if (p.paymentType === "transfer") m[kasir].transfer += amt;
+      else m[kasir].piutang += amt;
+      m[kasir].count += 1;
+    });
+    return Object.entries(m)
+      .map(([kasir, d]) => ({ kasir, total: d.tunai + d.transfer, ...d }))
+      .sort((a, b) => b.total - a.total);
+  }, [filteredPayments]);
+
+  // ── Transactions for detail panel ─────────────────────────────────────────
+  const detailTrx = useMemo(() => {
+    return [...filteredPayments]
+      .filter(p => activeMethod === null || p.paymentType === activeMethod)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [filteredPayments, activeMethod]);
+
+  // ── Export Excel ──────────────────────────────────────────────────────────
   function exportExcel() {
-    if (!detailPkgs.length) return;
-    const rows = detailPkgs.map((p: any) => ({
-      "Tanggal": formatDate(p.packageDate || p.createdAt),
-      "No Resi": p.resiNumber || "",
-      "No Paket": p.packageNumber || "",
-      "Nama Konsumen": p.customerName || "",
-      "Jenis Jastip": serviceLabel[p.serviceType] || p.serviceType || "",
-      "Rute": p.deliveryRoute || "",
-      "Berat Real (Kg)": p.realWeight ?? "",
-      "Berat Digunakan (Kg)": p.usedWeight ?? "",
-      "Total Berat (Kg)": p.totalWeight ?? "",
-      "Tarif/Kg": p.shippingRate ?? "",
-      "Total Ongkir": p.totalShipping ?? "",
-      "Status": p.status === "diserahkan" ? "Diserahkan" : "Pending",
-    }));
-
-    const summaryRows = stats.byService.map(s => ({
-      "Jenis Jastip": s.label,
-      "Jumlah Paket": s.count,
-      "Diserahkan": s.diserahkan,
-      "Total Berat (Kg)": s.berat.toFixed(2),
-      "Total Ongkir": s.ongkir,
-    }));
-
-    const harian = dailyStats.rows.map(r => ({
-      "Tanggal": formatDateLong(r.day),
-      "Pendapatan (Rp)": r.pendapatan,
-      "Pengeluaran (Rp)": r.pengeluaran,
-      "Laba Bersih (Rp)": r.laba,
-    }));
-
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(harian), "Harian");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Detail Paket");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), "Per Jenis Jastip");
-    XLSX.writeFile(wb, `keuangan-${new Date().toISOString().split("T")[0]}.xlsx`);
+
+    // Sheet 1: KPI
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ["Laporan Keuangan Jastip Anggun Jaya"],
+      ["Tanggal", selectedDate === "all" ? "Semua" : formatDateLabel(selectedDate)],
+      ["Kasir", kasirFilter === "all" ? "Semua" : kasirFilter],
+      ["Layanan", layananFilter === "all" ? "Semua" : (SERVICE_LABELS[layananFilter] || layananFilter)],
+      [],
+      ["PEMBAYARAN DITERIMA", kpi.pembayaranDiterima],
+      ["PENGELUARAN", kpi.totalPengeluaran],
+      ["ARUS KAS BERSIH", kpi.arusKas],
+      ["PIUTANG TERBUKA", kpi.piutangTerbuka],
+    ]), "Ringkasan");
+
+    // Sheet 2: Per jenis jastip
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(serviceRows.map(r => ({
+      Layanan: r.label,
+      "Tagihan (Rp)": r.tagihan,
+      "Dibayar (Rp)": r.dibayar,
+      "Sisa Tagihan (Rp)": r.sisa,
+      "Paket Diserahkan": r.diserahkan,
+      "Total Paket": r.totalPkg,
+    }))), "Per Jenis Jastip");
+
+    // Sheet 3: Transaksi pembayaran
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredPayments.map(p => ({
+      Waktu: formatTime(p.createdAt),
+      Kasir: p.adminName || "-",
+      Metode: p.paymentType,
+      "Total Tagihan (Rp)": Number(p.totalAmount || 0),
+      "Dibayar (Rp)": Number(p.paidAmount || p.totalAmount || 0),
+      Keterangan: p.notes || "",
+    }))), "Transaksi");
+
+    // Sheet 4: Pengeluaran
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filteredPengeluaran.map(e => ({
+      Tanggal: e.tanggal,
+      Kategori: e.kategori,
+      "Nominal (Rp)": Number(e.nominal || 0),
+      Metode: e.metodePembayaran,
+      Keterangan: e.keterangan || "",
+    }))), "Pengeluaran");
+
+    XLSX.writeFile(wb, `keuangan-${selectedDate || "all"}.xlsx`);
   }
 
-  if (isLoading) return <div className="animate-pulse p-8">Memuat data keuangan...</div>;
+  const isLoading = pkgLoading || loadingPay;
+  const dateLabel = selectedDate === "all"
+    ? "Semua tanggal"
+    : formatDateLabel(selectedDate);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-5">
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">Laporan Keuangan</h1>
-          <p className="text-muted-foreground mt-1">Pendapatan, pengeluaran, dan laba bersih Jastip Anggun Jaya.</p>
+          <h1 className="text-2xl font-black tracking-tight">Laporan Keuangan</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Seluruh penerimaan, pengeluaran, piutang, dan status kasir
+          </p>
         </div>
-        <Button variant="outline" onClick={exportExcel} disabled={!detailPkgs.length}>
-          <Download className="w-4 h-4 mr-2" /> Export Excel
+        <Button variant="outline" size="sm" onClick={exportExcel} className="gap-2 self-start sm:self-auto">
+          <Download className="w-4 h-4" />Export Excel
         </Button>
       </div>
 
-      {/* ── Ringkasan Hari Ini ─────────────────────────────────────────────── */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-          Ringkasan Hari Ini — {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-        </p>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-l-4 border-l-green-500 bg-green-50/40">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Pendapatan Hari Ini</p>
-                <ArrowUpCircle className="w-5 h-5 text-green-500" />
-              </div>
-              <p className="text-2xl font-black text-green-700">{formatRp(todayIncome)}</p>
-              <p className="text-xs text-green-600 mt-1">dari ongkir paket masuk hari ini</p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-red-400 bg-red-50/40">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Pengeluaran Hari Ini</p>
-                <ArrowDownCircle className="w-5 h-5 text-red-400" />
-              </div>
-              <p className="text-2xl font-black text-red-700">{formatRp(todayExpense)}</p>
-              <p className="text-xs text-red-600 mt-1">biaya operasional hari ini</p>
-            </CardContent>
-          </Card>
-          <Card className={`border-l-4 ${todayNet >= 0 ? "border-l-blue-500 bg-blue-50/40" : "border-l-orange-400 bg-orange-50/40"}`}>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className={`text-xs font-semibold uppercase tracking-wide ${todayNet >= 0 ? "text-blue-700" : "text-orange-700"}`}>
-                  Laba Bersih Hari Ini
-                </p>
-                <Minus className={`w-5 h-5 ${todayNet >= 0 ? "text-blue-500" : "text-orange-400"}`} />
-              </div>
-              <p className={`text-2xl font-black ${todayNet >= 0 ? "text-blue-700" : "text-orange-700"}`}>{formatRp(todayNet)}</p>
-              <p className={`text-xs mt-1 ${todayNet >= 0 ? "text-blue-600" : "text-orange-600"}`}>
-                {todayNet >= 0 ? "pendapatan − pengeluaran" : "pengeluaran melebihi pendapatan"}
-              </p>
-            </CardContent>
-          </Card>
+      {/* ── Filter Bar ──────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2 items-center bg-muted/30 border rounded-xl px-4 py-3">
+        {/* Date */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">Tanggal:</span>
+          <input
+            type="date"
+            className="text-sm font-medium border rounded-md px-2 py-1 bg-background h-8 focus:outline-none focus:ring-2 focus:ring-primary/30"
+            value={selectedDate === "all" ? "" : selectedDate}
+            onChange={e => setSelectedDate(e.target.value || "all")}
+          />
+          {selectedDate !== "all" && (
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+              onClick={() => setSelectedDate("all")}
+            >Semua</button>
+          )}
         </div>
+
+        <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+
+        {/* Kasir */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium">Kasir:</span>
+          <Select value={kasirFilter} onValueChange={setKasirFilter}>
+            <SelectTrigger className="h-8 text-sm w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua</SelectItem>
+              {kasirList.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Metode */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium">Metode:</span>
+          <Select value={metodeFilter} onValueChange={setMetodeFilter}>
+            <SelectTrigger className="h-8 text-sm w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua</SelectItem>
+              <SelectItem value="tunai">Tunai</SelectItem>
+              <SelectItem value="transfer">Transfer</SelectItem>
+              <SelectItem value="piutang">Piutang</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Layanan */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium">Layanan:</span>
+          <Select value={layananFilter} onValueChange={setLayananFilter}>
+            <SelectTrigger className="h-8 text-sm w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua</SelectItem>
+              <SelectItem value="jastip pesawat">Pesawat</SelectItem>
+              <SelectItem value="jastip hemat+">Hemat+</SelectItem>
+              <SelectItem value="jastip kargo">Kargo</SelectItem>
+              <SelectItem value="jastip pelni">Pelni</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Badge tanggal */}
+        <Badge variant="secondary" className="ml-auto text-xs">{dateLabel}</Badge>
       </div>
 
-      {/* ── Filter bar ────────────────────────────────────────────────────────── */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Dari:</span>
-              <Input type="date" className="w-full sm:w-[160px]" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setDetailPage(1); }} />
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Sampai:</span>
-              <Input type="date" className="w-full sm:w-[160px]" value={dateTo} onChange={e => { setDateTo(e.target.value); setDetailPage(1); }} />
-            </div>
-            <Select value={serviceFilter} onValueChange={v => { setServiceFilter(v); setDetailPage(1); }}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Semua Jenis" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Jenis</SelectItem>
-                <SelectItem value="jastip pesawat">Jastip Pesawat</SelectItem>
-                <SelectItem value="jastip hemat+">Jastip Hemat+</SelectItem>
-                <SelectItem value="jastip kargo">Jastip Kargo</SelectItem>
-                <SelectItem value="jastip pelni">Jastip Pelni</SelectItem>
-              </SelectContent>
-            </Select>
-            {(dateFrom || dateTo || serviceFilter !== "all") && (
-              <Button variant="outline" size="sm" onClick={() => { setDateFrom(""); setDateTo(""); setServiceFilter("all"); setDetailPage(1); }}>
-                Reset Filter
-              </Button>
-            )}
-            <Badge variant="secondary" className="ml-auto">{stats.totalPkgs} paket</Badge>
+      {isLoading ? (
+        <div className="animate-pulse space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[1,2,3,4].map(i => <div key={i} className="h-28 bg-muted rounded-xl" />)}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Tabs ──────────────────────────────────────────────────────────────── */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="harian">Harian</TabsTrigger>
-          <TabsTrigger value="ringkasan">Ringkasan</TabsTrigger>
-          <TabsTrigger value="per-jenis">Per Jenis Jastip</TabsTrigger>
-          <TabsTrigger value="detail">Detail Paket</TabsTrigger>
-        </TabsList>
-
-        {/* ── Tab: Harian ─────────────────────────────────────────────────────── */}
-        {activeTab === "harian" && (
-          <div className="mt-4 space-y-4">
-            {/* Range summary cards */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Card className="border-l-4 border-l-green-500">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Total Pendapatan</p>
-                  <p className="text-xl font-black text-green-700 mt-1">{formatRp(dailyStats.totalPendapatan)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">ongkir dari {stats.totalPkgs} paket</p>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-red-400">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Total Pengeluaran</p>
-                  <p className="text-xl font-black text-red-700 mt-1">{formatRp(dailyStats.totalPengeluaran)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{filteredPengeluaran.length} transaksi operasional</p>
-                </CardContent>
-              </Card>
-              <Card className={`border-l-4 ${dailyStats.totalLaba >= 0 ? "border-l-blue-500" : "border-l-orange-400"}`}>
-                <CardContent className="pt-4 pb-3">
-                  <p className={`text-xs font-semibold uppercase tracking-wide ${dailyStats.totalLaba >= 0 ? "text-blue-700" : "text-orange-700"}`}>
-                    Laba Bersih
-                  </p>
-                  <p className={`text-xl font-black mt-1 ${dailyStats.totalLaba >= 0 ? "text-blue-700" : "text-orange-700"}`}>
-                    {formatRp(dailyStats.totalLaba)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">pendapatan − pengeluaran</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Daily chart */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Pendapatan vs Pengeluaran Harian</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  {dailyStats.chartData.length > 0
-                    ? `${dailyStats.chartData.length} hari terakhir dalam rentang filter`
-                    : "Tidak ada data"}
-                </p>
-              </CardHeader>
-              <CardContent>
-                {dailyStats.chartData.length === 0 ? (
-                  <div className="h-[280px] flex items-center justify-center text-muted-foreground">Belum ada data</div>
-                ) : (
-                  <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={dailyStats.chartData} barCategoryGap="30%">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="label" fontSize={11} tickLine={false} axisLine={false} />
-                        <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000000).toFixed(1)}jt`} />
-                        <Tooltip content={<DailyTooltip />} />
-                        <Legend formatter={v => v === "pendapatan" ? "Pendapatan" : "Pengeluaran"} />
-                        <Bar dataKey="pendapatan" name="pendapatan" fill="#22c55e" radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="pengeluaran" name="pengeluaran" fill="#f87171" radius={[3, 3, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Daily table */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Rincian Per Hari</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {dailyStats.rows.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground">Belum ada data pada rentang ini</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/30">
-                          <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase">Tanggal</th>
-                          <th className="text-right py-3 px-4 text-xs font-semibold text-green-700 uppercase">Pendapatan</th>
-                          <th className="text-right py-3 px-4 text-xs font-semibold text-red-600 uppercase">Pengeluaran</th>
-                          <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase">Laba Bersih</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dailyStats.rows.map((row, i) => (
-                          <tr
-                            key={row.day}
-                            className={`border-b ${row.day === today ? "bg-blue-50 font-semibold" : i % 2 === 0 ? "" : "bg-muted/10"}`}
-                          >
-                            <td className="py-2.5 px-4 whitespace-nowrap">
-                              {formatDateLong(row.day)}
-                              {row.day === today && (
-                                <span className="ml-2 text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Hari Ini</span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-4 text-right font-semibold text-green-700 whitespace-nowrap">
-                              {row.pendapatan > 0 ? formatRp(row.pendapatan) : <span className="text-muted-foreground font-normal">-</span>}
-                            </td>
-                            <td className="py-2.5 px-4 text-right font-semibold text-red-600 whitespace-nowrap">
-                              {row.pengeluaran > 0 ? formatRp(row.pengeluaran) : <span className="text-muted-foreground font-normal">-</span>}
-                            </td>
-                            <td className={`py-2.5 px-4 text-right font-bold whitespace-nowrap ${row.laba >= 0 ? "text-blue-700" : "text-orange-600"}`}>
-                              {formatRp(row.laba)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 bg-muted/20 font-bold">
-                          <td className="py-3 px-4">Total</td>
-                          <td className="py-3 px-4 text-right text-green-700">{formatRp(dailyStats.totalPendapatan)}</td>
-                          <td className="py-3 px-4 text-right text-red-600">{formatRp(dailyStats.totalPengeluaran)}</td>
-                          <td className={`py-3 px-4 text-right ${dailyStats.totalLaba >= 0 ? "text-blue-700" : "text-orange-600"}`}>
-                            {formatRp(dailyStats.totalLaba)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* ── Tab: Ringkasan ──────────────────────────────────────────────────── */}
-        {activeTab === "ringkasan" && (
-          <div className="mt-4 space-y-4">
-            {/* KPI Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ongkir Terkumpul</CardTitle>
-                  <PackageCheck className="h-5 w-5 text-green-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{formatRp(stats.ongkirCollected)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{stats.pickedUpCount} paket diserahkan</p>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-amber-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Ongkir Pending</CardTitle>
-                  <Package className="h-5 w-5 text-amber-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-amber-600">{formatRp(stats.ongkirPending)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{stats.pendingCount} paket belum diserahkan</p>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-primary">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Ongkir</CardTitle>
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{formatRp(stats.totalOngkir)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{stats.totalPkgs} total paket</p>
-                </CardContent>
-              </Card>
-              <Card className="border-l-4 border-l-purple-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Rata-rata Ongkir</CardTitle>
-                  <Layers className="h-5 w-5 text-purple-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">{formatRp(stats.avgOngkir)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">per paket</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Ongkir Bulanan</CardTitle>
-                  <Select value={viewMonths} onValueChange={setViewMonths}>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3 Bulan</SelectItem>
-                      <SelectItem value="6">6 Bulan</SelectItem>
-                      <SelectItem value="12">12 Bulan</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </CardHeader>
-                <CardContent>
-                  {stats.monthlyData.length === 0 ? (
-                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">Belum ada data</div>
-                  ) : (
-                    <div className="h-[280px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stats.monthlyData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000000).toFixed(0)}jt`} />
-                          <Tooltip formatter={(v: any) => formatRp(v)} />
-                          <Bar dataKey="ongkir" name="Total Ongkir" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle>Status Paket</CardTitle></CardHeader>
-                <CardContent>
-                  {stats.pieData.length === 0 ? (
-                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">Belum ada data</div>
-                  ) : (
-                    <div className="h-[280px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={stats.pieData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={80}
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false} fontSize={11}>
-                            {stats.pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {stats.monthlyData.length > 0 && (
-                <Card className="lg:col-span-3">
-                  <CardHeader><CardTitle>Ringkasan Bulanan</CardTitle></CardHeader>
-                  <CardContent>
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-muted-foreground uppercase">Bulan</th>
-                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground uppercase">Jumlah Paket</th>
-                          <th className="text-right py-2 px-3 text-xs font-semibold text-muted-foreground uppercase">Total Ongkir</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {stats.monthlyData.map((row, i) => (
-                          <tr key={i} className="border-b hover:bg-muted/20">
-                            <td className="py-2.5 px-3 font-medium">{row.month}</td>
-                            <td className="py-2.5 px-3 text-right">{row.paket} paket</td>
-                            <td className="py-2.5 px-3 text-right font-semibold text-primary">{formatRp(row.ongkir)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 font-bold">
-                          <td className="py-2.5 px-3">Total</td>
-                          <td className="py-2.5 px-3 text-right">{stats.monthlyData.reduce((s, r) => s + r.paket, 0)} paket</td>
-                          <td className="py-2.5 px-3 text-right text-primary">{formatRp(stats.monthlyData.reduce((s, r) => s + r.ongkir, 0))}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </CardContent>
-                </Card>
-              )}
+        </div>
+      ) : (
+        <>
+          {/* ── KPI Cards ───────────────────────────────────────────────── */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
+              Ringkasan Utama
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiCard
+                title="Pembayaran Diterima"
+                subtitle="uang benar-benar diterima"
+                value={formatRp(kpi.pembayaranDiterima)}
+                sub={`${filteredPayments.filter(p => p.paymentType !== "piutang").length} transaksi`}
+                color="border-l-green-500"
+                icon={Wallet}
+                clickable
+                onClick={() => { setActiveMethod(null); setShowTrxDetail(true); }}
+              />
+              <KpiCard
+                title="Pengeluaran"
+                subtitle="operasional"
+                value={formatRp(kpi.totalPengeluaran)}
+                sub={`${filteredPengeluaran.length} item pengeluaran`}
+                color="border-l-red-400"
+                icon={TrendingDown}
+                clickable
+                onClick={() => setLocation("/owner/pengeluaran")}
+              />
+              <KpiCard
+                title="Arus Kas Bersih"
+                subtitle="penerimaan − pengeluaran"
+                value={formatRp(kpi.arusKas)}
+                sub={kpi.arusKas >= 0 ? "positif" : "defisit"}
+                color={kpi.arusKas >= 0 ? "border-l-blue-500" : "border-l-orange-500"}
+                icon={ArrowUpDown}
+              />
+              <KpiCard
+                title="Piutang Terbuka"
+                subtitle="belum lunas / sebagian"
+                value={formatRp(kpi.piutangTerbuka)}
+                sub={`${payments.filter(p => p.paymentType === "piutang").length} transaksi`}
+                color="border-l-amber-500"
+                icon={AlertCircle}
+                clickable
+                onClick={() => { setMetodeFilter("piutang"); setSelectedDate("all"); }}
+              />
             </div>
           </div>
-        )}
 
-        {/* ── Tab: Per Jenis Jastip ───────────────────────────────────────────── */}
-        {activeTab === "per-jenis" && (
-          <div className="mt-4 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {stats.byService.map(s => (
-                <Card key={s.svc} style={{ borderLeftColor: SERVICE_COLORS[s.svc] || "#6b7280", borderLeftWidth: 4 }}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-1">
-                    <div className="text-xl font-bold">{formatRp(s.ongkir)}</div>
-                    <div className="text-xs text-muted-foreground">{s.count} paket · {s.diserahkan} diserahkan</div>
-                    <div className="text-xs text-muted-foreground">Total berat: {s.berat.toFixed(2)} Kg</div>
-                  </CardContent>
-                </Card>
-              ))}
+          {/* ── Method Cards ─────────────────────────────────────────────── */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
+              Penerimaan Berdasarkan Metode Pembayaran
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <MethodCard
+                label="Tunai"
+                amount={byMethod.tunai?.amount ?? 0}
+                count={byMethod.tunai?.count ?? 0}
+                color="border-t-green-500"
+                icon={Banknote}
+                onClick={() => { setActiveMethod("tunai"); setShowTrxDetail(true); }}
+              />
+              <MethodCard
+                label="Transfer"
+                amount={byMethod.transfer?.amount ?? 0}
+                count={byMethod.transfer?.count ?? 0}
+                color="border-t-blue-500"
+                icon={ArrowRightLeft}
+                onClick={() => { setActiveMethod("transfer"); setShowTrxDetail(true); }}
+              />
+              <MethodCard
+                label="Piutang"
+                amount={byMethod.piutang?.amount ?? 0}
+                count={byMethod.piutang?.count ?? 0}
+                color="border-t-amber-500"
+                icon={Clock}
+                onClick={() => { setActiveMethod("piutang"); setShowTrxDetail(true); }}
+              />
             </div>
+          </div>
+
+          {/* ── Service Summary Table ────────────────────────────────────── */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
+              Ringkasan Per Jenis Jastip
+            </p>
             <Card>
-              <CardHeader><CardTitle>Perbandingan Jenis Jastip</CardTitle></CardHeader>
-              <CardContent>
-                {stats.byService.length === 0 ? (
-                  <div className="h-[280px] flex items-center justify-center text-muted-foreground">Belum ada data</div>
-                ) : (
-                  <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={stats.byService} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis type="number" fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => `${(v / 1000000).toFixed(1)}jt`} />
-                        <YAxis type="category" dataKey="label" fontSize={11} tickLine={false} axisLine={false} width={110} />
-                        <Tooltip formatter={(v: any) => formatRp(v)} />
-                        <Bar dataKey="ongkir" name="Total Ongkir" radius={[0, 4, 4, 0]}>
-                          {stats.byService.map((s) => (
-                            <Cell key={s.svc} fill={SERVICE_COLORS[s.svc] || "#6b7280"} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 p-0 overflow-x-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30">
-                      {["Jenis Jastip", "Jumlah Paket", "Diserahkan", "Pending", "Total Berat (Kg)", "Total Ongkir", "Rata-rata Ongkir"].map(h => (
-                        <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">{h}</th>
-                      ))}
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Layanan</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tagihan</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Dibayar</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Sisa tagihan</th>
+                      <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Paket diserahkan</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {stats.byService.map(s => (
-                      <tr key={s.svc} className="border-b hover:bg-muted/20">
-                        <td className="py-3 px-4 font-medium">
-                          <span className="inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ background: SERVICE_COLORS[s.svc] || "#6b7280" }} />
-                          {s.label}
+                    {serviceRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-muted-foreground text-sm">
+                          Belum ada data untuk periode ini
                         </td>
-                        <td className="py-3 px-4 text-right">{s.count}</td>
-                        <td className="py-3 px-4 text-right text-green-700">{s.diserahkan}</td>
-                        <td className="py-3 px-4 text-right text-amber-700">{s.count - s.diserahkan}</td>
-                        <td className="py-3 px-4 text-right">{s.berat.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right font-semibold text-primary">{formatRp(s.ongkir)}</td>
-                        <td className="py-3 px-4 text-right">{formatRp(s.count > 0 ? Math.round(s.ongkir / s.count) : 0)}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 font-bold bg-muted/10">
-                      <td className="py-3 px-4">Total</td>
-                      <td className="py-3 px-4 text-right">{stats.totalPkgs}</td>
-                      <td className="py-3 px-4 text-right text-green-700">{stats.pickedUpCount}</td>
-                      <td className="py-3 px-4 text-right text-amber-700">{stats.pendingCount}</td>
-                      <td className="py-3 px-4 text-right">{stats.byService.reduce((s, r) => s + r.berat, 0).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right text-primary">{formatRp(stats.totalOngkir)}</td>
-                      <td className="py-3 px-4 text-right">{formatRp(stats.avgOngkir)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* ── Tab: Detail Paket ───────────────────────────────────────────────── */}
-        {activeTab === "detail" && (
-          <div className="mt-4">
-            <Card>
-              <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full text-sm min-w-[900px]">
-                  <thead>
-                    <tr className="border-b bg-muted/30">
-                      {["Tanggal", "No Resi", "Nama Konsumen", "Jenis Jastip", "Berat Real (Kg)", "Berat Digunakan (Kg)", "Total Berat (Kg)", "Tarif/Kg", "Total Ongkir", "Status"].map(h => (
-                        <th key={h} className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detailPaginated.length > 0 ? (
-                      detailPaginated.map((p: any) => (
-                        <tr key={p.id} className="border-b hover:bg-muted/20">
-                          <td className="py-2.5 px-3 whitespace-nowrap text-muted-foreground">{formatDate(p.packageDate || p.createdAt)}</td>
-                          <td className="py-2.5 px-3 font-mono whitespace-nowrap">{p.resiNumber || "-"}</td>
-                          <td className="py-2.5 px-3 whitespace-nowrap font-medium">{p.customerName || "-"}</td>
-                          <td className="py-2.5 px-3 whitespace-nowrap text-xs">
-                            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: SERVICE_COLORS[p.serviceType] || "#6b7280" }} />
-                            {serviceLabel[p.serviceType] || p.serviceType || "-"}
+                    ) : (
+                      serviceRows.map(row => (
+                        <tr
+                          key={row.svc}
+                          className="border-b hover:bg-muted/20 cursor-pointer transition-colors"
+                          onClick={() => setLocation(`/owner/packages?serviceType=${encodeURIComponent(row.svc)}`)}
+                        >
+                          <td className="py-3 px-4 font-medium whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${SERVICE_COLOR[row.svc] || "bg-gray-400"}`} />
+                              {row.label}
+                              <span className="text-xs text-muted-foreground">({row.totalPkg} paket)</span>
+                            </div>
                           </td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">{p.realWeight ?? "-"}</td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">{p.usedWeight ?? "-"}</td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">{p.totalWeight ?? "-"}</td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">{p.shippingRate ? formatRp(p.shippingRate) : "-"}</td>
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-primary">{p.totalShipping ? formatRp(p.totalShipping) : "-"}</td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${p.status === "diserahkan" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                              {p.status === "diserahkan" ? "Diserahkan" : "Pending"}
+                          <td className="py-3 px-4 text-right font-semibold whitespace-nowrap">
+                            {formatRp(row.tagihan)}
+                          </td>
+                          <td className="py-3 px-4 text-right text-green-700 font-semibold whitespace-nowrap">
+                            {row.dibayar > 0 ? formatRp(row.dibayar) : <span className="text-muted-foreground font-normal">—</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            {row.sisa > 0
+                              ? <span className="text-amber-700 font-semibold">{formatRp(row.sisa)}</span>
+                              : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <span className={`font-bold ${row.diserahkan > 0 ? "text-green-700" : "text-muted-foreground"}`}>
+                              {row.diserahkan}
                             </span>
+                            <span className="text-muted-foreground text-xs ml-1">/ {row.totalPkg}</span>
                           </td>
                         </tr>
                       ))
-                    ) : (
-                      <tr><td colSpan={10} className="h-24 text-center text-muted-foreground">Tidak ada data</td></tr>
                     )}
                   </tbody>
-                  {detailPaginated.length > 0 && (
+                  {serviceRows.length > 0 && (
                     <tfoot>
-                      <tr className="border-t-2 bg-muted/10 font-semibold">
-                        <td className="py-2.5 px-3" colSpan={8}>Total halaman ini ({detailPaginated.length} paket)</td>
-                        <td className="py-2.5 px-3 text-right text-primary">
-                          {formatRp(detailPaginated.reduce((s: number, p: any) => s + (Number(p.totalShipping) || 0), 0))}
+                      <tr className="border-t-2 bg-muted/10 font-bold">
+                        <td className="py-3 px-4">Total</td>
+                        <td className="py-3 px-4 text-right">{formatRp(serviceRows.reduce((s, r) => s + r.tagihan, 0))}</td>
+                        <td className="py-3 px-4 text-right text-green-700">{formatRp(serviceRows.reduce((s, r) => s + r.dibayar, 0))}</td>
+                        <td className="py-3 px-4 text-right text-amber-700">{formatRp(serviceRows.reduce((s, r) => s + r.sisa, 0))}</td>
+                        <td className="py-3 px-4 text-right text-green-700">
+                          {serviceRows.reduce((s, r) => s + r.diserahkan, 0)}
+                          <span className="text-muted-foreground font-normal text-xs ml-1">
+                            / {serviceRows.reduce((s, r) => s + r.totalPkg, 0)}
+                          </span>
                         </td>
-                        <td />
                       </tr>
                     </tfoot>
                   )}
                 </table>
-              </CardContent>
-              {detailTotalPages > 1 && (
-                <div className="p-3 border-t flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{detailTotal} paket · {detailTotalPages} halaman</span>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={detailPage <= 1} onClick={() => setDetailPage(p => p - 1)}>Sebelumnya</Button>
-                    <span className="flex items-center px-2 text-sm">{detailPage} / {detailTotalPages}</span>
-                    <Button variant="outline" size="sm" disabled={detailPage >= detailTotalPages} onClick={() => setDetailPage(p => p + 1)}>Berikutnya</Button>
-                  </div>
-                </div>
-              )}
+              </div>
             </Card>
           </div>
-        )}
-      </Tabs>
+
+          {/* ── Kasir Table ──────────────────────────────────────────────── */}
+          {kasirRows.length > 0 && (
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
+                Rekapitulasi Per Kasir
+              </p>
+              <Card>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Kasir</th>
+                        <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tunai</th>
+                        <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Transfer</th>
+                        <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Piutang</th>
+                        <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Total Diterima</th>
+                        <th className="text-right py-3 px-4 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Jml Trx</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {kasirRows.map((row, i) => (
+                        <tr key={row.kasir} className={`border-b hover:bg-muted/20 ${i % 2 === 1 ? "bg-muted/5" : ""}`}>
+                          <td className="py-3 px-4 font-semibold">{row.kasir}</td>
+                          <td className="py-3 px-4 text-right text-green-700 font-medium whitespace-nowrap">
+                            {row.tunai > 0 ? formatRp(row.tunai) : <span className="text-muted-foreground font-normal">—</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right text-blue-700 font-medium whitespace-nowrap">
+                            {row.transfer > 0 ? formatRp(row.transfer) : <span className="text-muted-foreground font-normal">—</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right text-amber-700 font-medium whitespace-nowrap">
+                            {row.piutang > 0 ? formatRp(row.piutang) : <span className="text-muted-foreground font-normal">—</span>}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
+                            {formatRp(row.tunai + row.transfer)}
+                          </td>
+                          <td className="py-3 px-4 text-right text-muted-foreground">{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 bg-muted/10 font-bold">
+                        <td className="py-3 px-4">Total</td>
+                        <td className="py-3 px-4 text-right text-green-700">{formatRp(kasirRows.reduce((s, r) => s + r.tunai, 0))}</td>
+                        <td className="py-3 px-4 text-right text-blue-700">{formatRp(kasirRows.reduce((s, r) => s + r.transfer, 0))}</td>
+                        <td className="py-3 px-4 text-right text-amber-700">{formatRp(kasirRows.reduce((s, r) => s + r.piutang, 0))}</td>
+                        <td className="py-3 px-4 text-right">{formatRp(kasirRows.reduce((s, r) => s + r.tunai + r.transfer, 0))}</td>
+                        <td className="py-3 px-4 text-right text-muted-foreground">{kasirRows.reduce((s, r) => s + r.count, 0)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* ── Transaction Detail (collapsible) ────────────────────────── */}
+          <div>
+            <button
+              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors mb-2.5"
+              onClick={() => setShowTrxDetail(v => !v)}
+            >
+              {showTrxDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              Detail Transaksi Pembayaran
+              {activeMethod && (
+                <Badge variant="secondary" className="ml-1 capitalize text-[10px] normal-case font-normal">
+                  {activeMethod}
+                  <button className="ml-1 opacity-60 hover:opacity-100" onClick={e => { e.stopPropagation(); setActiveMethod(null); }}>×</button>
+                </Badge>
+              )}
+              <Badge variant="outline" className="ml-1 text-[10px] font-normal">{detailTrx.length} transaksi</Badge>
+            </button>
+
+            {showTrxDetail && (
+              <Card>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[700px]">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Jam</th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Kasir</th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Layanan</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Tagihan</th>
+                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Dibayar</th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Metode</th>
+                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase whitespace-nowrap">Keterangan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailTrx.length === 0 ? (
+                        <tr><td colSpan={7} className="py-10 text-center text-muted-foreground">Belum ada transaksi</td></tr>
+                      ) : detailTrx.map((p, i) => {
+                        // Get service types from packages in this payment
+                        const ids: number[] = p.packageIds || [];
+                        const svcTypes = [...new Set(ids.map(id => pkgMap.get(id)?.serviceType).filter(Boolean))];
+                        const svcLabel = svcTypes.map(s => SERVICE_LABELS[s] || s).join(", ") || "—";
+
+                        const isPiutang = p.paymentType === "piutang";
+                        const isLunas = !isPiutang && Number(p.paidAmount || 0) >= Number(p.totalAmount || 0);
+
+                        return (
+                          <tr key={p.id} className={`border-b transition-colors ${i % 2 === 1 ? "bg-muted/5" : ""} hover:bg-muted/20`}>
+                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap font-mono text-xs">
+                              {formatTime(p.createdAt)}
+                            </td>
+                            <td className="py-2.5 px-3 font-medium whitespace-nowrap">{p.adminName || "—"}</td>
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              {svcTypes.length > 0 ? (
+                                <span className="flex items-center gap-1">
+                                  <span className={`w-2 h-2 rounded-full inline-block shrink-0 ${SERVICE_COLOR[svcTypes[0]] || "bg-gray-400"}`} />
+                                  {svcLabel}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-medium">
+                              {formatRp(Number(p.totalAmount || 0))}
+                            </td>
+                            <td className="py-2.5 px-3 text-right whitespace-nowrap font-semibold text-green-700">
+                              {isPiutang
+                                ? <span className="text-amber-700">{formatRp(Number(p.paidAmount || 0))}</span>
+                                : formatRp(Number(p.paidAmount || p.totalAmount || 0))}
+                            </td>
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                p.paymentType === "tunai"    ? "bg-green-100 text-green-800" :
+                                p.paymentType === "transfer" ? "bg-blue-100 text-blue-800" :
+                                "bg-amber-100 text-amber-800"
+                              }`}>
+                                {p.paymentType === "tunai" ? "Tunai" : p.paymentType === "transfer" ? "Transfer" : "Piutang"}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground text-xs max-w-[160px] truncate">
+                              {p.notes || "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {detailTrx.length > 0 && (
+                      <tfoot>
+                        <tr className="border-t-2 bg-muted/10 font-bold">
+                          <td className="py-2.5 px-3" colSpan={3}>
+                            Total ({detailTrx.length} transaksi)
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {formatRp(detailTrx.reduce((s, p) => s + Number(p.totalAmount || 0), 0))}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-green-700">
+                            {formatRp(detailTrx
+                              .filter(p => p.paymentType !== "piutang")
+                              .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0))}
+                          </td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </Card>
+            )}
+          </div>
+
+          {/* ── Quick link to pengeluaran ────────────────────────────────── */}
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground text-xs gap-1.5"
+              onClick={() => setLocation("/owner/pengeluaran")}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Kelola pengeluaran operasional
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
