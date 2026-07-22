@@ -361,7 +361,8 @@ export default function OwnerFinanceDetail({ params }: Props) {
   function paymentInBatch(p: any, batchId: string) {
     if (batchId === "all") return true;
     const ids: number[] = p.packageIds ?? [];
-    return ids.some((id) => String(pkgMap.get(id)?.batchId) === batchId);
+    const firstPackage = ids.length ? pkgMap.get(ids[0]) : null;
+    return String(firstPackage?.batchId) === batchId;
   }
 
   // ── Batch list (batches that have at least one payment for this service) ───
@@ -403,13 +404,17 @@ export default function OwnerFinanceDetail({ params }: Props) {
       if (adminFilter !== "all" && p.adminName !== adminFilter) return false;
       if (!paymentInBatch(p, batchFilter)) return false;
 
-      // Must include at least one package of this service type
+      // Match admin riwayat-pembayaran: first package/summary determines service.
       const ids: number[] = p.packageIds || [];
-      if (
-        serviceKey &&
-        !ids.some((id) => pkgMap.get(id)?.serviceType === serviceKey)
+      const firstPackage = ids.length ? pkgMap.get(ids[0]) : null;
+      const paymentService = (
+        p.packageSummary?.[0]?.serviceType ||
+        firstPackage?.serviceType ||
+        ""
       )
-        return false;
+        .toLowerCase()
+        .trim();
+      if (serviceKey && paymentService !== serviceKey) return false;
 
       // Status bayar filter
       if (statusBayar !== "all") {
@@ -453,9 +458,10 @@ export default function OwnerFinanceDetail({ params }: Props) {
 
   // ── KPI ───────────────────────────────────────────────────────────────────
   const kpi = useMemo(() => {
-    const dibayar = filteredPayments
-      .filter((p) => p.paymentType !== "piutang")
-      .reduce((s, p) => s + Number(p.paidAmount ?? p.totalAmount ?? 0), 0);
+    const dibayar = filteredPayments.reduce(
+      (s, p) => s + Number(p.totalAmount || 0),
+      0,
+    );
     const belumDibayar = filteredPackages
       .filter(
         (p: any) =>
@@ -478,7 +484,7 @@ export default function OwnerFinanceDetail({ params }: Props) {
     filteredPayments.forEach((p) => {
       const key = p.paymentType as string;
       if (!m[key]) m[key] = { amount: 0, count: 0 };
-      m[key].amount += Number(p.paidAmount ?? p.totalAmount ?? 0);
+      m[key].amount += Number(p.totalAmount || 0);
       m[key].count += 1;
     });
     return m;
