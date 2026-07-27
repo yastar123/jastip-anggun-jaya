@@ -92,9 +92,7 @@ export function groupQrValue(pkgs: { id: number; barcode?: string | null; resiNu
 
 export function qrSectionHtml(qrDataUrl: string, qrValue: string) {
   return `<div class="qr-section">
-    <div class="scan-label">SCAN RESI</div>
     <img class="qr-img" src="${qrDataUrl}" alt="QR" />
-    <div class="qr-txt">${qrValue}</div>
   </div>`;
 }
 
