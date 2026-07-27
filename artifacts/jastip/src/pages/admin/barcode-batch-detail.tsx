@@ -770,10 +770,12 @@ export default function BarcodeBatchDetail({
     safePage * PAGE_SIZE,
   );
 
-  const totalWeight = batchPkgs.reduce(
-    (s: number, p: any) => s + Number(p.realWeight || 0),
-    0,
-  );
+  const totalWeight = batchPkgs.reduce((s: number, p: any) => {
+    const real = Number(p.realWeight || 0);
+    const vol  = Number(p.volumeWeight || 0);
+    const chargeable = p.usedWeight != null ? Number(p.usedWeight) : Math.max(real, vol);
+    return s + chargeable;
+  }, 0);
   const totalShipping = batchPkgs.reduce(
     (s: number, p: any) => s + Number(p.totalShipping || 0),
     0,
