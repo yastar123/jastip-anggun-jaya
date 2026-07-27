@@ -6,7 +6,7 @@ import {
   serviceTypesTable,
   batchesTable,
 } from "@workspace/db";
-import { eq, and, ne, inArray } from "drizzle-orm";
+import { eq, and, ne, inArray, ilike, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -947,14 +947,14 @@ router.get(
       let pkgs = await db
         .select()
         .from(packagesTable)
-        .where(eq(packagesTable.barcode, barcode))
+        .where(sql`lower(${packagesTable.barcode}) = lower(${barcode})`)
         .limit(1);
       if (!pkgs[0]) {
-        // Search all matching resiNumber rows, then prefer the one in hintBatchId
+        // Search all matching resiNumber rows (case-insensitive), then prefer the one in hintBatchId
         const byResi = await db
           .select()
           .from(packagesTable)
-          .where(eq(packagesTable.resiNumber, barcode));
+          .where(sql`lower(${packagesTable.resiNumber}) = lower(${barcode})`);
         if (byResi.length > 0) {
           const inBatch = hintBatchId != null ? byResi.find((p) => p.batchId === hintBatchId) : null;
           pkgs = [inBatch ?? byResi[0]];

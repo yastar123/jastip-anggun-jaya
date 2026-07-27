@@ -206,7 +206,13 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
           headers: { Authorization: `Bearer ${token}` },
         });
         const list = await r2.json();
-        if (Array.isArray(list) && list.length > 0) pkg = list[0];
+        if (Array.isArray(list) && list.length > 0) {
+          // Prefer the package that belongs to the current batch
+          const inBatch = !isNoBatch && batchId
+            ? list.find((p: any) => p.batchId === batchId)
+            : null;
+          pkg = inBatch ?? list[0];
+        }
       }
 
       if (!pkg) {

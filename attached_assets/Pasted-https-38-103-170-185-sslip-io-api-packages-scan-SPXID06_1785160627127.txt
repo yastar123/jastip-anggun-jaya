@@ -1,0 +1,275 @@
+https://38-103-170-185.sslip.io/api/packages/scan/SPXID066036210557?batchId=36
+Request URL
+https://38-103-170-185.sslip.io/api/packages/scan/SPXID066036210557?batchId=36
+Request Method
+GET
+Status Code
+304 Not Modified
+Remote Address
+[fd00:aa:bb:2220::2667:aab9]:443
+Referrer Policy
+strict-origin-when-cross-origin
+batchId
+36
+
+{valid: false, message: "Paket tidak ditemukan"}
+message
+: 
+"Paket tidak ditemukan"
+valid
+: 
+false
+
+{"valid":false,"message":"Paket tidak ditemukan"}
+
+equest URL
+https://38-103-170-185.sslip.io/api/packages?search=SPXID066036210557
+Request Method
+GET
+Status Code
+304 Not Modified
+Remote Address
+[fd00:aa:bb:2220::2667:aab9]:443
+Referrer Policy
+strict-origin-when-cross-origin
+
+search
+SPXID066036210557
+
+{id: 2855, barcode: "JAJ-MRVFSZ7W-E69A75", resiNumber: "spxid066036210557", packageNumber: "275",…},…]
+0
+: 
+{id: 2855, barcode: "JAJ-MRVFSZ7W-E69A75", resiNumber: "spxid066036210557", packageNumber: "275",…}
+1
+: 
+{id: 4439, barcode: "JAJ-MRVFVBZN-AA59CC", resiNumber: "spxid066036210557", packageNumber: "275",…}
+2
+: 
+{id: 6824, barcode: "JAJ-MS2HJL37-E4EA58", resiNumber: "spxid066036210557", packageNumber: "275",…}
+3
+: 
+{id: 8705, barcode: "JAJ-MS33B6PI-096E86", resiNumber: "spxid066036210557", packageNumber: "275",…}
+
+[
+    {
+        "id": 2855,
+        "barcode": "JAJ-MRVFSZ7W-E69A75",
+        "resiNumber": "spxid066036210557",
+        "packageNumber": "275",
+        "itemName": null,
+        "packageMode": "grup",
+        "realWeight": 0.68,
+        "length": 30,
+        "width": 20,
+        "height": 10,
+        "volumeWeight": 1.5,
+        "packagingType": null,
+        "serviceType": "jastip hemat+",
+        "deliveryRoute": "Surabaya → Manokwari",
+        "usedWeight": 1.5,
+        "shippingRate": 10000,
+        "totalWeight": null,
+        "price": null,
+        "totalShipping": 15000,
+        "weight": null,
+        "notes": null,
+        "status": "pending",
+        "verified": "belum_diverifikasi",
+        "verifiedAt": null,
+        "statusVerifikasi": "BELUM_DIVERIFIKASI",
+        "statusPengambilan": "BELUM_DIAMBIL",
+        "statusPembayaran": "BELUM_DIBAYAR",
+        "batchId": 27,
+        "serviceTypeId": null,
+        "customerName": "PERDANA",
+        "customerId": null,
+        "adminId": 2,
+        "packageDate": "2026-07-22T00:00:00.000Z",
+        "pickedUpAt": null,
+        "createdAt": "2026-07-22T02:02:10.893Z",
+        "updatedAt": "2026-07-22T02:02:23.704Z",
+        "customerPhone": "",
+        "adminName": "Admin wina"
+    },
+    {
+        "id": 4439,
+        "barcode": "JAJ-MRVFVBZN-AA59CC",
+        "resiNumber": "spxid066036210557",
+        "packageNumber": "275",
+        "itemName": null,
+        "packageMode": "grup",
+        "realWeight": 0.68,
+        "length": 30,
+        "width": 20,
+        "height": 10,
+        "volumeWeight": 1.5,
+        "packagingType": null,
+        "serviceType": "jastip pelni",
+        "deliveryRoute": "Jakarta → Manokwari",
+        "usedWeight": 1.5,
+        "shippingRate": 17000,
+        "totalWeight": null,
+        "price": null,
+        "totalShipping": 25500,
+        "weight": null,
+        "notes": null,
+        "status": "pending",
+        "verified": "belum_diverifikasi",
+        "verifiedAt": null,
+        "statusVerifikasi": "BELUM_DIVERIFIKASI",
+        "statusPengambilan": "BELUM_DIAMBIL",
+        "statusPembayaran": "BELUM_DIBAYAR",
+        "batchId": 22,
+        "serviceTypeId": null,
+        "customerName": "PERDANA",
+        "customerId": null,
+        "adminId": 2,
+        "packageDate": "2026-07-22T00:00:00.000Z",
+        "pickedUpAt": null,
+        "createdAt": "2026-07-22T02:04:00.756Z",
+        "updatedAt": "2026-07-22T02:04:14.163Z",
+        "customerPhone": "",
+        "adminName": "Admin wina"
+    },
+    {
+        "id": 6824,
+        "barcode": "JAJ-MS2HJL37-E4EA58",
+        "resiNumber": "spxid066036210557",
+        "packageNumber": "275",
+        "itemName": null,
+        "packageMode": "grup",
+        "realWeight": 0.68,
+        "length": 30,
+        "width": 20,
+        "height": 10,
+        "volumeWeight": 1.5,
+        "packagingType": null,
+        "serviceType": "jastip pelni",
+        "deliveryRoute": "Jakarta → Manokwari",
+        "usedWeight": 1.5,
+        "shippingRate": 17000,
+        "totalWeight": null,
+        "price": null,
+        "totalShipping": 25500,
+        "weight": null,
+        "notes": null,
+        "status": "pending",
+        "verified": "belum_diverifikasi",
+        "verifiedAt": null,
+        "statusVerifikasi": "BELUM_DIVERIFIKASI",
+        "statusPengambilan": "BELUM_DIAMBIL",
+        "statusPembayaran": "BELUM_DIBAYAR",
+        "batchId": 36,
+        "serviceTypeId": null,
+        "customerName": "PERDANA",
+        "customerId": null,
+        "adminId": 1,
+        "packageDate": "2026-07-27T00:00:00.000Z",
+        "pickedUpAt": null,
+        "createdAt": "2026-07-27T00:25:15.140Z",
+        "updatedAt": "2026-07-27T00:25:28.454Z",
+        "customerPhone": "",
+        "adminName": null
+    },
+    {
+        "id": 8705,
+        "barcode": "JAJ-MS33B6PI-096E86",
+        "resiNumber": "spxid066036210557",
+        "packageNumber": "275",
+        "itemName": null,
+        "packageMode": "grup",
+        "realWeight": 0.68,
+        "length": 30,
+        "width": 20,
+        "height": 10,
+        "volumeWeight": 1.5,
+        "packagingType": null,
+        "serviceType": "jastip pelni",
+        "deliveryRoute": "Jakarta → Manokwari",
+        "usedWeight": 1.5,
+        "shippingRate": 17000,
+        "totalWeight": null,
+        "price": null,
+        "totalShipping": 25500,
+        "weight": null,
+        "notes": null,
+        "status": "pending",
+        "verified": "belum_diverifikasi",
+        "verifiedAt": null,
+        "statusVerifikasi": "BELUM_DIVERIFIKASI",
+        "statusPengambilan": "BELUM_DIAMBIL",
+        "statusPembayaran": "BELUM_DIBAYAR",
+        "batchId": 39,
+        "serviceTypeId": null,
+        "customerName": "PERDANA",
+        "customerId": null,
+        "adminId": 1,
+        "packageDate": "2026-07-27T00:00:00.000Z",
+        "pickedUpAt": null,
+        "createdAt": "2026-07-27T10:34:34.807Z",
+        "updatedAt": "2026-07-27T10:34:48.087Z",
+        "customerPhone": "",
+        "adminName": null
+    }
+]
+
+PELNI JKT DOBONSOLO CLOSING 19 JULI 2026
+Aktif
+Jakarta → Manokwari ·  ETD: 19 Jul 2026 ·  Closing: 4 Jul 2026 – 17 Jul 2026
+
+56 terverifikasi
+·
+1526 belum
+·
+324 penerima
+Jenis Jastip
+🚢 Jastip Pelni
+PERDANA
+
+73 paket · Jastip pelni · Scan barcode untuk verifikasi
+
+0 ✓
+2 ✗
+← Ganti
+✗ TIDAK COCOK
+
+Paket ini milik PERDANA, bukan PERDANA.
+
+
+Scan Kamera
+
+Arahkan ke barcode
+
+Buka
+Upload Gambar
+
+Foto barcode dari galeri
+
+Pilih
+Input Manual
+Ketik nomor resi atau barcode secara manual
+Contoh: JAJ-ABC123 atau JNE123456789
+Verifikasi
+Riwayat Scan — 2 itemHapus
+
+JAJ-MRVFSZ7W-E69A75
+Milik PERDANA
+JAJ-MRVFSZ7W-E69A75
+Milik PERDANA
+Daftar Paket — PERDANA
+
+11LP1783409451212
+✓ Diverifikasi
+jt14781671312
+Belum
+11LP1784086333902
+✓ Diverifikasi
+JY1061755404
+✓ Diverifikasi
+JY1051892165
+✓ Diverifikasi
+2965829064
+Belum
+JY1062481005
+Belum
+
