@@ -721,6 +721,23 @@ router.post(
             continue;
           }
 
+          // Skip jika resiNumber sudah ada di batch yang sama (cegah duplikat import ulang)
+          const existing = await db
+            .select({ id: packagesTable.id })
+            .from(packagesTable)
+            .where(
+              and(
+                eq(packagesTable.resiNumber, String(resiNumber)),
+                eq(packagesTable.batchId, Number(batchId)),
+              ),
+            )
+            .limit(1);
+          if (existing[0]) {
+            failed++;
+            errors.push(`Duplikat dilewati — resi ${resiNumber} sudah ada di batch ini`);
+            continue;
+          }
+
           const divisor = getVolumeDivisor(serviceType);
           let volumeWeight: number | null = null;
           if (length && width && height) {
@@ -924,22 +941,32 @@ router.get(
         return;
       }
 
+      // Optional batchId hint: prefer the package belonging to this batch
+      const hintBatchId = req.query.batchId ? Number(req.query.batchId) : null;
+
       let pkgs = await db
         .select()
         .from(packagesTable)
         .where(eq(packagesTable.barcode, barcode))
         .limit(1);
       if (!pkgs[0]) {
-        pkgs = await db
+        // Search all matching resiNumber rows, then prefer the one in hintBatchId
+        const byResi = await db
           .select()
           .from(packagesTable)
-          .where(eq(packagesTable.resiNumber, barcode))
-          .limit(1);
+          .where(eq(packagesTable.resiNumber, barcode));
+        if (byResi.length > 0) {
+          const inBatch = hintBatchId != null ? byResi.find((p) => p.batchId === hintBatchId) : null;
+          pkgs = [inBatch ?? byResi[0]];
+        }
       }
       if (!pkgs[0] && barcode) {
         const all = await db.select().from(packagesTable);
-        const found = all.find((p) => p.packageNumber === barcode);
-        if (found) pkgs = [found];
+        const candidates = all.filter((p) => p.packageNumber === barcode);
+        if (candidates.length > 0) {
+          const inBatch = hintBatchId != null ? candidates.find((p) => p.batchId === hintBatchId) : null;
+          pkgs = [inBatch ?? candidates[0]];
+        }
       }
       const pkg = pkgs[0];
 

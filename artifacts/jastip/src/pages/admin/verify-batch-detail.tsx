@@ -193,7 +193,8 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
     setResultPkg(null);
     try {
       const token = localStorage.getItem("jaj_token");
-      const r = await fetch(`/api/packages/scan/${encodeURIComponent(code)}`, {
+      const batchParam = !isNoBatch && batchId ? `?batchId=${batchId}` : "";
+      const r = await fetch(`/api/packages/scan/${encodeURIComponent(code)}${batchParam}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await r.json();
