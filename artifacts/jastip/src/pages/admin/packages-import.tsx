@@ -318,9 +318,10 @@ export default function AdminPackagesImport() {
             v = v.replace(/\./g, "").replace(",", ".");
           } else if (v.includes(",") && !v.includes(".")) {
             const parts = v.split(",");
-            // "38,000" → koma sebagai ribuan (3 digit setelah koma)
-            if (parts.length === 2 && parts[1].length === 3) {
-              v = v.replace(",", "");
+            // Jika ada lebih dari satu koma ATAU satu koma dengan tepat 3 digit setelahnya
+            // → semua koma adalah pemisah ribuan (mis. "1,890,000" atau "38,000")
+            if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+              v = v.replace(/,/g, "");
             } else {
               // "1,5" → koma sebagai desimal
               v = v.replace(",", ".");
