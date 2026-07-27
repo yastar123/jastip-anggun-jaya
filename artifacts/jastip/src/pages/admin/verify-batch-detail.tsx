@@ -216,7 +216,7 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
 
       const isMatch =
         pkg.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim() &&
-        (pkg.serviceType || "").toLowerCase() === selectedGroup.serviceType.toLowerCase();
+        (isNoBatch ? (pkg.batchId == null) : (pkg.batchId === batchId));
 
       if (isMatch && pkg.statusVerifikasi !== "SUDAH_DIVERIFIKASI") {
         try {
