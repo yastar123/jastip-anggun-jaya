@@ -102,6 +102,7 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lookupRef = useRef<(code: string) => Promise<void>>(async () => {});
   const SCANNER_ID = "verify-qr-scanner";
 
   // ── Derived data ─────────────────────────────────────────────────────────────
@@ -238,6 +239,49 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
       setIsSearching(false);
     }
   }
+
+  // Keep lookupRef always pointing to latest closure (avoids stale-ref in keyboard listener)
+  useEffect(() => { lookupRef.current = lookupAndVerify; });
+
+  // ── External barcode scanner (USB/Bluetooth HID keyboard wedge) ──────────────
+  // Scanners type chars very fast then send Enter. Accumulate chars and fire on Enter.
+  useEffect(() => {
+    if (!selectedGroup) return;
+    let buffer = "";
+    let lastKeyTime = 0;
+
+    function onKeyDown(e: KeyboardEvent) {
+      // Ignore when user is typing inside an input / textarea
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      const now = Date.now();
+
+      if (e.key === "Enter") {
+        const trimmed = buffer.trim();
+        buffer = "";
+        if (trimmed.length >= 4) {
+          e.preventDefault();
+          lookupRef.current(trimmed);
+        }
+        return;
+      }
+
+      // Only printable single characters
+      if (e.key.length !== 1) return;
+
+      // If gap since last char > 100 ms the user is typing manually (not a scanner)
+      if (buffer.length > 0 && now - lastKeyTime > 100) {
+        buffer = "";
+      }
+
+      buffer += e.key;
+      lastKeyTime = now;
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedGroup]);
 
   const handleScanSuccess = useCallback(async (code: string) => {
     await stopCamera();
