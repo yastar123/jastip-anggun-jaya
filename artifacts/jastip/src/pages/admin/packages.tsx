@@ -355,7 +355,7 @@ export default function AdminPackages() {
         formatDate(p.packageDate || p.createdAt),
         p.resiNumber || "-",
         p.barcode || p.resiNumber || "-",
-        p.status === "diserahkan" ? "SUDAH\nSCAN" : "BELUM\nSCAN",
+        p.statusVerifikasi === "SUDAH_DIVERIFIKASI" ? "SUDAH\nSCAN" : "BELUM\nSCAN",
         p.packageNumber || "-",
         p.customerName || "-",
         fNum(p.realWeight, 1),
