@@ -13,7 +13,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import * as XLSX from "xlsx";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 function formatRp(n: any) {
   if (n == null) return "-";

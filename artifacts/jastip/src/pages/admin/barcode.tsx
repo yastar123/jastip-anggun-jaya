@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth";
 import { labelDocumentHtml, labelPageHtml, qrSectionHtml, groupQrValue } from "@/lib/print-label";
 
 const PAGE_SIZE = 15;
+const BATCH_PAGE_SIZE = 5;
 
 const SERVICE_TYPES = [
   { value: "jastip pesawat", label: "Jastip Pesawat" },
@@ -603,12 +604,17 @@ export default function AdminBarcode() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [filterServiceType, setFilterServiceType] = useState<string>("all");
+  const [batchPage, setBatchPage] = useState(1);
 
   const idsParam = new URLSearchParams(window.location.search).get("ids");
   const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
   const allPackages = packages || [];
   const allBatches = batches || [];
+
+  const totalBatchPages = Math.max(1, Math.ceil(allBatches.length / BATCH_PAGE_SIZE));
+  const safeBatchPage = Math.min(batchPage, totalBatchPages);
+  const paginatedBatches = allBatches.slice((safeBatchPage - 1) * BATCH_PAGE_SIZE, safeBatchPage * BATCH_PAGE_SIZE);
 
   const activePackages = allPackages.filter(
     (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
@@ -846,7 +852,7 @@ export default function AdminBarcode() {
         </div>
       ) : (
         <div className="space-y-3">
-          {allBatches.map((batch: any) => {
+          {paginatedBatches.map((batch: any) => {
             const label = batch.namaKapal || `Batch #${batch.id}`;
             return (
               <BatchBarcodeSection
@@ -862,7 +868,7 @@ export default function AdminBarcode() {
             );
           })}
 
-          {noBatchPkgs.length > 0 && (
+          {noBatchPkgs.length > 0 && safeBatchPage === totalBatchPages && (
             <NoBatchSection
               packages={allPackages}
               search={search}
@@ -871,6 +877,14 @@ export default function AdminBarcode() {
               onDelete={(pkg) => setDeletePkg(pkg)}
             />
           )}
+
+          <Pagination
+            page={safeBatchPage}
+            totalPages={totalBatchPages}
+            total={allBatches.length}
+            pageSize={BATCH_PAGE_SIZE}
+            onPageChange={setBatchPage}
+          />
         </div>
       )}
 

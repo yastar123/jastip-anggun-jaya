@@ -21,6 +21,9 @@ import {
   Lock, Archive, CheckCircle2, Clock, Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { Pagination } from "@/components/pagination";
+
+const BATCH_PAGE_SIZE = 5;
 
 // ── API helpers ───────────────────────────────────────────────────────────────
 
@@ -355,6 +358,9 @@ export default function AdminBatches() {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState<{ id: number; newStatus: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: number; namaKapal: string } | null>(null);
   const [showArchivedBatches, setShowArchivedBatches] = useState(false);
+  const [openPage, setOpenPage] = useState(1);
+  const [closedPage, setClosedPage] = useState(1);
+  const [archivedPage, setArchivedPage] = useState(1);
 
   const { data: batches = [], isLoading } = useQuery({
     queryKey: ["batches"],
@@ -430,15 +436,24 @@ export default function AdminBatches() {
             </CardContent>
           </Card>
         ) : (
-          openBatches.map((batch: any) => (
-            <BatchCard
-              key={batch.id}
-              batch={batch}
-              base={base}
-              onStatusChange={handleStatusChange}
-              onDelete={handleDeleteRequest}
+          <>
+            {openBatches.slice((openPage - 1) * BATCH_PAGE_SIZE, openPage * BATCH_PAGE_SIZE).map((batch: any) => (
+              <BatchCard
+                key={batch.id}
+                batch={batch}
+                base={base}
+                onStatusChange={handleStatusChange}
+                onDelete={handleDeleteRequest}
+              />
+            ))}
+            <Pagination
+              page={Math.min(openPage, Math.max(1, Math.ceil(openBatches.length / BATCH_PAGE_SIZE)))}
+              totalPages={Math.max(1, Math.ceil(openBatches.length / BATCH_PAGE_SIZE))}
+              total={openBatches.length}
+              pageSize={BATCH_PAGE_SIZE}
+              onPageChange={setOpenPage}
             />
-          ))
+          </>
         )}
       </div>
 
@@ -450,7 +465,7 @@ export default function AdminBatches() {
             <h2 className="font-semibold text-sm">Batch Ditutup</h2>
             <span className="text-xs text-muted-foreground">({closedBatches.length})</span>
           </div>
-          {closedBatches.map((batch: any) => (
+          {closedBatches.slice((closedPage - 1) * BATCH_PAGE_SIZE, closedPage * BATCH_PAGE_SIZE).map((batch: any) => (
             <BatchCard
               key={batch.id}
               batch={batch}
@@ -459,6 +474,13 @@ export default function AdminBatches() {
               onDelete={handleDeleteRequest}
             />
           ))}
+          <Pagination
+            page={Math.min(closedPage, Math.max(1, Math.ceil(closedBatches.length / BATCH_PAGE_SIZE)))}
+            totalPages={Math.max(1, Math.ceil(closedBatches.length / BATCH_PAGE_SIZE))}
+            total={closedBatches.length}
+            pageSize={BATCH_PAGE_SIZE}
+            onPageChange={setClosedPage}
+          />
         </div>
       )}
 
@@ -473,15 +495,26 @@ export default function AdminBatches() {
             <span className="font-medium">Arsip ({archivedBatches.length})</span>
             {showArchivedBatches ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
-          {showArchivedBatches && archivedBatches.map((batch: any) => (
-            <BatchCard
-              key={batch.id}
-              batch={batch}
-              base={base}
-              onStatusChange={handleStatusChange}
-              onDelete={handleDeleteRequest}
-            />
-          ))}
+          {showArchivedBatches && (
+            <>
+              {archivedBatches.slice((archivedPage - 1) * BATCH_PAGE_SIZE, archivedPage * BATCH_PAGE_SIZE).map((batch: any) => (
+                <BatchCard
+                  key={batch.id}
+                  batch={batch}
+                  base={base}
+                  onStatusChange={handleStatusChange}
+                  onDelete={handleDeleteRequest}
+                />
+              ))}
+              <Pagination
+                page={Math.min(archivedPage, Math.max(1, Math.ceil(archivedBatches.length / BATCH_PAGE_SIZE)))}
+                totalPages={Math.max(1, Math.ceil(archivedBatches.length / BATCH_PAGE_SIZE))}
+                total={archivedBatches.length}
+                pageSize={BATCH_PAGE_SIZE}
+                onPageChange={setArchivedPage}
+              />
+            </>
+          )}
         </div>
       )}
 
