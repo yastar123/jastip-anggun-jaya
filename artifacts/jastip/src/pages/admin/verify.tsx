@@ -63,7 +63,7 @@ export default function AdminVerify() {
   const batchStats: BatchStat[] = allBatches
     .map((batch: any) => {
       const bPkgs = allPackages.filter(
-        (p: any) => p.batchId === batch.id && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+        (p: any) => p.batchId === batch.id
       );
       const verified = bPkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
       return {
@@ -77,7 +77,7 @@ export default function AdminVerify() {
 
   // Paket aktif tanpa batch
   const noBatchPkgs = allPackages.filter(
-    (p: any) => p.batchId == null && p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+    (p: any) => p.batchId == null
   );
   const noBatchVerified = noBatchPkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
 

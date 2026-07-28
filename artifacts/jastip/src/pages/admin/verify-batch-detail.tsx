@@ -29,7 +29,6 @@ function groupPackages(pkgs: any[]): PkgGroup[] {
   const map: Record<string, any[]> = {};
   for (const p of pkgs) {
     if (!p.customerName) continue;
-    if (p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan") continue;
     const key = [
       p.customerName.trim().toLowerCase(),
       (p.serviceType || "").toLowerCase(),
@@ -117,9 +116,7 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
   const allGroups = groupPackages(batchPkgs);
 
   // Counts for summary
-  const activePkgs = batchPkgs.filter(
-    (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
-  );
+  const activePkgs = batchPkgs;
   const totalPkgs = activePkgs.length;
   const totalVerified = batchPkgs.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length;
 
@@ -149,8 +146,6 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
     const fresh = (allPackages || []).filter(
       (p: any) =>
         (isNoBatch ? p.batchId == null : p.batchId === batchId) &&
-        p.statusPengambilan !== "SUDAH_DIAMBIL" &&
-        p.status !== "diserahkan" &&
         p.customerName?.toLowerCase().trim() === selectedGroup.customerName.toLowerCase().trim() &&
         (p.serviceType || "").toLowerCase() === selectedGroup.serviceType.toLowerCase()
     );
