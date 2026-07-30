@@ -69,6 +69,7 @@ async function recalcPesawatCustomerOngkir(
   const totalGroupOngkir = Math.round(roundedWeight * 77000);
 
   // Distribusi ongkir proporsional ke setiap paket agar sum = totalGroupOngkir
+  const updates: Array<{ id: number; pkgOngkir: number }> = [];
   let distributed = 0;
   for (let i = 0; i < customerPkgs.length; i++) {
     const pkg = customerPkgs[i];
@@ -85,15 +86,20 @@ async function recalcPesawatCustomerOngkir(
           : Math.round(totalGroupOngkir / customerPkgs.length);
       distributed += pkgOngkir;
     }
-    await db
-      .update(packagesTable)
-      .set({
-        shippingRate: "77000",
-        totalShipping: String(pkgOngkir),
-        updatedAt: new Date(),
-      })
-      .where(eq(packagesTable.id, pkg.id));
+    updates.push({ id: pkg.id, pkgOngkir });
   }
+  await Promise.all(
+    updates.map(({ id, pkgOngkir }) =>
+      db
+        .update(packagesTable)
+        .set({
+          shippingRate: "77000",
+          totalShipping: String(pkgOngkir),
+          updatedAt: new Date(),
+        })
+        .where(eq(packagesTable.id, id)),
+    ),
+  );
 }
 
 // ── Hemat+: hitung ongkir berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch
@@ -140,6 +146,7 @@ async function recalcHematCustomerOngkir(
   const totalGroupOngkir = Math.round(beratDigunakan * 10000);
 
   // Distribusi proporsional ke tiap paket agar sum = totalGroupOngkir
+  const updates: Array<{ id: number; pkgOngkir: number }> = [];
   let distributed = 0;
   for (let i = 0; i < customerPkgs.length; i++) {
     const pkg = customerPkgs[i];
@@ -157,15 +164,20 @@ async function recalcHematCustomerOngkir(
           : Math.round(totalGroupOngkir / customerPkgs.length);
       distributed += pkgOngkir;
     }
-    await db
-      .update(packagesTable)
-      .set({
-        shippingRate: "10000",
-        totalShipping: String(pkgOngkir),
-        updatedAt: new Date(),
-      })
-      .where(eq(packagesTable.id, pkg.id));
+    updates.push({ id: pkg.id, pkgOngkir });
   }
+  await Promise.all(
+    updates.map(({ id, pkgOngkir }) =>
+      db
+        .update(packagesTable)
+        .set({
+          shippingRate: "10000",
+          totalShipping: String(pkgOngkir),
+          updatedAt: new Date(),
+        })
+        .where(eq(packagesTable.id, id)),
+    ),
+  );
 }
 
 // ── Pelni: tarif per-kg berdasarkan TOTAL BERAT GABUNGAN konsumen dalam satu batch
@@ -230,18 +242,20 @@ async function recalcPelniCustomerOngkir(
   if (!rate) return;
 
   // Update setiap paket: shippingRate = rate, totalShipping = usedWeight × rate
-  for (const pkg of customerPkgs) {
-    const pkgWeight = Number(pkg.usedWeight) || 0;
-    const pkgTotalShipping = Math.round(pkgWeight * rate);
-    await db
-      .update(packagesTable)
-      .set({
-        shippingRate: String(rate),
-        totalShipping: String(pkgTotalShipping),
-        updatedAt: new Date(),
-      })
-      .where(eq(packagesTable.id, pkg.id));
-  }
+  await Promise.all(
+    customerPkgs.map((pkg) => {
+      const pkgWeight = Number(pkg.usedWeight) || 0;
+      const pkgTotalShipping = Math.round(pkgWeight * rate);
+      return db
+        .update(packagesTable)
+        .set({
+          shippingRate: String(rate),
+          totalShipping: String(pkgTotalShipping),
+          updatedAt: new Date(),
+        })
+        .where(eq(packagesTable.id, pkg.id));
+    }),
+  );
 }
 
 function getShippingRate(
