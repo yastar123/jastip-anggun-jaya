@@ -1382,6 +1382,28 @@ export default function AdminPackagesNew() {
                       ))}
                     </div>
 
+                    {/* Jenis Paking (opsional) */}
+                    <FormField
+                      control={form.control}
+                      name="packagingType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Jenis Paking{" "}
+                            <span className="text-muted-foreground font-normal text-xs">(Opsional)</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Contoh: Karton, Kayu, Plastik..."
+                              {...field}
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     {/* Notif khusus Pesawat: hitung dari total berat gabungan konsumen */}
                     {isPesawat && (
                       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 flex gap-3">

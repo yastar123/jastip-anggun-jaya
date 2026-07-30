@@ -106,6 +106,7 @@ const TEMPLATE_STANDARD = [
   { header: "Panjang (cm)",     key: "length",        example: "30",        required: false },
   { header: "Lebar (cm)",       key: "width",         example: "20",        required: false },
   { header: "Tinggi (cm)",      key: "height",        example: "15",        required: false },
+  { header: "Jenis Paking",     key: "packagingType", example: "Karton",    required: false },
 ];
 
 const TEMPLATE_KARGO = [
