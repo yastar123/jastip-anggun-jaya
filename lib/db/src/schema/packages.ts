@@ -5,6 +5,7 @@ import {
   numeric,
   integer,
   timestamp,
+  index,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -89,7 +90,16 @@ export const packagesTable = pgTable("packages", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (t) => [
+  // Indexes for fast filtering — without these, every query does a full table scan
+  index("idx_packages_status").on(t.status),
+  index("idx_packages_status_pengambilan").on(t.statusPengambilan),
+  index("idx_packages_batch_id").on(t.batchId),
+  index("idx_packages_batch_status").on(t.batchId, t.status, t.statusPengambilan),
+  index("idx_packages_created_at").on(t.createdAt),
+  index("idx_packages_customer_name").on(t.customerName),
+  index("idx_packages_service_type").on(t.serviceType),
+]);
 
 export const insertPackageSchema = createInsertSchema(packagesTable).omit({
   id: true,

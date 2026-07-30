@@ -6,7 +6,7 @@ import {
   serviceTypesTable,
   batchesTable,
 } from "@workspace/db";
-import { eq, and, ne, inArray, ilike, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, ilike, sql, gte, lte, or } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -356,46 +356,58 @@ router.get(
         statusVerifikasi,
       } = req.query as any;
 
-      const admins = await db
-        .select({ id: usersTable.id, name: usersTable.name })
-        .from(usersTable)
-        .where(eq(usersTable.role, "admin"));
-      const adminMap = new Map(admins.map((a) => [a.id, a]));
-      const customerMap = new Map<number, any>();
+      // Build WHERE conditions pushed to the database — avoids loading all rows
+      // into Node then filtering in JS (the old approach was O(n) in memory).
+      const conditions: ReturnType<typeof eq>[] = [];
 
-      let rows = await db
-        .select()
-        .from(packagesTable)
-        .orderBy(packagesTable.createdAt);
-
-      if (status) rows = rows.filter((p) => p.status === status);
+      if (status) conditions.push(eq(packagesTable.status, status));
       if (statusPengambilan)
-        rows = rows.filter((p) => p.statusPengambilan === statusPengambilan);
+        conditions.push(eq(packagesTable.statusPengambilan, statusPengambilan));
       if (statusVerifikasi)
-        rows = rows.filter((p) => p.statusVerifikasi === statusVerifikasi);
-      if (batchId) rows = rows.filter((p) => p.batchId === Number(batchId));
+        conditions.push(eq(packagesTable.statusVerifikasi, statusVerifikasi));
+      if (batchId)
+        conditions.push(eq(packagesTable.batchId, Number(batchId)));
       if (serviceTypeId)
-        rows = rows.filter((p) => p.serviceTypeId === Number(serviceTypeId));
+        conditions.push(eq(packagesTable.serviceTypeId, Number(serviceTypeId)));
       if (customerId)
-        rows = rows.filter((p) => p.customerId === Number(customerId));
-      if (adminId) rows = rows.filter((p) => p.adminId === Number(adminId));
+        conditions.push(eq(packagesTable.customerId, Number(customerId)));
+      if (adminId)
+        conditions.push(eq(packagesTable.adminId, Number(adminId)));
       if (dateFrom)
-        rows = rows.filter((p) => new Date(p.createdAt) >= new Date(dateFrom));
+        conditions.push(gte(packagesTable.createdAt, new Date(dateFrom)));
       if (dateTo)
-        rows = rows.filter(
-          (p) => new Date(p.createdAt) <= new Date(dateTo + "T23:59:59Z"),
+        conditions.push(
+          lte(packagesTable.createdAt, new Date(dateTo + "T23:59:59Z")),
         );
       if (search) {
-        const s = search.toLowerCase();
-        rows = rows.filter(
-          (p) =>
-            p.resiNumber.toLowerCase().includes(s) ||
-            (p.itemName ?? "").toLowerCase().includes(s) ||
-            p.barcode.toLowerCase().includes(s) ||
-            (p.packageNumber ?? "").toLowerCase().includes(s) ||
-            (p.customerName ?? "").toLowerCase().includes(s),
+        const pattern = `%${search}%`;
+        conditions.push(
+          or(
+            ilike(packagesTable.resiNumber, pattern),
+            ilike(packagesTable.barcode, pattern),
+            ilike(packagesTable.packageNumber, pattern),
+            ilike(packagesTable.customerName, pattern),
+            ilike(packagesTable.itemName, pattern),
+          ) as ReturnType<typeof eq>,
         );
       }
+
+      const [rows, admins] = await Promise.all([
+        conditions.length > 0
+          ? db
+              .select()
+              .from(packagesTable)
+              .where(and(...conditions))
+              .orderBy(packagesTable.createdAt)
+          : db.select().from(packagesTable).orderBy(packagesTable.createdAt),
+        db
+          .select({ id: usersTable.id, name: usersTable.name })
+          .from(usersTable)
+          .where(eq(usersTable.role, "admin")),
+      ]);
+
+      const adminMap = new Map(admins.map((a) => [a.id, a]));
+      const customerMap = new Map<number, any>();
 
       res.json(rows.map((p) => formatPackage(p, customerMap, adminMap)));
     } catch (err) {

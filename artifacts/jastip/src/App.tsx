@@ -40,7 +40,17 @@ import OwnerPengeluaran from "@/pages/owner/pengeluaran";
 import OwnerTarif from "@/pages/owner/tarif";
 import ProfilePage from "@/pages/profile";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Cache stays fresh for 30s — avoids redundant fetches when multiple
+      // devices/tabs are open at the same time, and on route navigation.
+      staleTime: 30_000,
+      // Keep unused queries in cache for 5 minutes
+      gcTime: 5 * 60_000,
+    },
+  },
+});
 
 function ProtectedRoute({ component: Component, roles, role, ...rest }: any) {
   const { user, isLoading } = useAuth();
