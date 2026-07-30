@@ -1014,6 +1014,7 @@ export default function AdminPackagesImport() {
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">No Paket</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Real (Kg)</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">P×L×T (cm)</th>
+                          <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Jenis Paking</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Vol (Kg)</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap text-blue-700">Pakai (Kg)</th>
                           <th className="px-2 py-2 text-left font-medium whitespace-nowrap text-green-700">Total Ongkir</th>
@@ -1024,7 +1025,7 @@ export default function AdminPackagesImport() {
                           <tr key={i} className={`border-t ${row.error ? "bg-red-50" : i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}>
                             <td className="px-2 py-1.5 text-muted-foreground">{i + 1}</td>
                             {row.error ? (
-                              <td colSpan={8} className="px-2 py-1.5 text-red-600">
+                              <td colSpan={9} className="px-2 py-1.5 text-red-600">
                                 <span className="flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0" />{row.error}</span>
                               </td>
                             ) : (
@@ -1036,6 +1037,7 @@ export default function AdminPackagesImport() {
                                 <td className="px-2 py-1.5 whitespace-nowrap">
                                   {(row.length && row.width && row.height) ? `${row.length}×${row.width}×${row.height}` : "-"}
                                 </td>
+                                <td className="px-2 py-1.5 whitespace-nowrap">{row.packagingType || "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap">{(row as any).volumeWeight != null ? Number((row as any).volumeWeight).toFixed(3) : "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap font-semibold text-blue-700">{(row as any).usedWeight != null ? (row as any).usedWeight : "-"}</td>
                                 <td className="px-2 py-1.5 whitespace-nowrap font-semibold text-green-700">{formatRp((row as any).totalShipping)}</td>
