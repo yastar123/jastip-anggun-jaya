@@ -1,0 +1,39 @@
+
+1.	Pada menu transaksi, saat diskon dimasukkan, tombol Bayar dan Serahkan tidak muncul dan halaman tidak dapat digulir. Masalah yang sama terjadi pada laptop, bahkan tanpa diskon. Saat ini kami harus memperkecil zoom Google Chrome agar tombol tersebut terlihat.
+Mohon tambahkan fitur scroll atau buat tampilan landscape agar seluruh menu dapat diakses.
+
+
+
+
+2.	PENTING: Menu Label Barcode memerlukan waktu lama untuk dibuka, rata-rata lebih dari 10 detik. Proses menjadi semakin lambat saat sistem diakses dari beberapa perangkat secara bersamaan.
+
+
+3.	Mohon samakan fitur Export pada akun Owner dan Admin. Akun Owner harus dapat memilih jenis jastip yang akan diekspor, sedangkan akun Admin juga harus dapat mengekspor data dalam format Excel. Intinya, kedua akun memiliki fitur ekspor yang sama, dengan pilihan format PDF dan Excel.
+
+
+
+4.	Belum tersedia kolom Jenis Paking
+Kolom ini belum tersedia pada file Excel Import Paket maupun input manual.
+Mohon tambahkan kolom Jenis Paking Paket yang bersifat opsional agar data tetap dapat disimpan meskipun tidak diisi.
+
+Di file Export sebenarya mas suda sediakan kolom jenis paking tapi karena di kolom input data dan import data tidak ada kolom untuk masukan data jenis paking makanya kosong.
+
+
+ 
+5.	Pada menu Verifikasi Paket, mohon tambahkan informasi Jenis Paking. Jika jenis paking tidak diisi saat input paket, kolom tersebut cukup ditampilkan kosong. Nama jenis paking dapat berbeda sesuai data yang dimasukkan. Jenis yang paling sering digunakan adalah KB dan T; tata letaknya dapat disesuaikan. Jenis paking dibagi menjadi dua kategori. KB adalah paket kecil yang dimasukkan ke dalam Karung Barang (KB) dan dikirim ke Manokwari dalam bentuk karungan. T adalah paket TUNGGAL (T), yaitu paket besar yang dikirim tanpa dimasukkan ke dalam karung. Penomoran dapat dibuat menjadi KB 1, KB 2, KB 3, dan seterusnya sesuai jumlah karung yang digunakan.
+
+ 
+6.	Pada file Excel Import Paket, mohon tambahkan kolom Harga Kubikasi agar kolom tersebut juga muncul saat data paket diekspor. Pada hasil ekspor Excel maupun PDF, kolom Harga Kubikasi ditempatkan di sebelah kolom Pakai (m3).
+Contohnya seperti berikut:
+ 
+Lebar kolom juga perlu disesuaikan. Kolom Jenis Barang dapat diperlebar, sedangkan kolom Koli diperkecil.
+
+
+ 
+7.	Pada file Export Data Cargo, nominal jutaan tidak tampil dengan benar. Nilai yang seharusnya 1.110.000 hanya terbaca 1,11. Mohon diperiksa apakah kendala ini hanya terjadi pada Cargo atau juga pada layanan lainnya.
+8.	Hasil cetak Label Barcode Cargo masih sering terpotong sehingga sebagian informasi pada label resi tidak terbaca. Mohon sesuaikan ukuran dan tata letaknya agar seluruh informasi tercetak lengkap.
+
+
+9.	Untuk penggunaan ini mungkin di hapus saja mas, soalnya kadang ketika kita scroll kebawah atau keatas setelah input pada kolom itu dia jadi berubah nilainyaa, jadi di kolom berat dan ukuran bisa di hapus saja fitur itu. Hanya bisa di isi ketika di ketik.
+
+10.	Ketika kita melakukan edit di menu label barcode dan save atau simpan perubahan, itu sering kali sanggat lambat atau lama prosesnya.
