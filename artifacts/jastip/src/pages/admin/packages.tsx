@@ -7,7 +7,7 @@ import { Pagination } from "@/components/pagination";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { Search, FileDown, X, Filter } from "lucide-react";
+import { Search, FileDown, Download, X, Filter } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -17,6 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 const PAGE_SIZE = 10;
 
@@ -459,6 +460,37 @@ export default function AdminPackages() {
     setPdfOpen(false);
   }
 
+  function exportExcel() {
+    const data = displayed.length > 0 ? displayed : (packages || []);
+    if (!data.length) return;
+    const rows = data.map((p: any) => ({
+      "Tanggal": formatDate(p.packageDate || p.createdAt),
+      "No Resi": p.resiNumber || "",
+      "No Paket": p.packageNumber || "",
+      "Nama Konsumen": p.customerName || "",
+      "Jenis Jastip": p.serviceType || "",
+      "Rute": p.deliveryRoute || "",
+      "Jenis Barang": p.itemName || "",
+      "Berat Real (Kg)": p.realWeight ?? "",
+      "P (cm)": p.length ?? "",
+      "L (cm)": p.width ?? "",
+      "T (cm)": p.height ?? "",
+      "Berat Volume (Kg)": p.volumeWeight ?? "",
+      "Jenis Paking": p.packagingType || "",
+      "Berat Digunakan (Kg)": p.usedWeight ?? "",
+      "Ongkir/Kg": p.shippingRate ?? "",
+      "Total Berat (Kg)": p.totalWeight ?? "",
+      "Total Ongkir": p.totalShipping ?? "",
+      "Status": p.status === "diserahkan" ? "Diserahkan" : "Pending",
+      "Barcode": p.barcode || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Semua Paket");
+    const safeBatch = filterJenis !== "all" ? `-${filterJenis.replace(/\s+/g, "-").toLowerCase()}` : "";
+    XLSX.writeFile(wb, `laporan-paket${safeBatch}-${new Date().toISOString().split("T")[0]}.xlsx`);
+  }
+
   const showGroupedFields = isGroupedExport();
   const showNamaKapal = pdfJenis.toLowerCase() === "jastip pelni";
   const canExport = !!pdfBatchId && !!packages && packages.length > 0;
@@ -470,15 +502,26 @@ export default function AdminPackages() {
           <h1 className="text-3xl font-bold tracking-tight">Semua Paket</h1>
           <p className="text-muted-foreground mt-1">Kelola data paket pelanggan.</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handlePdfOpenChange(true)}
-          disabled={!packages || packages.length === 0}
-        >
-          <FileDown className="w-4 h-4 mr-2" />
-          Export PDF
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePdfOpenChange(true)}
+            disabled={!packages || packages.length === 0}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Export PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportExcel}
+            disabled={!packages || packages.length === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
+        </div>
       </div>
 
       <Card>

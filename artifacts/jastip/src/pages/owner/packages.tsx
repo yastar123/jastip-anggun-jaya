@@ -1,13 +1,17 @@
-import { useListPackages, PackageStatus, getListPackagesQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useListPackages, useListBatches, PackageStatus, getListPackagesQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
 import { Pagination } from "@/components/pagination";
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, Download, ScanLine, CheckCircle2, XCircle, AlertCircle, Hash, Trash2, AlertTriangle } from "lucide-react";
+import { Search, Download, ScanLine, CheckCircle2, XCircle, AlertCircle, Hash, Trash2, AlertTriangle, FileDown, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,8 +20,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const PAGE_SIZE = 10;
+
+const JENIS_JASTIP = ["Jastip Kargo", "Jastip Hemat+", "Jastip Pelni", "Jastip Pesawat"];
+const GROUPED_JENIS = ["jastip hemat+", "jastip pelni", "jastip pesawat"];
+const KARGO_JENIS   = ["jastip kargo", "jastip cargo"];
 
 function formatRp(n: any) {
   if (!n) return "-";
@@ -31,6 +41,11 @@ function packagingLabel(t: string | null | undefined) {
   const map: Record<string, string> = { karton: "Karton", plastik: "Plastik", kayu: "Kayu", bubble_wrap: "Bubble Wrap", sack: "Karung", lainnya: "Lainnya" };
   return t ? (map[t] || t) : "-";
 }
+function fNum(n: any, decimals = 1) {
+  if (n == null || n === "") return "";
+  const v = Number(n);
+  return isNaN(v) ? "" : v.toFixed(decimals);
+}
 
 export default function OwnerPackages() {
   const [search, setSearch] = useState("");
@@ -40,6 +55,12 @@ export default function OwnerPackages() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // PDF export state
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [pdfBatchId, setPdfBatchId] = useState<string>("");
+  const [pdfJenis, setPdfJenis] = useState<string>("all");
+  const [pdfNamaKapal, setPdfNamaKapal] = useState("");
 
   // Scan verification state
   const [scanInput, setScanInput] = useState("");
@@ -53,12 +74,184 @@ export default function OwnerPackages() {
     status: status === "all" ? undefined : (status as any),
   });
 
+  const { data: batches } = useListBatches();
+  const sortedBatches = [...(batches || [])].sort(
+    (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const selectedPdfBatch = sortedBatches.find((b: any) => String(b.id) === pdfBatchId);
+
   const total = packages?.length || 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const paginated = packages?.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function handleSearch(v: string) { setSearch(v); setPage(1); }
   function handleStatus(v: string) { setStatus(v); setPage(1); }
+
+  function handlePdfOpenChange(open: boolean) {
+    setPdfOpen(open);
+    if (open) { setPdfBatchId(""); setPdfJenis("all"); setPdfNamaKapal(""); }
+  }
+
+  function getFilteredPackages() {
+    if (!packages) return [];
+    let filtered = [...packages] as any[];
+    if (pdfBatchId) filtered = filtered.filter((p) => String(p.batchId) === pdfBatchId);
+    if (pdfJenis !== "all") filtered = filtered.filter((p) => (p.serviceType || "").toLowerCase() === pdfJenis.toLowerCase());
+    return filtered;
+  }
+
+  function isGroupedExport() { return GROUPED_JENIS.includes(pdfJenis.toLowerCase()); }
+  function isKargoExport()   { return KARGO_JENIS.includes(pdfJenis.toLowerCase()); }
+
+  function exportPdf() {
+    if (!packages || packages.length === 0 || !pdfBatchId) return;
+    if (isKargoExport()) exportPdfKargo();
+    else if (isGroupedExport()) exportPdfGrouped();
+    else exportPdfFlat();
+  }
+
+  function exportPdfKargo() {
+    const filtered = getFilteredPackages();
+    if (filtered.length === 0) { toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket yang cocok dengan filter." }); return; }
+    filtered.sort((a: any, b: any) => (a.customerName || "").localeCompare(b.customerName || "", "id"));
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageW = 297; const margin = 10;
+    const batchLabel = selectedPdfBatch ? `${selectedPdfBatch.namaKapal} (${selectedPdfBatch.kotaAsal} → ${selectedPdfBatch.tujuan})` : "-";
+    doc.setFontSize(13); doc.setFont("helvetica", "bold");
+    doc.text("JASTIP CARGO — JASTIP ANGGUN JAYA", pageW / 2, 11, { align: "center" });
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    doc.text(`Batch: ${batchLabel}`, margin, 17);
+    doc.text(`Total Paket: ${filtered.length} paket`, margin, 21);
+    doc.text(`Dicetak: ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, margin, 25);
+    const head = [["No","Nama Konsumen","Tgl Masuk","No Resi / Kurir","Total Koli","Koli","Jenis Barang","Ukuran (cm)","Pakai (M³)","Ongkir Paket","Status"]];
+    const rows = filtered.map((p: any, i: number) => [
+      i + 1, p.customerName || "-", formatDate(p.packageDate || p.createdAt), p.resiNumber || "-",
+      p.packageNumber || "-", p.packagingType || "-", p.itemName || "-",
+      (p.length && p.width && p.height) ? `${p.length}×${p.width}×${p.height}` : "-",
+      p.usedWeight != null ? Number(p.usedWeight).toFixed(4) : "-",
+      p.totalShipping != null ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
+      p.status === "diserahkan" ? "Diserahkan" : "Pending",
+    ]);
+    autoTable(doc, {
+      startY: 30, head, body: rows,
+      styles: { fontSize: 6.5, cellPadding: 1.3, overflow: "ellipsize", lineColor: [200,200,200], lineWidth: 0.1 },
+      headStyles: { fillColor: [234,88,12], textColor: 255, fontStyle: "bold", fontSize: 6.5, halign: "center", valign: "middle" },
+      alternateRowStyles: { fillColor: [255,247,237] },
+      columnStyles: { 0:{cellWidth:8,halign:"center"},1:{cellWidth:28},2:{cellWidth:16},3:{cellWidth:28},4:{cellWidth:14,halign:"center"},5:{cellWidth:20},6:{cellWidth:25},7:{cellWidth:20,halign:"center"},8:{cellWidth:16,halign:"right"},9:{cellWidth:23,halign:"right"},10:{cellWidth:16,halign:"center"} },
+      margin: { left: margin, right: margin },
+    });
+    const totalOngkir = filtered.reduce((s: number, p: any) => s + (Number(p.totalShipping) || 0), 0);
+    const finalY = (doc as any).lastAutoTable.finalY + 5;
+    doc.setFontSize(8); doc.setFont("helvetica", "bold");
+    doc.text(`Total Ongkir Keseluruhan: Rp ${totalOngkir.toLocaleString("id-ID")}`, pageW - margin, finalY, { align: "right" });
+    const safeBatch = selectedPdfBatch ? `-${selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase()}` : "";
+    doc.save(`laporan-kargo${safeBatch}.pdf`);
+    setPdfOpen(false);
+  }
+
+  function exportPdfGrouped() {
+    const filtered = getFilteredPackages();
+    if (filtered.length === 0) { toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket yang cocok dengan filter." }); return; }
+    filtered.sort((a: any, b: any) => (a.customerName || "").localeCompare(b.customerName || "", "id"));
+    const groups = new Map<string, any[]>();
+    for (const pkg of filtered) {
+      const name = (pkg.customerName || "(Tanpa Nama)").trim();
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name)!.push(pkg);
+    }
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const pageW = 297; const margin = 10;
+    const serviceUpper: Record<string, string> = { "jastip pelni":"JASTIP PELNI","jastip hemat+":"JASTIP HEMAT+","jastip pesawat":"JASTIP PESAWAT" };
+    const jenisKey = pdfJenis.toLowerCase();
+    const titleText = (serviceUpper[jenisKey] || pdfJenis.toUpperCase()) + (pdfNamaKapal ? " " + pdfNamaKapal.toUpperCase() : "");
+    const rute = selectedPdfBatch ? `${selectedPdfBatch.kotaAsal} - ${selectedPdfBatch.tujuan}`.toUpperCase() : "-";
+    doc.setFontSize(13); doc.setFont("helvetica", "bold");
+    doc.text(titleText, pageW / 2, 11, { align: "center" });
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    let y = 17;
+    for (const [lbl, val] of [["Rute", rute], ["Jumlah Paket", `${filtered.length} Item`]] as [string,string][]) {
+      doc.text(lbl, 45, y); doc.text(val, 95, y); y += 4.2;
+    }
+    y += 3;
+    const tableHead = [["TANGGAL","NO RESI","SCAN PAKET","STATUS NO\nSCAN PAKET","NO\nPAKET","NAMA\nKONSUMEN","BERAT\nREAL","P","L","T","BERAT\nVOLUME","JENIS\nPAKING","BERAT YANG\nDI GUNAKAN","ONGKIR PER\nPAKET","TOTAL\nBERAT","HARGA","TOTAL ONGKIR\nJASTIP"]];
+    const colStyles: Record<number, object> = { 0:{cellWidth:15},1:{cellWidth:25},2:{cellWidth:25},3:{cellWidth:13,halign:"center"},4:{cellWidth:12,halign:"center"},5:{cellWidth:18},6:{cellWidth:9,halign:"right"},7:{cellWidth:7,halign:"right"},8:{cellWidth:7,halign:"right"},9:{cellWidth:7,halign:"right"},10:{cellWidth:10,halign:"right"},11:{cellWidth:13,halign:"center"},12:{cellWidth:14,halign:"right"},13:{cellWidth:18,halign:"right"},14:{cellWidth:13,halign:"right"},15:{cellWidth:16,halign:"right"},16:{cellWidth:20,halign:"right"} };
+    for (const [customerName, pkgs] of groups) {
+      const totalBeratGrup = pkgs.reduce((s: number, p: any) => s + (Number(p.usedWeight) || 0), 0);
+      const totalOngkirGrup = pkgs.reduce((s: number, p: any) => s + (Number(p.totalShipping) || 0), 0);
+      const hargaPerKg = pkgs.find((p: any) => p.shippingRate != null)?.shippingRate ?? null;
+      if (210 - y < 22) { doc.addPage(); y = 10; }
+      doc.setFontSize(8.5); doc.setFont("helvetica", "bold");
+      doc.text(`NAMA KONSUMEN       ${customerName}`, margin, y + 3);
+      doc.setFontSize(7.5); doc.setFont("helvetica", "normal");
+      doc.text(`  Jumlah Paket:     ${pkgs.length}.0`, margin, y + 7.5);
+      y += 12;
+      const rows = pkgs.map((p: any, i: number) => [
+        formatDate(p.packageDate || p.createdAt), p.resiNumber || "-", p.barcode || p.resiNumber || "-",
+        p.statusVerifikasi === "SUDAH_DIVERIFIKASI" ? "SUDAH\nSCAN" : "BELUM\nSCAN",
+        p.packageNumber || "-", p.customerName || "-",
+        fNum(p.realWeight,1), fNum(p.length,0), fNum(p.width,0), fNum(p.height,0),
+        p.volumeWeight != null ? fNum(p.volumeWeight,1) : "0.0", p.packagingType || "-",
+        fNum(p.usedWeight,1),
+        p.totalShipping != null ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
+        i === 0 ? totalBeratGrup.toFixed(1) : "",
+        i === 0 && hargaPerKg != null ? `Rp ${Number(hargaPerKg).toLocaleString("id-ID")}` : (i === 0 ? "-" : ""),
+        i === 0 ? `Rp ${totalOngkirGrup.toLocaleString("id-ID")}` : "",
+      ]);
+      autoTable(doc, {
+        startY: y, head: tableHead, body: rows,
+        styles: { fontSize: 5.8, cellPadding: 1.1, overflow: "ellipsize", lineColor: [200,200,200], lineWidth: 0.1 },
+        headStyles: { fillColor: [185,28,28], textColor: 255, fontStyle: "bold", fontSize: 5.8, halign: "center", valign: "middle" },
+        alternateRowStyles: { fillColor: [253,248,248] },
+        columnStyles: colStyles, margin: { left: margin, right: margin },
+        tableLineColor: [200,200,200], tableLineWidth: 0.1,
+      });
+      y = (doc as any).lastAutoTable.finalY + 8;
+    }
+    const safeJenis = pdfJenis.replace(/\+/g, "plus").replace(/\s+/g, "-").toLowerCase();
+    const safeKapal = pdfNamaKapal ? `-${pdfNamaKapal.replace(/\s+/g, "-")}` : "";
+    const safeBatch = selectedPdfBatch ? `-${selectedPdfBatch.namaKapal.replace(/\s+/g, "-").toLowerCase()}` : "";
+    doc.save(`laporan-${safeJenis}${safeBatch}${safeKapal}.pdf`);
+    setPdfOpen(false);
+  }
+
+  function exportPdfFlat() {
+    const filtered = getFilteredPackages();
+    if (filtered.length === 0) { toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket yang cocok dengan filter." }); return; }
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const judul = pdfJenis !== "all" ? pdfJenis : "Semua Jenis Jastip";
+    const batchLabel = selectedPdfBatch ? `${selectedPdfBatch.namaKapal} (${selectedPdfBatch.kotaAsal} → ${selectedPdfBatch.tujuan})` : "-";
+    doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.text("Jastip Anggun Jaya — Laporan Paket", 14, 14);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
+    doc.text(`Batch Pengiriman : ${batchLabel}`, 14, 21);
+    doc.text(`Jenis Jastip     : ${judul}`, 14, 26);
+    doc.text(`Dicetak          : ${new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}`, 14, 31);
+    doc.text(`Total Paket      : ${filtered.length} paket`, 14, 36);
+    const rows = filtered.map((p: any, i: number) => [
+      i+1, formatDate(p.packageDate||p.createdAt), p.resiNumber||"-", p.packageNumber||"-",
+      p.customerName||"-", p.serviceType||"-", p.itemName||"-",
+      p.realWeight??"-", p.usedWeight??"-", p.totalWeight??"-",
+      p.totalShipping ? `Rp ${Number(p.totalShipping).toLocaleString("id-ID")}` : "-",
+      p.status==="diserahkan"?"Diserahkan":"Pending",
+    ]);
+    autoTable(doc, {
+      startY: 40,
+      head: [["No","Tanggal","No Resi","No Paket","Nama Konsumen","Jenis Jastip","Jenis Barang","Berat Real","Berat Digunakan","Total Berat","Total Ongkir","Status"]],
+      body: rows,
+      styles: { fontSize: 7, cellPadding: 1.5 },
+      headStyles: { fillColor: [200,30,30], textColor: 255, fontStyle: "bold", fontSize: 7 },
+      alternateRowStyles: { fillColor: [250,245,245] },
+      columnStyles: { 0:{halign:"center",cellWidth:8},1:{cellWidth:18},2:{cellWidth:22},3:{cellWidth:18},7:{halign:"right",cellWidth:16},8:{halign:"right",cellWidth:18},9:{halign:"right",cellWidth:16},10:{halign:"right",cellWidth:24},11:{halign:"center",cellWidth:18} },
+      margin: { left: 14, right: 14 },
+    });
+    const namaFile = ["laporan-paket", selectedPdfBatch?selectedPdfBatch.namaKapal.replace(/\s+/g,"-").toLowerCase():"batch", pdfJenis!=="all"?pdfJenis.replace(/\s+/g,"-").toLowerCase():"semua"].join("_")+".pdf";
+    doc.save(namaFile);
+    setPdfOpen(false);
+  }
+
+  const showGroupedFields = isGroupedExport();
+  const showNamaKapal = pdfJenis.toLowerCase() === "jastip pelni";
+  const canExport = !!pdfBatchId && !!packages && packages.length > 0;
 
   function exportExcel() {
     if (!packages || packages.length === 0) return;
@@ -193,10 +386,26 @@ export default function OwnerPackages() {
           <h1 className="text-3xl font-bold tracking-tight">Monitor Paket</h1>
           <p className="text-muted-foreground mt-1">Pantau seluruh data paket dalam sistem.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={exportExcel} disabled={!packages || packages.length === 0}>
-          <Download className="w-4 h-4 mr-2" />
-          Export Excel
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePdfOpenChange(true)}
+            disabled={!packages || packages.length === 0}
+          >
+            <FileDown className="w-4 h-4 mr-2" />
+            Export PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportExcel}
+            disabled={!packages || packages.length === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
+        </div>
       </div>
 
       {/* Scan Verification Panel */}
@@ -422,6 +631,92 @@ export default function OwnerPackages() {
         </CardContent>
         <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
+
+      {/* PDF Export Dialog */}
+      <Dialog open={pdfOpen} onOpenChange={handlePdfOpenChange}>
+        <DialogContent className="sm:max-w-md flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="w-5 h-5 text-primary" />
+              Export Laporan PDF
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
+            <div className="space-y-1.5">
+              <Label>Batch Pengiriman</Label>
+              <Select value={pdfBatchId} onValueChange={(v) => { setPdfBatchId(v); setPdfJenis("all"); }}>
+                <SelectTrigger className="w-full overflow-hidden">
+                  <span className="truncate block text-left">
+                    {pdfBatchId
+                      ? (() => { const b = sortedBatches.find((b: any) => String(b.id) === pdfBatchId); return b ? `${b.namaKapal} · ${b.kotaAsal} → ${b.tujuan}` : "Pilih batch pengiriman"; })()
+                      : "Pilih batch pengiriman"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-h-[260px] overflow-y-auto max-w-[420px]">
+                  {sortedBatches.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">Belum ada batch pengiriman.</div>
+                  )}
+                  {sortedBatches.map((b: any) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      <div className="flex flex-col w-full">
+                        <span className="font-medium text-sm truncate max-w-[360px]">{b.namaKapal}</span>
+                        <span className="text-xs text-muted-foreground truncate max-w-[360px]">
+                          {b.kotaAsal} → {b.tujuan}
+                          {b.statusBatch === "OPEN" ? " · Aktif" : b.statusBatch === "CLOSED" ? " · Ditutup" : " · Arsip"}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Pilih batch pengiriman terlebih dahulu untuk melanjutkan.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Jenis Jastip</Label>
+              <Select value={pdfJenis} onValueChange={setPdfJenis} disabled={!pdfBatchId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih jenis jastip" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Jenis</SelectItem>
+                  {JENIS_JASTIP.map((j) => (
+                    <SelectItem key={j} value={j}>{j}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {showGroupedFields && showNamaKapal && (
+              <div className="space-y-1.5">
+                <Label>Nama Kapal <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></Label>
+                <input
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Contoh: KM DEMPO"
+                  value={pdfNamaKapal}
+                  onChange={(e) => setPdfNamaKapal(e.target.value)}
+                />
+              </div>
+            )}
+
+            {(pdfBatchId || pdfJenis !== "all" || pdfNamaKapal) && (
+              <button
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground flex items-center gap-1"
+                onClick={() => { setPdfBatchId(""); setPdfJenis("all"); setPdfNamaKapal(""); }}
+              >
+                <X className="w-3 h-3" /> Reset filter
+              </button>
+            )}
+          </div>
+          <DialogFooter className="gap-2 shrink-0">
+            <Button variant="outline" onClick={() => setPdfOpen(false)}>Batal</Button>
+            <Button onClick={exportPdf} disabled={!canExport}>
+              <FileDown className="w-4 h-4 mr-2" />
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
