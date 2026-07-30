@@ -1042,9 +1042,12 @@ export default function AdminPackagesNew() {
                                 <FormLabel>{label} <span className="text-destructive">*</span></FormLabel>
                                 <FormControl>
                                   <Input
-                                    type="number" step="0.1" placeholder="0"
+                                    type="text" inputMode="decimal" placeholder="0"
                                     {...field} value={field.value ?? ""}
-                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                    onChange={(e) => {
+                                      const v = e.target.value;
+                                      field.onChange(v === "" ? null : Number(v));
+                                    }}
                                   />
                                 </FormControl>
                                 <FormMessage />
@@ -1370,9 +1373,12 @@ export default function AdminPackagesNew() {
                               <FormLabel>{label} <span className="text-muted-foreground font-normal text-xs">(Opsional)</span></FormLabel>
                               <FormControl>
                                 <Input
-                                  type="number" step="0.1" placeholder="0"
+                                  type="text" inputMode="decimal" placeholder="0"
                                   {...field} value={field.value ?? ""}
-                                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    field.onChange(v === "" ? null : Number(v));
+                                  }}
                                 />
                               </FormControl>
                               <FormMessage />

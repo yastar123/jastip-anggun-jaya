@@ -66,7 +66,7 @@ export function labelHeaderHtml() {
 }
 
 export function labelFooterHtml() {
-  return `<div class="footer">Jastip Anggun Jaya · +62 812-4500-8384 · Jln Merpati Sp 4 jlr 8 (Depan SMKN 4), Manokwari</div>`;
+  return ``;
 }
 
 // Prefix used to encode a "grup" barcode — a single QR/barcode that stands
