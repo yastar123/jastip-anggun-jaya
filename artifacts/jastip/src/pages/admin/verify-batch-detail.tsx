@@ -644,7 +644,7 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
                             <span>Resi: <strong className="font-mono">{resultPkg.resiNumber}</strong></span>
                             <span>Berat: {resultPkg.realWeight != null ? resultPkg.realWeight + " Kg" : "-"}</span>
                             <span>Jastip: {resultPkg.serviceType || "-"}</span>
-                            <span>Status: {resultPkg.status === "diserahkan" ? "Diserahkan" : "Pending"}</span>
+                            <span>Jenis Paking: <strong>{resultPkg.packagingType || "—"}</strong></span>
                           </div>
                         )}
                       </>
@@ -780,11 +780,18 @@ export default function VerifyBatchDetail({ params }: { params: { id: string } }
               {selectedGroup.packages.map((p: any) => {
                 const isVerified = p.statusVerifikasi === "SUDAH_DIVERIFIKASI";
                 return (
-                  <div key={p.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs ${isVerified ? "bg-green-50 border-green-200" : "bg-muted/30"}`}>
+                  <div key={p.id} className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs ${isVerified ? "bg-green-50 border-green-200" : "bg-muted/30"}`}>
                     {isVerified
-                      ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
-                      : <Package className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                    <span className="font-mono flex-1 truncate">{p.resiNumber || p.barcode}</span>
+                      ? <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0 mt-0.5" />
+                      : <Package className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />}
+                    <div className="flex-1 min-w-0">
+                      <span className="font-mono block truncate">{p.resiNumber || p.barcode}</span>
+                      {p.packagingType ? (
+                        <span className="text-muted-foreground">{p.packagingType}</span>
+                      ) : (
+                        <span className="text-muted-foreground/40 italic">Paking: —</span>
+                      )}
+                    </div>
                     <Badge variant="outline" className={`text-xs shrink-0 ${isVerified ? "bg-green-100 text-green-800 border-green-300" : "bg-amber-100 text-amber-800 border-amber-300"}`}>
                       {isVerified ? "✓ Diverifikasi" : "Belum"}
                     </Badge>
