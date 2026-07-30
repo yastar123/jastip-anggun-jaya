@@ -676,14 +676,14 @@ export default function AdminScan() {
 
       {/* Payment Modal */}
       <Dialog open={showPayModal} onOpenChange={setShowPayModal}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
+        <DialogContent className="max-w-sm flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <ScanLine className="h-5 w-5 text-primary" /> Pembayaran &amp; Serah Terima
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
             {/* Bill summary */}
             <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2">
               <div className="flex justify-between text-sm text-muted-foreground">
