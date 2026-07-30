@@ -282,7 +282,7 @@ function SingleBarcodeCard({
     const html = labelDocumentHtml(
       `Label Paket — ${pkg.resiNumber || qrValue}`,
       labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
-        <div class="info">
+        <div class="info compact">
           <div class="cust">${pkg.customerName || "-"}</div>
           <div class="grid">
             <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
@@ -638,7 +638,7 @@ export default function BarcodeBatchDetail({
   const [syncing, setSyncing] = useState(false);
 
   const { data: batches } = useListBatches();
-  const { data: packages, isLoading } = useListPackages();
+  const { data: packages, isLoading } = useListPackages({ batchId });
 
   const batch = (batches || []).find((b: any) => b.id === batchId);
   const batchLabel = batch
@@ -647,7 +647,6 @@ export default function BarcodeBatchDetail({
 
   const batchPkgs = (packages || []).filter(
     (p: any) =>
-      p.batchId === batchId &&
       p.statusPengambilan !== "SUDAH_DIAMBIL" &&
       p.status !== "diserahkan",
   );
@@ -918,7 +917,7 @@ export default function BarcodeBatchDetail({
           : "-";
         pages.push(
           labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
-          <div class="info">
+          <div class="info compact">
             <div class="cust">${pkg.customerName || "-"}</div>
             <div class="grid">
               <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>

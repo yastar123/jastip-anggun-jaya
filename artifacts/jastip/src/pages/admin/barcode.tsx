@@ -77,8 +77,9 @@ function buildSinglePrintHtml(pkg: any, qrDataUrl: string, qrValue: string, batc
   const batchRow = batchLabel
     ? `<div class="field full"><div class="fl">Batch Pengiriman</div><div class="fv" style="color:#1d4ed8;">${batchLabel}</div></div>`
     : "";
+  const isKargo = (pkg.serviceType || "").toLowerCase() === "jastip kargo";
   const inner = `${qrSectionHtml(qrDataUrl, qrValue)}
-    <div class="info">
+    <div class="info${isKargo ? " compact" : ""}">
       <div class="cust">${pkg.customerName || "-"}</div>
       <div class="grid">
         <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
@@ -412,8 +413,9 @@ function BatchBarcodeSection({
       try {
         qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
       } catch { continue; }
+      const isKargoPkg = (pkg.serviceType || "").toLowerCase() === "jastip kargo";
       pages.push(labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
-        <div class="info">
+        <div class="info${isKargoPkg ? " compact" : ""}">
           <div class="cust">${pkg.customerName || "-"}</div>
           <div class="grid">
             <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>
@@ -581,7 +583,7 @@ function NoBatchSection({
 export default function AdminBarcode() {
   const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const { data: packages, isLoading } = useListPackages();
+  const { data: packages, isLoading } = useListPackages({ status: "pending" });
   const { data: batches } = useListBatches();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -711,8 +713,9 @@ export default function AdminBarcode() {
       try {
         qrDataUrl = await QRCode.toDataURL(qrValue, { width: 400, margin: 3, color: { dark: "#000000", light: "#ffffff" } });
       } catch { continue; }
+      const isKargoBulk = (pkg.serviceType || "").toLowerCase() === "jastip kargo";
       pages.push(labelPageHtml(`${qrSectionHtml(qrDataUrl, qrValue)}
-        <div class="info">
+        <div class="info${isKargoBulk ? " compact" : ""}">
           <div class="cust">${pkg.customerName || "-"}</div>
           <div class="grid">
             <div class="field"><div class="fl">No. Resi</div><div class="fv mono">${pkg.resiNumber || "-"}</div></div>

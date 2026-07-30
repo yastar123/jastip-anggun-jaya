@@ -47,9 +47,17 @@ export const LABEL_STYLES = `
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 3.5mm; }
   .field { display: flex; flex-direction: column; gap: 0.7mm; }
   .fl { font-size: 7pt; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.3px; }
-  .fv { font-size: 12pt; font-weight: 700; color: #222; line-height: 1.15; }
+  .fv { font-size: 12pt; font-weight: 700; color: #222; line-height: 1.15; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .fv.mono { font-family: monospace; font-size: 11pt; }
   .fv.red { color: #cc0000; font-size: 13.5pt; }
+  /* Compact variant for labels with many fields (e.g. Kargo) */
+  .compact.info { padding: 1.5mm 3.5mm; }
+  .compact .cust { font-size: 13pt; margin-bottom: 1.5mm; padding-bottom: 1mm; }
+  .compact .grid { gap: 1.5mm 2.5mm; }
+  .compact .fl { font-size: 6pt; }
+  .compact .fv { font-size: 9pt; }
+  .compact .fv.mono { font-size: 8.5pt; }
+  .compact .fv.red { font-size: 10pt; }
   .full { grid-column: 1 / -1; }
   .status { display: inline-block; padding: 0.8mm 2.5mm; border-radius: 3mm; font-size: 7.5pt; font-weight: 700; }
   .footer {
