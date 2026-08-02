@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useListPackages, getListPackagesQueryKey, useListBatches } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -389,8 +389,8 @@ function BatchBarcodeSection({
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
 
-  const batchPkgs = packages.filter((p: any) => p.batchId === batch.id &&
-    p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan");
+  // packages sudah pre-filtered by batchId + active status di parent (useMemo)
+  const batchPkgs = packages;
 
   const filtered = batchPkgs.filter((p: any) =>
     (filterServiceType === "all" || (p.serviceType || "").toLowerCase() === filterServiceType) &&
@@ -583,16 +583,14 @@ function NoBatchSection({
 export default function AdminBarcode() {
   const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
-  const { data: packages, isLoading } = useListPackages({ status: "pending" });
+  // Tidak pakai filter status=pending agar cache key sama dengan halaman lain (arsip, dll)
+  // sehingga data tidak di-fetch ulang saat pindah halaman.
+  const { data: packages, isLoading } = useListPackages();
   const { data: batches } = useListBatches();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
   const base = user?.role === "owner" ? "/owner" : "/admin";
-
-  const batchMap = new Map<number, string>(
-    (batches || []).map((b: any) => [b.id, b.name || `Batch #${b.id}`])
-  );
 
   const [editPkg, setEditPkg] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({
@@ -611,24 +609,58 @@ export default function AdminBarcode() {
   const idsParam = new URLSearchParams(window.location.search).get("ids");
   const highlightIds = idsParam ? idsParam.split(",").map(Number).filter(Boolean) : null;
 
-  const allPackages = packages || [];
-  const allBatches = batches || [];
+  const allPackages = useMemo(() => packages || [], [packages]);
+  const allBatches = useMemo(() => batches || [], [batches]);
 
-  const totalBatchPages = Math.max(1, Math.ceil(allBatches.length / BATCH_PAGE_SIZE));
-  const safeBatchPage = Math.min(batchPage, totalBatchPages);
-  const paginatedBatches = allBatches.slice((safeBatchPage - 1) * BATCH_PAGE_SIZE, safeBatchPage * BATCH_PAGE_SIZE);
-
-  const activePackages = allPackages.filter(
-    (p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"
+  // Paket aktif (belum diserahkan) — dihitung sekali, tidak diulang tiap render
+  const activePackages = useMemo(
+    () => allPackages.filter((p: any) => p.statusPengambilan !== "SUDAH_DIAMBIL" && p.status !== "diserahkan"),
+    [allPackages]
   );
 
-  const sudahDiambilCount = allPackages.filter(
-    (p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan"
-  ).length;
+  const sudahDiambilCount = useMemo(
+    () => allPackages.filter((p: any) => p.statusPengambilan === "SUDAH_DIAMBIL" || p.status === "diserahkan").length,
+    [allPackages]
+  );
 
-  const noBatchPkgs = activePackages.filter((p: any) => p.batchId == null);
+  const noBatchPkgs = useMemo(
+    () => activePackages.filter((p: any) => p.batchId == null),
+    [activePackages]
+  );
+
+  // Pre-group paket aktif per batchId — O(N) sekali, bukan O(N×M) tiap render
+  const packagesByBatch = useMemo(() => {
+    const map = new Map<number, any[]>();
+    for (const p of activePackages) {
+      if (p.batchId != null) {
+        if (!map.has(p.batchId)) map.set(p.batchId, []);
+        map.get(p.batchId)!.push(p);
+      }
+    }
+    return map;
+  }, [activePackages]);
+
+  const batchMap = useMemo(
+    () => new Map<number, string>((allBatches).map((b: any) => [b.id, b.name || `Batch #${b.id}`])),
+    [allBatches]
+  );
+
+  const totalBatchPages = useMemo(() => Math.max(1, Math.ceil(allBatches.length / BATCH_PAGE_SIZE)), [allBatches]);
+  const safeBatchPage = Math.min(batchPage, totalBatchPages);
+  const paginatedBatches = useMemo(
+    () => allBatches.slice((safeBatchPage - 1) * BATCH_PAGE_SIZE, safeBatchPage * BATCH_PAGE_SIZE),
+    [allBatches, safeBatchPage]
+  );
 
   const totalActive = activePackages.length;
+
+  // Hitung jumlah paket per jenis jastip sekali saja, bukan di tiap render JSX
+  const serviceTypeCounts = useMemo(() => ({
+    "jastip pesawat": activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === "jastip pesawat").length,
+    "jastip hemat+": activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === "jastip hemat+").length,
+    "jastip kargo": activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === "jastip kargo").length,
+    "jastip pelni": activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === "jastip pelni").length,
+  }), [activePackages]);
 
   function handleSearch(v: string) { setSearch(v); }
 
@@ -803,7 +835,7 @@ export default function AdminBarcode() {
         ].map((opt) => {
           const count = opt.value === "all"
             ? totalActive
-            : activePackages.filter((p: any) => (p.serviceType || "").toLowerCase() === opt.value).length;
+            : serviceTypeCounts[opt.value as keyof typeof serviceTypeCounts] ?? 0;
           return (
             <Button
               key={opt.value}
@@ -861,7 +893,7 @@ export default function AdminBarcode() {
               <BatchBarcodeSection
                 key={batch.id}
                 batch={batch}
-                packages={allPackages}
+                packages={packagesByBatch.get(batch.id) || []}
                 batchLabel={label}
                 search={search}
                 filterServiceType={filterServiceType}
