@@ -551,19 +551,19 @@ export default function AdminBatches() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Hapus Batch confirmation (soft delete) */}
+      {/* Hapus Batch confirmation (hard delete) */}
       <AlertDialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-600">
               <Trash2 className="w-5 h-5" />
-              Hapus Batch "{showDeleteConfirm?.namaKapal}"?
+              Hapus Permanen Batch "{showDeleteConfirm?.namaKapal}"?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Batch ini akan disembunyikan dari daftar aktif (soft delete). Data paket yang sudah masuk tetap aman
-              di database dan tidak dihapus. Tindakan ini tidak bisa dibatalkan dari tampilan utama.
+              <strong>Tindakan ini tidak bisa dibatalkan.</strong> Batch beserta seluruh paket di dalamnya akan
+              dihapus permanen dari database.
               <br /><br />
-              Gunakan fitur ini jika data batch salah dan perlu diupload ulang.
+              Gunakan fitur ini jika data batch salah dan perlu diupload ulang dari awal.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -577,7 +577,7 @@ export default function AdminBatches() {
                 }
               }}
             >
-              Ya, Hapus Batch
+              Ya, Hapus Permanen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
