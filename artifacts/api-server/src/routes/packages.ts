@@ -747,21 +747,25 @@ router.post(
             continue;
           }
 
-          // Skip jika resiNumber sudah ada di batch yang sama (cegah duplikat import ulang)
-          const existing = await db
-            .select({ id: packagesTable.id })
-            .from(packagesTable)
-            .where(
-              and(
-                eq(packagesTable.resiNumber, String(resiNumber)),
-                eq(packagesTable.batchId, Number(batchId)),
-              ),
-            )
-            .limit(1);
-          if (existing[0]) {
-            failed++;
-            errors.push(`Duplikat dilewati — resi ${resiNumber} sudah ada di batch ini`);
-            continue;
+          // Skip jika resiNumber sudah ada di batch yang sama (cegah duplikat import ulang).
+          // Kargo (packageMode="single") dikecualikan: kolom Toko/Kurir bukan nomor resi unik,
+          // banyak paket bisa berasal dari kurir yang sama (JNE, JNT, SPX, dst).
+          if (packageMode !== "single") {
+            const existing = await db
+              .select({ id: packagesTable.id })
+              .from(packagesTable)
+              .where(
+                and(
+                  eq(packagesTable.resiNumber, String(resiNumber)),
+                  eq(packagesTable.batchId, Number(batchId)),
+                ),
+              )
+              .limit(1);
+            if (existing[0]) {
+              failed++;
+              errors.push(`Duplikat dilewati — resi ${resiNumber} sudah ada di batch ini`);
+              continue;
+            }
           }
 
           const divisor = getVolumeDivisor(serviceType);

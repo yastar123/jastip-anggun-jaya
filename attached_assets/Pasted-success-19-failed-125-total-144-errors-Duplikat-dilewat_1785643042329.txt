@@ -1,0 +1,320 @@
+success: 19, failed: 125, total: 144,…}
+errors
+: 
+["Duplikat dilewati — resi JNE sudah ada di batch ini",…]
+[0 … 99]
+0
+: 
+"Duplikat dilewati — resi JNE sudah ada di batch ini"
+1
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+2
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+3
+: 
+"Duplikat dilewati — resi Tiktok sudah ada di batch ini"
+4
+: 
+"Duplikat dilewati — resi Tiktok sudah ada di batch ini"
+5
+: 
+"Duplikat dilewati — resi Tiktok sudah ada di batch ini"
+6
+: 
+"Duplikat dilewati — resi Tiktok sudah ada di batch ini"
+7
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+8
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+9
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+10
+: 
+"Duplikat dilewati — resi JNE sudah ada di batch ini"
+11
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+12
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+13
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+14
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+15
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+16
+: 
+"Duplikat dilewati — resi Baraka Express sudah ada di batch ini"
+17
+: 
+"Duplikat dilewati — resi Baraka Express sudah ada di batch ini"
+18
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+19
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+20
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+21
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+22
+: 
+"Duplikat dilewati — resi Indah Logistic Cargo sudah ada di batch ini"
+23
+: 
+"Duplikat dilewati — resi Indah Logistic Cargo sudah ada di batch ini"
+24
+: 
+"Duplikat dilewati — resi Indah Logistic Cargo sudah ada di batch ini"
+25
+: 
+"Duplikat dilewati — resi Indah Logistic Cargo sudah ada di batch ini"
+26
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+27
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+28
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+29
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+30
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+31
+: 
+"Duplikat dilewati — resi JNE sudah ada di batch ini"
+32
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+33
+: 
+"Duplikat dilewati — resi JNE sudah ada di batch ini"
+34
+: 
+"Duplikat dilewati — resi Sicepat sudah ada di batch ini"
+35
+: 
+"Duplikat dilewati — resi JNE sudah ada di batch ini"
+36
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+37
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+38
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+39
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+40
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+41
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+42
+: 
+"Duplikat dilewati — resi JNE sudah ada di batch ini"
+43
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+44
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+45
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+46
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+47
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+48
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+49
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+50
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+51
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+52
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+53
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+54
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+55
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+56
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+57
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+58
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+59
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+60
+: 
+"Duplikat dilewati — resi AnterAja sudah ada di batch ini"
+61
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+62
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+63
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+64
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+65
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+66
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+67
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+68
+: 
+"Duplikat dilewati — resi Indah Logistic Cargo sudah ada di batch ini"
+69
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+70
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+71
+: 
+"Duplikat dilewati — resi AnterAja sudah ada di batch ini"
+72
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+73
+: 
+"Duplikat dilewati — resi GTL sudah ada di batch ini"
+74
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+75
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+76
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+77
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+78
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+79
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+80
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+81
+: 
+"Duplikat dilewati — resi Lalamove sudah ada di batch ini"
+82
+: 
+"Duplikat dilewati — resi Lalamove sudah ada di batch ini"
+83
+: 
+"Duplikat dilewati — resi Lalamove sudah ada di batch ini"
+84
+: 
+"Duplikat dilewati — resi Lalamove sudah ada di batch ini"
+85
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+86
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+87
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+88
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+89
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+90
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+91
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+92
+: 
+"Duplikat dilewati — resi JNT sudah ada di batch ini"
+93
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+94
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+95
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+96
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+97
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+98
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+99
+: 
+"Duplikat dilewati — resi SPX sudah ada di batch ini"
+[100 … 124]
+failed
+: 
+125
+ids
+: 
+[10572, 10573, 10574, 10575, 10576, 10577, 10578, 10579, 10580, 10581, 10582, 10583, 10584, 10585,…]
+success
+: 
+19
+total
+: 
+144
+
+
