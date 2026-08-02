@@ -83,8 +83,6 @@ export const packagesTable = pgTable("packages", {
   adminId: integer("admin_id").references(() => usersTable.id),
   packageDate: timestamp("package_date", { withTimezone: true }),
   pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
-  // Soft-delete: null = aktif, diisi = sudah dihapus (tidak tampil tapi data tetap ada di DB)
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

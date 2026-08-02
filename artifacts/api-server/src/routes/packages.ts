@@ -6,7 +6,7 @@ import {
   serviceTypesTable,
   batchesTable,
 } from "@workspace/db";
-import { eq, and, ne, inArray, ilike, sql, gte, lte, or, isNull } from "drizzle-orm";
+import { eq, and, ne, inArray, ilike, sql, gte, lte, or } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import crypto from "crypto";
 
@@ -49,7 +49,6 @@ async function recalcPesawatCustomerOngkir(
       and(
         eq(packagesTable.batchId, batchId),
         eq(packagesTable.serviceType, "jastip pesawat"),
-        isNull(packagesTable.deletedAt),
       ),
     );
 
@@ -122,7 +121,6 @@ async function recalcHematCustomerOngkir(
       and(
         eq(packagesTable.batchId, batchId),
         eq(packagesTable.serviceType, "jastip hemat+"),
-        isNull(packagesTable.deletedAt),
       ),
     );
 
@@ -222,7 +220,6 @@ async function recalcPelniCustomerOngkir(
       and(
         eq(packagesTable.batchId, batchId),
         eq(packagesTable.serviceType, "jastip pelni"),
-        isNull(packagesTable.deletedAt),
       ),
     );
 
@@ -375,10 +372,7 @@ router.get(
 
       // Build WHERE conditions pushed to the database — avoids loading all rows
       // into Node then filtering in JS (the old approach was O(n) in memory).
-      // isNull(deletedAt) selalu disertakan agar paket yang sudah dihapus tidak muncul.
-      const conditions: ReturnType<typeof eq>[] = [
-        isNull(packagesTable.deletedAt) as ReturnType<typeof eq>,
-      ];
+      const conditions: ReturnType<typeof eq>[] = [];
 
       if (status) conditions.push(eq(packagesTable.status, status));
       if (statusPengambilan)
@@ -413,11 +407,13 @@ router.get(
       }
 
       const [rows, admins] = await Promise.all([
-        db
-          .select()
-          .from(packagesTable)
-          .where(and(...conditions))
-          .orderBy(packagesTable.createdAt),
+        conditions.length > 0
+          ? db
+              .select()
+              .from(packagesTable)
+              .where(and(...conditions))
+              .orderBy(packagesTable.createdAt)
+          : db.select().from(packagesTable).orderBy(packagesTable.createdAt),
         db
           .select({ id: usersTable.id, name: usersTable.name })
           .from(usersTable)
@@ -939,7 +935,7 @@ router.get(
         const groupPkgs = await db
           .select()
           .from(packagesTable)
-          .where(and(inArray(packagesTable.id, ids), isNull(packagesTable.deletedAt)));
+          .where(inArray(packagesTable.id, ids));
 
         if (!groupPkgs.length) {
           res.json({ valid: false, message: "Paket grup tidak ditemukan" });
@@ -977,21 +973,21 @@ router.get(
       let pkgs = await db
         .select()
         .from(packagesTable)
-        .where(and(sql`lower(${packagesTable.barcode}) = lower(${barcode})`, isNull(packagesTable.deletedAt)))
+        .where(sql`lower(${packagesTable.barcode}) = lower(${barcode})`)
         .limit(1);
       if (!pkgs[0]) {
         // Search all matching resiNumber rows (case-insensitive), then prefer the one in hintBatchId
         const byResi = await db
           .select()
           .from(packagesTable)
-          .where(and(sql`lower(${packagesTable.resiNumber}) = lower(${barcode})`, isNull(packagesTable.deletedAt)));
+          .where(sql`lower(${packagesTable.resiNumber}) = lower(${barcode})`);
         if (byResi.length > 0) {
           const inBatch = hintBatchId != null ? byResi.find((p) => p.batchId === hintBatchId) : null;
           pkgs = [inBatch ?? byResi[0]];
         }
       }
       if (!pkgs[0] && barcode) {
-        const all = await db.select().from(packagesTable).where(isNull(packagesTable.deletedAt));
+        const all = await db.select().from(packagesTable);
         const candidates = all.filter((p) => p.packageNumber === barcode);
         if (candidates.length > 0) {
           const inBatch = hintBatchId != null ? candidates.find((p) => p.batchId === hintBatchId) : null;
@@ -1049,7 +1045,7 @@ router.get(
       const pkgs = await db
         .select()
         .from(packagesTable)
-        .where(and(eq(packagesTable.id, id), isNull(packagesTable.deletedAt)))
+        .where(eq(packagesTable.id, id))
         .limit(1);
       const pkg = pkgs[0];
       if (!pkg) {
@@ -1314,7 +1310,7 @@ router.patch(
   },
 );
 
-// DELETE /api/packages/:id — soft delete (data tetap ada di DB, hanya ditandai deletedAt)
+// DELETE /api/packages/:id — hard delete (data dihapus permanen dari database)
 router.delete(
   "/:id",
   requireAuth,
@@ -1322,12 +1318,11 @@ router.delete(
   async (req, res) => {
     try {
       const id = Number(req.params.id);
-      const updated = await db
-        .update(packagesTable)
-        .set({ deletedAt: new Date(), updatedAt: new Date() })
-        .where(and(eq(packagesTable.id, id), isNull(packagesTable.deletedAt)))
+      const deleted = await db
+        .delete(packagesTable)
+        .where(eq(packagesTable.id, id))
         .returning();
-      if (!updated[0]) {
+      if (!deleted[0]) {
         res.status(404).json({ error: "Not found" });
         return;
       }
@@ -1462,7 +1457,7 @@ router.get(
       const pkgs = await db
         .select()
         .from(packagesTable)
-        .where(and(eq(packagesTable.id, id), isNull(packagesTable.deletedAt)))
+        .where(eq(packagesTable.id, id))
         .limit(1);
       const pkg = pkgs[0];
       if (!pkg) {
