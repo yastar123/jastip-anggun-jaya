@@ -20,9 +20,9 @@ export const batchesTable = pgTable("batches", {
   // Asal & tujuan
   kotaAsal: text("kota_asal").notNull(),
   tujuan: text("tujuan").notNull().default("Manokwari"),
-  // Status: OPEN = masih aktif, CLOSED = dikunci, ARSIP = selesai read-only
+  // Status: OPEN = masih aktif, CLOSED = dikunci, ARSIP = selesai read-only, HAPUS = soft-deleted
   statusBatch: text("status_batch", {
-    enum: ["OPEN", "CLOSED", "ARSIP"],
+    enum: ["OPEN", "CLOSED", "ARSIP", "HAPUS"],
   })
     .notNull()
     .default("OPEN"),

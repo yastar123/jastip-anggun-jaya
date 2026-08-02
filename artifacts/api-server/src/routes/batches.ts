@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, batchesTable, packagesTable, serviceTypesTable } from "@workspace/db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router = Router();
@@ -136,7 +136,7 @@ router.get("/:id", requireAuth, requireRole("admin", "owner"), async (req, res) 
         createdAt: packagesTable.createdAt,
       })
       .from(packagesTable)
-      .where(eq(packagesTable.batchId, id))
+      .where(and(eq(packagesTable.batchId, id), isNull(packagesTable.deletedAt as any)))
       .orderBy(packagesTable.customerName);
 
     // Group by serviceType + customerName
@@ -218,6 +218,14 @@ router.patch("/:id", requireAuth, requireRole("admin", "owner"), async (req, res
       .set(updates)
       .where(eq(batchesTable.id, id))
       .returning();
+
+    // Cascade soft-delete: jika batch di-HAPUS, tandai semua paketnya sebagai dihapus juga
+    if (statusBatch === "HAPUS") {
+      await db
+        .update(packagesTable)
+        .set({ deletedAt: new Date(), updatedAt: new Date() } as any)
+        .where(and(eq(packagesTable.batchId, id), isNull(packagesTable.deletedAt as any)));
+    }
 
     res.json(formatBatch(updated));
   } catch (err) {
