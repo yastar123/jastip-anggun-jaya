@@ -78,7 +78,7 @@ export default function AdminPackages() {
   const [pdfNamaKapal, setPdfNamaKapal] = useState("");
 
   const [xlsxOpen, setXlsxOpen] = useState(false);
-  const [xlsxBatchId, setXlsxBatchId] = useState<string>("");
+  const [xlsxBatchId, setXlsxBatchId] = useState<string>("__all__");
 
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
@@ -100,12 +100,16 @@ export default function AdminPackages() {
     }
   }
 
+  const XLSX_ALL = "__all__";
+
   function handleXlsxOpenChange(open: boolean) {
     setXlsxOpen(open);
-    if (open) setXlsxBatchId("");
+    if (open) setXlsxBatchId(XLSX_ALL);
   }
 
-  const selectedXlsxBatch = sortedBatches.find((b: any) => String(b.id) === xlsxBatchId);
+  const selectedXlsxBatch = xlsxBatchId !== XLSX_ALL
+    ? sortedBatches.find((b: any) => String(b.id) === xlsxBatchId)
+    : undefined;
 
   function applyTableFilters(data: any[]): any[] {
     let filtered = [...data];
@@ -475,7 +479,7 @@ export default function AdminPackages() {
   function exportExcel() {
     if (!packages || packages.length === 0) return;
     let data = [...packages] as any[];
-    if (xlsxBatchId) data = data.filter((p) => String(p.batchId) === xlsxBatchId);
+    if (xlsxBatchId && xlsxBatchId !== XLSX_ALL) data = data.filter((p) => String(p.batchId) === xlsxBatchId);
     if (!data.length) {
       toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket untuk batch yang dipilih." });
       return;
@@ -753,13 +757,13 @@ export default function AdminPackages() {
               <Select value={xlsxBatchId} onValueChange={setXlsxBatchId}>
                 <SelectTrigger className="w-full overflow-hidden">
                   <span className="truncate block text-left">
-                    {xlsxBatchId
+                    {xlsxBatchId !== XLSX_ALL
                       ? (() => { const b = sortedBatches.find((b: any) => String(b.id) === xlsxBatchId); return b ? `${b.namaKapal} · ${b.kotaAsal} → ${b.tujuan}` : "Pilih batch"; })()
                       : "Semua batch (tidak difilter)"}
                   </span>
                 </SelectTrigger>
                 <SelectContent className="max-h-[260px] overflow-y-auto max-w-[420px]">
-                  <SelectItem value="">Semua batch</SelectItem>
+                  <SelectItem value={XLSX_ALL}>Semua batch</SelectItem>
                   {sortedBatches.map((b: any) => (
                     <SelectItem key={b.id} value={String(b.id)} className="flex-col items-start">
                       <div className="flex flex-col w-full">
@@ -780,7 +784,7 @@ export default function AdminPackages() {
             {packages && (
               <div className="rounded-md bg-muted/40 border px-4 py-3 space-y-1.5 text-sm">
                 {(() => {
-                  const preview = xlsxBatchId
+                  const preview = xlsxBatchId !== XLSX_ALL
                     ? packages.filter((p: any) => String(p.batchId) === xlsxBatchId)
                     : packages;
                   return (
