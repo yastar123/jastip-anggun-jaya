@@ -77,6 +77,9 @@ export default function AdminPackages() {
   const [pdfJenis, setPdfJenis] = useState<string>("all");
   const [pdfNamaKapal, setPdfNamaKapal] = useState("");
 
+  const [xlsxOpen, setXlsxOpen] = useState(false);
+  const [xlsxBatchId, setXlsxBatchId] = useState<string>("");
+
   const { data: packages, isLoading } = useListPackages({
     search: search || undefined,
     status: status === "all" ? undefined : (status as any),
@@ -96,6 +99,13 @@ export default function AdminPackages() {
       setPdfNamaKapal("");
     }
   }
+
+  function handleXlsxOpenChange(open: boolean) {
+    setXlsxOpen(open);
+    if (open) setXlsxBatchId("");
+  }
+
+  const selectedXlsxBatch = sortedBatches.find((b: any) => String(b.id) === xlsxBatchId);
 
   function applyTableFilters(data: any[]): any[] {
     let filtered = [...data];
@@ -463,14 +473,26 @@ export default function AdminPackages() {
   }
 
   function exportExcel() {
-    const data = displayed.length > 0 ? displayed : (packages || []);
-    if (!data.length) return;
-    const rows = data.map((p: any) => ({
+    if (!packages || packages.length === 0) return;
+    let data = [...packages] as any[];
+    if (xlsxBatchId) data = data.filter((p) => String(p.batchId) === xlsxBatchId);
+    if (!data.length) {
+      toast({ variant: "destructive", title: "Tidak ada data", description: "Tidak ada paket untuk batch yang dipilih." });
+      return;
+    }
+    const batchInfo = selectedXlsxBatch
+      ? `${selectedXlsxBatch.namaKapal} (${selectedXlsxBatch.kotaAsal} → ${selectedXlsxBatch.tujuan})`
+      : "Semua Batch";
+
+    const rows = data.map((p: any, i: number) => ({
+      "No": i + 1,
       "Tanggal": formatDate(p.packageDate || p.createdAt),
       "No Resi": p.resiNumber || "",
       "No Paket": p.packageNumber || "",
       "Nama Konsumen": p.customerName || "",
-      "Jenis Jastip": p.serviceType || "",
+      "No HP": p.customerPhone || "",
+      "Batch": p.batchId ? (() => { const b = sortedBatches.find((b: any) => b.id === p.batchId); return b ? `${b.namaKapal} · ${b.kotaAsal}→${b.tujuan}` : String(p.batchId); })() : "",
+      "Jenis Jastip": serviceTypeLabel(p.serviceType),
       "Rute": p.deliveryRoute || "",
       "Jenis Barang": p.itemName || "",
       "Berat Real (Kg)": p.realWeight != null ? Number(p.realWeight) : "",
@@ -483,14 +505,45 @@ export default function AdminPackages() {
       "Berat Digunakan (Kg)": p.usedWeight != null ? Number(p.usedWeight) : "",
       "Total Berat (Kg)": p.totalWeight != null ? Number(p.totalWeight) : "",
       "Total Ongkir": p.totalShipping != null ? Number(p.totalShipping) : "",
-      "Status": p.status === "diserahkan" ? "Diserahkan" : "Pending",
       "Barcode": p.barcode || "",
+      "Sudah Generate Barcode": p.barcode ? "Ya" : "Belum",
+      "Sudah Diverifikasi": p.statusVerifikasi === "SUDAH_DIVERIFIKASI" ? "Ya" : "Belum",
+      "Sudah Diambil": p.status === "diserahkan" ? "Ya" : "Belum",
     }));
+
     const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Column widths
+    ws["!cols"] = [
+      { wch: 4 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 22 }, { wch: 14 },
+      { wch: 30 }, { wch: 16 }, { wch: 18 }, { wch: 20 },
+      { wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 18 },
+      { wch: 14 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+      { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 14 },
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Semua Paket");
-    const safeBatch = filterJenis !== "all" ? `-${filterJenis.replace(/\s+/g, "-").toLowerCase()}` : "";
+    XLSX.utils.book_append_sheet(wb, ws, "Paket");
+
+    // Info sheet
+    const infoRows = [
+      ["Laporan Paket — Jastip Anggun Jaya"],
+      ["Batch", batchInfo],
+      ["Tanggal Ekspor", new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })],
+      ["Total Paket", data.length],
+      ["Sudah Generate Barcode", data.filter((p: any) => !!p.barcode).length],
+      ["Sudah Diverifikasi", data.filter((p: any) => p.statusVerifikasi === "SUDAH_DIVERIFIKASI").length],
+      ["Sudah Diambil", data.filter((p: any) => p.status === "diserahkan").length],
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(infoRows);
+    wsInfo["!cols"] = [{ wch: 24 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, wsInfo, "Info");
+
+    const safeBatch = selectedXlsxBatch
+      ? `-${selectedXlsxBatch.namaKapal.replace(/\s+/g, "-").toLowerCase()}`
+      : "";
     XLSX.writeFile(wb, `laporan-paket${safeBatch}-${new Date().toISOString().split("T")[0]}.xlsx`);
+    setXlsxOpen(false);
   }
 
   const showGroupedFields = isGroupedExport();
@@ -517,7 +570,7 @@ export default function AdminPackages() {
           <Button
             variant="outline"
             size="sm"
-            onClick={exportExcel}
+            onClick={() => handleXlsxOpenChange(true)}
             disabled={!packages || packages.length === 0}
           >
             <Download className="w-4 h-4 mr-2" />
@@ -684,6 +737,85 @@ export default function AdminPackages() {
         </CardContent>
         <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
       </Card>
+
+      {/* Excel Export Dialog */}
+      <Dialog open={xlsxOpen} onOpenChange={handleXlsxOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5 text-primary" />
+              Export Excel
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Batch Pengiriman</Label>
+              <Select value={xlsxBatchId} onValueChange={setXlsxBatchId}>
+                <SelectTrigger className="w-full overflow-hidden">
+                  <span className="truncate block text-left">
+                    {xlsxBatchId
+                      ? (() => { const b = sortedBatches.find((b: any) => String(b.id) === xlsxBatchId); return b ? `${b.namaKapal} · ${b.kotaAsal} → ${b.tujuan}` : "Pilih batch"; })()
+                      : "Semua batch (tidak difilter)"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-h-[260px] overflow-y-auto max-w-[420px]">
+                  <SelectItem value="">Semua batch</SelectItem>
+                  {sortedBatches.map((b: any) => (
+                    <SelectItem key={b.id} value={String(b.id)} className="flex-col items-start">
+                      <div className="flex flex-col w-full">
+                        <span className="font-medium text-sm truncate max-w-[360px]">{b.namaKapal}</span>
+                        <span className="text-xs text-muted-foreground truncate max-w-[360px]">
+                          {b.kotaAsal} → {b.tujuan}
+                          {b.statusBatch === "OPEN" ? " · Aktif" : b.statusBatch === "CLOSED" ? " · Ditutup" : " · Arsip"}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Kosongkan untuk ekspor semua paket tanpa filter batch.</p>
+            </div>
+
+            {/* Preview counts */}
+            {packages && (
+              <div className="rounded-md bg-muted/40 border px-4 py-3 space-y-1.5 text-sm">
+                {(() => {
+                  const preview = xlsxBatchId
+                    ? packages.filter((p: any) => String(p.batchId) === xlsxBatchId)
+                    : packages;
+                  return (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total paket</span>
+                        <span className="font-semibold">{preview.length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sudah generate barcode</span>
+                        <span className="font-semibold">{preview.filter((p: any) => !!p.barcode).length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sudah diverifikasi</span>
+                        <span className="font-semibold">{preview.filter((p: any) => (p as any).statusVerifikasi === "SUDAH_DIVERIFIKASI").length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sudah diambil</span>
+                        <span className="font-semibold text-green-600">{preview.filter((p: any) => p.status === "diserahkan").length}</span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setXlsxOpen(false)}>Batal</Button>
+            <Button onClick={exportExcel} disabled={!packages || packages.length === 0}>
+              <Download className="w-4 h-4 mr-2" />
+              Download Excel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pdfOpen} onOpenChange={handlePdfOpenChange}>
         <DialogContent className="sm:max-w-md">
